@@ -1,0 +1,666 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// 用户与权限 (RBAC)
+// ============================================================
+
+// 用户表
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  avatar    String?
+  // 全局角色: admin / member
+  globalRole String  @default("member")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 关联
+  applications    Application[]
+  knowledgeBases  KnowledgeBase[]
+  skills          Skill[]
+  chatHistories   ChatHistory[]
+  mcpServers      McpServer[]
+  templates       WorkflowTemplate[]
+  ownedTeams      Team[]              @relation("TeamOwner")
+  teamMemberships TeamMember[]
+  apiKeys         ApiKey[]
+  tokenUsageRecords TokenUsageRecord[]
+
+
+  @@map("users")
+}
+
+// ============================================================
+// 应用管理
+// ============================================================
+
+// 应用表
+model Application {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  icon        String?
+  status      String   @default("draft") // draft, published, archived
+  shareLink   String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 外键
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 关联
+  workflows       Workflow[]
+  teamApplications TeamApplication[]
+  appShares       AppShare[]
+  apiKeys         ApiKey[]
+  tokenUsageRecords TokenUsageRecord[]
+
+
+  @@map("applications")
+}
+
+// ============================================================
+// 工作流
+// ============================================================
+
+// 工作流配置表
+model Workflow {
+  id          String @id @default(uuid())
+  name        String
+  description String?
+  
+  // 节点和边配置 (JSON存储)
+  nodes String
+  edges String
+  
+  // 变量定义
+  variables String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 外键
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  // 当前版本号（每次发布版本递增）
+  currentVersion Int @default(1)
+
+  // 关联
+  executions WorkflowExecution[]
+  versions   WorkflowVersion[]
+  tokenUsageRecords TokenUsageRecord[]
+  traces           WorkflowTrace[]
+
+
+  @@map("workflows")
+}
+
+// 工作流版本快照表
+// Phase 4.2: 版本管理 — 快照、回滚、差异对比
+model WorkflowVersion {
+  id String @id @default(uuid())
+
+  // 版本号（在同一工作流内自增）
+  version Int
+
+  // 版本名称/标签（如 "v1.0 发布版"）
+  label String?
+
+  // 版本说明（变更日志）
+  description String?
+
+  // 快照内容（JSON 存储，与 Workflow 一致）
+  nodes     String
+  edges     String
+  variables String?
+
+  // 创建者
+  createdBy String?
+
+  // 是否为发布版本（vs 自动保存的草稿快照）
+  isPublished Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  // 外键
+  workflowId String
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, version])
+  @@index([workflowId])
+  @@map("workflow_versions")
+}
+
+// 工作流模板表
+// Phase 4.3: 模板市场 — 模板 CRUD、分类搜索、一键导入
+model WorkflowTemplate {
+  id String @id @default(uuid())
+
+  // 模板基本信息
+  name        String
+  description String?
+  icon        String?           // 模板图标/封面 URL
+  screenshot  String?           // 工作流截图 URL
+
+  // 分类与标签
+  category String              // 分类: productivity, customer-service, content-creation, data-analysis, education, development, other
+  tags     String              // 标签列表 JSON 数组, 如 '["AI","客服","自动化"]'
+
+  // 快照内容（来自工作流的完整定义）
+  nodes     String
+  edges     String
+  variables String?
+
+  // 统计数据
+  downloadCount Int    @default(0)
+  rating        Float  @default(0)   // 平均评分 0-5
+  ratingCount   Int    @default(0)   // 评分人数
+
+  // 状态: draft(草稿), published(已发布), archived(已下架)
+  status String @default("draft")
+
+  // 是否为官方模板
+  isOfficial Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 外键 — 模板创建者
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([category])
+  @@index([status])
+  @@index([isOfficial])
+  @@index([downloadCount])
+  @@map("workflow_templates")
+}
+
+// 工作流执行记录表
+model WorkflowExecution {
+  id     String @id @default(uuid())
+  status String @default("pending") // pending, running, success, failed, cancelled
+  
+  // 输入参数
+  inputs String?
+  
+  // 执行上下文 (节点输出结果)
+  context String?
+  
+  // 执行日志
+  logs String?
+  
+  // 错误信息
+  error String?
+  
+  // 执行耗时(ms)
+  duration Int?
+  
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  // 外键
+  workflowId String
+  workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  // 关联
+  tokenUsageRecords TokenUsageRecord[]
+
+
+  @@map("workflow_executions")
+}
+
+// ============================================================
+// RAG 知识库
+// ============================================================
+
+// 知识库表
+model KnowledgeBase {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+  
+  // 嵌入模型配置
+  // Provider 类型: qwen / openai / ollama
+  embeddingProvider String @default("qwen")
+  embeddingModel    String @default("text-embedding-v3")
+  
+  // 向量维度 (根据模型不同而不同: text-embedding-v3=1024, text-embedding-v2=1536)
+  embeddingDimension Int @default(1024)
+
+  // 向量存储后端: pgvector / qdrant / milvus
+  vectorStore String @default("pgvector")
+  
+  // 分块配置
+  chunkSize     Int     @default(500)
+  chunkOverlap  Int     @default(50)
+  
+  // 检索配置
+  topK              Int     @default(5)
+  similarityThreshold Float @default(0.7)
+  
+  // 检索模式: vector(纯向量), keyword(纯关键词), hybrid(混合)
+  retrievalMode String @default("vector")
+  
+  // 混合检索配置 (Phase 2.2)
+  // 向量检索权重 (0-1, 关键词权重 = 1 - vectorWeight)
+  vectorWeight Float @default(0.7)
+  // RRF 融合常数 K (学术推荐值 60)
+  rrfK Int @default(60)
+  
+  // 重排序配置 (Phase 2.3)
+  // 是否启用重排序
+  rerankerEnabled Boolean @default(false)
+  // Reranker 类型: cohere / ollama / none
+  rerankerProvider String @default("none")
+  // Reranker 模型名称
+  rerankerModel String @default("")
+  // 重排序返回的文档数量 (null 表示不截断, 保持与 topK 一致)
+  rerankerTopN Int?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 外键
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 关联
+  documents Document[]
+
+  @@unique([name, userId])
+  @@map("knowledge_bases")
+}
+
+// 文档表
+model Document {
+  id              String  @id @default(uuid())
+  name            String
+  content         String
+  mimeType        String  @default("text/markdown")
+  size            Int
+  status          String  @default("completed")
+  error           String?
+  metadata        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  knowledgeBaseId String
+  knowledgeBase   KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  chunks          DocumentChunk[]
+
+  @@unique([name, knowledgeBaseId])
+  @@map("documents")
+}
+
+// 文档分块表 (向量存储 — 使用 pgvector)
+model DocumentChunk {
+  id      String @id @default(uuid())
+  content String
+  
+  // 向量数据 — 使用 pgvector 的 vector 类型存储
+  // 通过 Prisma Unsupported 类型映射，SQL 层面使用 vector(1024)
+  embedding Unsupported("vector(1024)")?
+  
+  // 分块位置
+  chunkIndex Int
+  startIndex Int
+  endIndex   Int
+  
+  // 元数据
+  metadata String?
+  
+  createdAt DateTime @default(now())
+
+  // 外键
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@map("document_chunks")
+}
+
+// ============================================================
+// 技能/工具
+// ============================================================
+
+// Skill工具表
+model Skill {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+  
+  // 工具类型: builtin(内置), custom(自定义)
+  type String @default("custom")
+  
+  // 内置工具类型标识
+  builtinType String?
+  
+  // 自定义工具配置
+  config String?
+  
+  // 输入参数定义
+  inputSchema String?
+  
+  // 输出格式定义
+  outputSchema String?
+  
+  // 是否启用
+  isActive Boolean @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 外键
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("skills")
+}
+
+// ============================================================
+// 对话与聊天
+// ============================================================
+
+// 对话历史表
+model ChatHistory {
+  id String @id @default(uuid())
+  
+  // 会话ID
+  sessionId String
+  
+  // 消息角色
+  role String // user, assistant, system
+  
+  // 消息内容
+  content String
+  
+  // 引用的知识库文档
+  references String?
+  
+  // 使用的工具
+  toolCalls String?
+  
+  // 元数据
+  metadata String?
+  
+  createdAt DateTime @default(now())
+
+  // 外键
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([userId])
+  @@map("chat_histories")
+}
+
+// ============================================================
+// MCP 服务器
+// ============================================================
+
+// MCP 服务器配置表
+model McpServer {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+
+  // 连接方式: stdio | sse
+  transportType String @default("stdio")
+
+  // stdio 模式: 启动命令 (如 "npx -y @modelcontextprotocol/server-filesystem /tmp")
+  command     String?
+  args        String?   // JSON 数组字符串, 如 '["--port","3001"]'
+  env         String?   // JSON 对象字符串, 额外环境变量
+
+  // SSE 模式: 服务器 URL
+  url         String?
+
+  // 状态
+  isActive    Boolean @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 外键
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([name, userId])
+  @@map("mcp_servers")
+}
+
+// ============================================================
+// 团队与权限 (RBAC)
+// ============================================================
+
+// 团队表
+model Team {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  avatar      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 外键
+  ownerId String
+  owner   User   @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // 关联
+  members         TeamMember[]
+  teamApplications TeamApplication[]
+
+  @@map("teams")
+}
+
+// 团队成员表
+model TeamMember {
+  id        String   @id @default(uuid())
+  role      String   @default("viewer") // owner, admin, editor, viewer
+  joinedAt  DateTime @default(now())
+
+  // 外键
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@map("team_members")
+}
+
+// 团队应用关联表
+model TeamApplication {
+  id         String   @id @default(uuid())
+  permission String   @default("can_view") // full_access, can_edit, can_view
+  addedAt    DateTime @default(now())
+
+  // 外键
+  teamId        String
+  team          Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, applicationId])
+  @@map("team_applications")
+}
+
+// API 密钥表
+model ApiKey {
+  id        String   @id @default(uuid())
+  name      String
+  keyHash   String   @unique
+  keyPrefix String   // sk-xxxx 前缀用于识别
+  scopes    String   // JSON 数组, 如 '["app:read","app:execute"]'
+  isActive  Boolean  @default(true)
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  createdAt  DateTime @default(now())
+
+  // 外键
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 可选: 关联到特定应用
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+
+  @@map("api_keys")
+}
+
+// 应用分享表
+model AppShare {
+  id            String   @id @default(uuid())
+  shareLink     String   @unique
+  isPublic      Boolean  @default(false)
+  accessCount   Int      @default(0)
+  embedConfig   String?  // JSON 配置
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // 外键
+  applicationId String  @unique
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@map("app_shares")
+}
+
+// ============================================================
+// Token 使用量与成本统计 (Phase 6.2)
+// ============================================================
+
+// Token 使用记录表
+model TokenUsageRecord {
+  id String @id @default(uuid())
+
+  // 关联资源
+  userId        String
+  applicationId String?
+  workflowId    String?
+  executionId   String?  // 关联工作流执行记录
+
+  // 模型信息
+  provider String  // openai, claude, qwen, gemini, ollama
+  model    String  // gpt-4o, qwen-max, etc.
+
+  // Token 使用量
+  promptTokens     Int
+  completionTokens Int
+  totalTokens      Int
+
+  // 成本 (USD)
+  cost Float @default(0)
+
+  // 调用类型: chat, embedding, agent
+  callType String @default("chat")
+
+  createdAt DateTime @default(now())
+
+  // 外键
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  workflow    Workflow?    @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+  execution   WorkflowExecution? @relation(fields: [executionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([applicationId])
+  @@index([model])
+  @@index([provider])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([applicationId, createdAt])
+  @@map("token_usage_records")
+}
+
+// ============================================================
+// 全链路 Trace
+// ============================================================
+
+// 工作流执行 Trace
+model WorkflowTrace {
+  id String @id @default(uuid())
+
+  // Trace 标识
+  traceId String @unique
+
+  // 关联资源
+  userId        String?
+  applicationId String?
+  workflowId    String
+  executionId   String?
+
+  // 执行信息
+  status    String  @default("running") // running, success, failed, cancelled
+  totalMs   Int?    // 总耗时
+  spanCount Int     @default(0)
+
+  // 元数据
+  inputs  String? // JSON
+  outputs String? // JSON
+  error   String?
+
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  // 外键
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  // 关联
+  spans SpanRecord[]
+
+  @@index([traceId])
+  @@index([workflowId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([status])
+  @@map("workflow_traces")
+}
+
+// Span 记录
+model SpanRecord {
+  id String @id @default(uuid())
+
+  // Span 标识
+  spanId String @unique
+  traceId String
+
+  // 父 Span
+  parentSpanId String?
+
+  // Span 信息
+  name     String // 节点名称/操作名称
+  kind     String @default("internal") // internal, client, server, producer, consumer
+  status   String @default("ok") // ok, error, timeout
+
+  // 时间
+  startTime DateTime
+  endTime   DateTime?
+  durationMs Int?
+
+  // 属性 (JSON)
+  attributes String?
+
+  // 事件 (JSON)
+  events String?
+
+  // 关联
+  trace WorkflowTrace @relation(fields: [traceId], references: [traceId], onDelete: Cascade)
+
+  @@index([traceId])
+  @@index([spanId])
+  @@index([parentSpanId])
+  @@index([startTime])
+  @@map("span_records")
+}

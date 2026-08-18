@@ -1,0 +1,106 @@
+.shared-app-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f0f0ff 0%, #f5f0ff 50%, #f0f5ff 100%);
+  display: flex;
+  flex-direction: column;
+}
+
+.shared-app-header {
+  padding: 16px 32px;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.shared-app-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  color: #7c3aed;
+}
+
+.shared-app-logo-text {
+  font-weight: 700;
+  font-size: 16px;
+  color: #1a1a2e;
+}
+
+.shared-app-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+}
+
+.shared-app-card {
+  width: 100%;
+  max-width: 640px;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(124, 58, 237, 0.08);
+  padding: 40px 32px;
+}
+
+.shared-app-card .ant-card-body {
+  padding: 0;
+}
+
+.shared-app-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.shared-app-icon-default {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shared-app-chat-container {
+  margin-top: 24px;
+  min-height: 200px;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.shared-app-chat-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  gap: 8px;
+}
+
+.shared-app-footer {
+  text-align: center;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.shared-app-loading {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f0f0ff 0%, #f5f0ff 50%, #f0f5ff 100%);
+}
+
+.shared-app-error {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f0f0ff 0%, #f5f0ff 50%, #f0f5ff 100%);
+}

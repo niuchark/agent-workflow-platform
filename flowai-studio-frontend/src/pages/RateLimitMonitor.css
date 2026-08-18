@@ -1,0 +1,134 @@
+.rate-limit-page {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.rate-limit-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.rate-limit-toolbar h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.rate-limit-section {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.rate-limit-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+/* 配额进度条 */
+.quota-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.quota-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.quota-label {
+  min-width: 160px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1a1a2e;
+}
+
+.quota-bar {
+  flex: 1;
+  height: 8px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.quota-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.quota-bar-fill.high { background: #10b981; }
+.quota-bar-fill.medium { background: #f59e0b; }
+.quota-bar-fill.low { background: #ef4444; }
+
+.quota-text {
+  min-width: 100px;
+  text-align: right;
+  font-size: 13px;
+  color: #8c8c8c;
+}
+
+/* 熔断器卡片 */
+.circuit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.circuit-card {
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 16px;
+  transition: box-shadow 0.2s;
+}
+
+.circuit-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.circuit-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.circuit-card-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: #1a1a2e;
+}
+
+.circuit-card-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.circuit-card-detail span {
+  font-size: 13px;
+  color: #666;
+}
+
+.circuit-card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.rate-limit-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+}

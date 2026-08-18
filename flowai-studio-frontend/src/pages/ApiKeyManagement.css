@@ -1,0 +1,121 @@
+.api-key-management-page {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.api-key-management-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.api-key-management-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.api-key-table {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.api-key-name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.api-key-name {
+  font-weight: 500;
+  color: #1a1a2e;
+}
+
+.api-key-prefix {
+  font-size: 12px;
+  color: #8c8c8c;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.api-key-scopes {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.api-key-created-modal .ant-modal-body {
+  padding: 24px;
+}
+
+.api-key-warning {
+  background: #fffbe6;
+  border: 1px solid #ffe58f;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.api-key-warning .anticon {
+  color: #faad14;
+  font-size: 18px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.api-key-warning-text {
+  font-size: 13px;
+  color: #595959;
+  line-height: 1.6;
+}
+
+.api-key-display {
+  background: #f5f5f5;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.api-key-display-label {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-bottom: 8px;
+}
+
+.api-key-display-value {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 14px;
+  color: #1a1a2e;
+  word-break: break-all;
+  background: #fff;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid #e8e8e8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.api-key-display-value .key-text {
+  flex: 1;
+  word-break: break-all;
+}
+
+.api-key-copy-btn {
+  flex-shrink: 0;
+}
+
+.api-key-empty-state {
+  text-align: center;
+  padding: 48px 0;
+  color: #8c8c8c;
+}

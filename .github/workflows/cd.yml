@@ -1,0 +1,84 @@
+# ============================================================
+# FlowAI Studio - CD Pipeline (自动部署)
+# ============================================================
+# 触发条件:
+#   - push to main: 仅验证 Docker build（不 push）
+#   - tag (v*): 构建 + 推送到 GHCR
+#
+# 竞品对标:
+# - Dify: GitHub Actions → Docker Hub → K8s
+# - n8n: GitHub Actions → npm publish + Docker Hub
+# ============================================================
+
+name: CD
+
+on:
+  # 暂时禁用 CD，后续按需启用
+  # push:
+  #   branches: [main]
+  #   tags: ['v*']
+  workflow_dispatch: {}
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE: ghcr.io/${{ github.repository }}/backend
+  FRONTEND_IMAGE: ghcr.io/${{ github.repository }}/frontend
+
+jobs:
+  # ============================================================
+  # 构建并推送 Docker 镜像
+  # ============================================================
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+
+    # 仅在 tag 推送时需要 packages: write 权限
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Container Registry
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.BACKEND_IMAGE }}
+            ${{ env.FRONTEND_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,prefix=
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # main 分支 push: 仅 build 验证（不 push 镜像）
+      # tag 推送: build + push 到 GHCR
+      - name: Build and push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./flowai-studio-backend
+          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          tags: ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./flowai-studio-frontend
+          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          tags: ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

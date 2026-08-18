@@ -1,0 +1,15 @@
+{
+  "name": "aiflow-studio-tooling",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "prepare": "husky",
+    "commitlint": "commitlint --edit",
+    "setup:hooks": "./scripts/setup-git-hooks.sh"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.0",
+    "@commitlint/config-conventional": "^19.8.0",
+    "husky": "^9.1.7"
+  }
+}

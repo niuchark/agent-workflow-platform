@@ -1,0 +1,28 @@
+.trace-list-page {
+  padding: 24px;
+}
+
+.trace-list-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.trace-list-toolbar h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.trace-list-toolbar-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.trace-list-loading {
+  display: flex;
+  justify-content: center;
+  padding: 80px 0;
+}
