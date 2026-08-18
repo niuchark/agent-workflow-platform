@@ -15,7 +15,6 @@ import {
   CodeOutlined,
 } from '@ant-design/icons'
 import request from '../utils/axios'
-import './McpManager.css'
 
 const { TextArea } = Input
 
@@ -364,7 +363,7 @@ const McpManager: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <ApiOutlined style={{ color: 'var(--c-accent)' }} />
             <span>{selectedServer?.name} — 工具列表</span>
-            <Tag color="purple">{tools.length} 个工具</Tag>
+            <Tag color="blue">{tools.length} 个工具</Tag>
           </div>
         }
         open={toolsPanelVisible}

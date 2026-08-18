@@ -9,7 +9,6 @@ import {
 } from '@ant-design/icons'
 import { useStore } from '../store'
 import { ApiKey, CreateApiKeyForm, API_KEY_SCOPE_OPTIONS } from '../types'
-import './ApiKeyManagement.css'
 
 const { Text, Paragraph } = Typography
 
@@ -93,7 +92,7 @@ const ApiKeyManagement: React.FC = () => {
       key: 'name',
       render: (name: string, record: ApiKey) => (
         <div className="apikey-name-cell">
-          <KeyOutlined style={{ color: record.isActive ? '#7c3aed' : '#8c8c8c' }} />
+          <KeyOutlined style={{ color: record.isActive ? '#0284c7' : '#8c8c8c' }} />
           <div className="apikey-name-info">
             <span className="apikey-name-text">{name}</span>
             <span className="apikey-prefix">{record.keyPrefix}…</span>
@@ -109,7 +108,7 @@ const ApiKeyManagement: React.FC = () => {
       render: (scopes: string[]) => (
         <Space wrap size={[4, 4]}>
           {scopes?.map((scope) => (
-            <Tag key={scope} color="purple" style={{ fontSize: 11 }}>
+            <Tag key={scope} color="blue" style={{ fontSize: 11 }}>
               {API_KEY_SCOPE_OPTIONS.find((o) => o.value === scope)?.label || scope}
             </Tag>
           ))}
@@ -180,7 +179,7 @@ const ApiKeyManagement: React.FC = () => {
 
       <div className="apikey-tip">
         <Alert
-          message="API 密钥用于外部程序访问 FlowAI Studio 的 API。创建后请妥善保管，密钥仅在创建时显示一次。"
+          message="API 密钥用于外部程序访问 Agent Flow Platform 的 API。创建后请妥善保管，密钥仅在创建时显示一次。"
           type="info"
           showIcon
           style={{ marginBottom: 16 }}

@@ -1,6 +1,6 @@
-# FlowAI Studio
+# Agent Flow Platform
 
-FlowAI Studio 是一个先进的全栈可视化 AI 应用低代码编排平台。它旨在降低 AI 应用开发的门槛，使开发者和业务人员能够通过直观的拖拽式交互，快速构建、测试和部署复杂的 AI 工作流。
+Agent Flow Platform 是一个先进的全栈可视化 AI 应用低代码编排平台。它旨在降低 AI 应用开发的门槛，使开发者和业务人员能够通过直观的拖拽式交互，快速构建、测试和部署复杂的 AI 工作流。
 
 ## 项目亮点
 
@@ -93,9 +93,9 @@ npm run dev
 
 ## 如何验证 RAG（最短路径）
 1. 使用默认账号登录。
-2. 打开「知识库管理」，确认存在「默认知识库」，并且里面有文档「FlowAI Studio 功能介绍.md」。
+2. 打开「知识库管理」，确认存在「默认知识库」，并且里面有文档「Agent Flow Platform 功能介绍.md」。
 3. 打开「调试中心」→「AI 聊天」，在"关联知识库"下拉框中选择「默认知识库」。
-4. 发送问题：`FlowAI Studio 有什么核心特性？`
+4. 发送问题：`Agent Flow Platform 有什么核心特性？`
 5. 观察返回结果下方的「参考文档」区域，应该能看到命中的文档片段与相似度。
 
 ## 验证 RAG（接口方式，可选）
@@ -113,7 +113,7 @@ curl -s http://localhost:3000/api/rag/knowledge-bases \
 curl -s -X POST http://localhost:3000/api/rag/retrieve \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer YOUR_TOKEN" \
-  -d '{"query":"FlowAI Studio 有什么核心特性","knowledgeBaseId":"KB_ID","topK":3}'
+  -d '{"query":"Agent Flow Platform 有什么核心特性","knowledgeBaseId":"KB_ID","topK":3}'
 ```
 
 ## 项目结构说明

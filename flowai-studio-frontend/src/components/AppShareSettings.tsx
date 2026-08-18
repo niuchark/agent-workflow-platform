@@ -119,7 +119,7 @@ const AppShareSettings: React.FC<AppShareSettingsProps> = ({ appId }) => {
       {!shareInfo ? (
         <Card className="share-card">
           <div style={{ textAlign: 'center', padding: '24px 0' }}>
-            <ShareAltOutlined style={{ fontSize: 48, color: '#7c3aed', marginBottom: 16 }} />
+            <ShareAltOutlined style={{ fontSize: 48, color: '#0284c7', marginBottom: 16 }} />
             <Title level={5}>分享此应用</Title>
             <Text type="secondary" style={{ display: 'block', marginBottom: 24 }}>
               生成分享链接，让其他人可以通过链接访问此应用

@@ -11,33 +11,34 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       locale={zhCN}
       theme={{
         token: {
-          colorPrimary: '#7c3aed',
-          colorLink: '#7c3aed',
+          colorPrimary: '#0284c7',
+          colorLink: '#0284c7',
           colorSuccess: '#059669',
           colorWarning: '#d97706',
           colorError: '#dc2626',
-          borderRadius: 8,
-          borderRadiusLG: 12,
+          borderRadius: 10,
+          borderRadiusLG: 16,
           borderRadiusSM: 6,
           fontFamily:
-            "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, 'Helvetica Neue', Arial, 'Noto Sans SC', sans-serif",
+            "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif",
           fontSize: 14,
           colorBgContainer: '#ffffff',
-          colorBgLayout: '#f7f8fa',
-          colorBorder: '#e8eaed',
-          colorBorderSecondary: '#f0f2f5',
-          colorText: '#1c2433',
-          colorTextSecondary: '#6b7a99',
-          colorTextTertiary: '#a0adc0',
+          colorBgLayout: '#f8fafc',
+          colorBorder: '#e2e8f0',
+          colorBorderSecondary: '#f1f5f9',
+          colorText: '#0f172a',
+          colorTextSecondary: '#475569',
+          colorTextTertiary: '#94a3b8',
           boxShadow:
-            '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
+            '0 1px 2px rgba(15,23,42,0.04), 0 1px 3px rgba(15,23,42,0.06)',
           boxShadowSecondary:
-            '0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04)',
+            '0 12px 30px -12px rgba(15,23,42,0.22)',
         },
         components: {
           Button: {
-            borderRadius: 8,
-            controlHeight: 36,
+            borderRadius: 10,
+            controlHeight: 38,
+            primaryShadow: 'none',
           },
           Input: {
             borderRadius: 8,
@@ -50,18 +51,20 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           },
           Table: {
             borderRadius: 0,
-            headerBg: '#f7f8fa',
+            headerBg: '#f8fafc',
+            headerColor: '#475569',
+            rowHoverBg: '#f8fafc',
           },
           Menu: {
-            itemBorderRadius: 8,
-            itemSelectedBg: '#f3effe',
-            itemSelectedColor: '#7c3aed',
-            itemHoverBg: '#f7f8fa',
-            itemHoverColor: '#1c2433',
-            itemActiveBg: '#f3effe',
+            itemBorderRadius: 12,
+            itemSelectedBg: '#e0f2fe',
+            itemSelectedColor: '#0369a1',
+            itemHoverBg: '#f1f5f9',
+            itemHoverColor: '#0f172a',
+            itemActiveBg: '#bae6fd',
           },
           Modal: {
-            borderRadius: 20,
+            borderRadius: 16,
           },
           Tag: {
             borderRadius: 999,

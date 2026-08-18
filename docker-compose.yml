@@ -1,5 +1,5 @@
 # ============================================================
-# FlowAI Studio - Docker Compose 一键部署
+# Agent Flow Platform - Docker Compose 一键部署
 # ============================================================
 # 用法:
 #   开发环境: docker-compose up -d

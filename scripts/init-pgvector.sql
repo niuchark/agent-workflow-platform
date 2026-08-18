@@ -1,4 +1,4 @@
--- FlowAI Studio — PostgreSQL 初始化脚本
+-- Agent Flow Platform — PostgreSQL 初始化脚本
 -- 自动启用 pgvector 扩展
 -- 此脚本通过 docker-entrypoint-initdb.d 自动执行
 

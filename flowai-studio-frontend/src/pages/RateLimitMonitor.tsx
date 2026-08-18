@@ -6,7 +6,6 @@ import {
   resetCircuitBreaker,
   CircuitBreakerStats,
 } from '../utils/rateLimitApi'
-import './RateLimitMonitor.css'
 
 const CIRCUIT_STATE_MAP: Record<string, { color: string; label: string }> = {
   closed: { color: 'green', label: '关闭（正常）' },

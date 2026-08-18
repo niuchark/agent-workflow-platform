@@ -19,7 +19,6 @@ import {
   ModelRankingItem,
 } from '../utils/tokenUsageApi'
 import { useStore } from '../store'
-import './CostStatistics.css'
 
 const { RangePicker } = DatePicker
 
@@ -134,7 +133,7 @@ const CostStatistics: React.FC = () => {
       dataIndex: 'model',
       key: 'model',
       render: (model: string, record: TokenUsageRecord) => (
-        <Tag color="purple">{record.provider}/{model}</Tag>
+        <Tag color="blue">{record.provider}/{model}</Tag>
       ),
     },
     {
@@ -219,7 +218,7 @@ const CostStatistics: React.FC = () => {
           <div className="cost-stat-cards">
             <div className="cost-stat-card">
               <div className="cost-stat-card-label">
-                <ThunderboltOutlined style={{ color: '#7c3aed' }} /> 总 Token 用量
+                <ThunderboltOutlined style={{ color: '#0284c7' }} /> 总 Token 用量
               </div>
               <div className="cost-stat-card-value token-value">
                 {summary ? formatNumber(summary.totalTokens) : '0'}
@@ -257,7 +256,7 @@ const CostStatistics: React.FC = () => {
 
           <div className="cost-charts-row">
             <div className="cost-chart-card">
-              <h3><FireOutlined style={{ color: '#7c3aed', marginRight: 8 }} />Token 用量趋势</h3>
+              <h3><FireOutlined style={{ color: '#0284c7', marginRight: 8 }} />Token 用量趋势</h3>
               <div className="cost-chart-container">
                 {trendData.length > 0 ? (
                   <Column
@@ -267,7 +266,7 @@ const CostStatistics: React.FC = () => {
                     colorField="type"
                     group
                     style={{ radius: { topLeft: 4, topRight: 4 } }}
-                    color={['#7c3aed', '#a78bfa']}
+                    color={['#0284c7', '#7dd3fc']}
                     axis={{
                       y: { title: 'Token 数量' },
                       x: { title: groupBy === 'day' ? '日期' : groupBy === 'week' ? '周' : '月份' },

@@ -1,7 +1,7 @@
 {
   "name": "flowai-studio-backend",
   "version": "1.0.0",
-  "description": "FlowAI Studio - 全栈可视化AI应用低代码编排平台后端",
+  "description": "Agent Flow Platform - 全栈可视化AI应用低代码编排平台后端",
   "author": "FlowAI Team",
   "private": true,
   "license": "MIT",

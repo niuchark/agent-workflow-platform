@@ -357,14 +357,14 @@ export interface TemplateCategoryCount {
 }
 
 /** 模板分类选项 */
-export const TEMPLATE_CATEGORY_OPTIONS: { label: string; value: TemplateCategory; icon: string }[] = [
-  { label: '生产力', value: 'productivity', icon: '🚀' },
-  { label: '客服', value: 'customer-service', icon: '💬' },
-  { label: '内容创作', value: 'content-creation', icon: '✍️' },
-  { label: '数据分析', value: 'data-analysis', icon: '📊' },
-  { label: '教育', value: 'education', icon: '🎓' },
-  { label: '开发', value: 'development', icon: '💻' },
-  { label: '其他', value: 'other', icon: '📦' },
+export const TEMPLATE_CATEGORY_OPTIONS: { label: string; value: TemplateCategory }[] = [
+  { label: '生产力', value: 'productivity' },
+  { label: '客服', value: 'customer-service' },
+  { label: '内容创作', value: 'content-creation' },
+  { label: '数据分析', value: 'data-analysis' },
+  { label: '教育', value: 'education' },
+  { label: '开发', value: 'development' },
+  { label: '其他', value: 'other' },
 ]
 
 // ============================================================

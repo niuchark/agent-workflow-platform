@@ -13,7 +13,6 @@ import {
   CloseCircleOutlined,
 } from '@ant-design/icons'
 import { useStore } from '../store'
-import './Skill.css'
 
 const { TextArea } = Input
 

@@ -3,7 +3,7 @@ import { Form, Input, Button, Alert, Checkbox } from 'antd'
 import { LockOutlined, UserOutlined } from '@ant-design/icons'
 import { useNavigate, Link } from 'react-router-dom'
 import { useStore } from '../store'
-import './Auth.css'
+import BrandLogo from '../components/BrandLogo'
 
 const Login: React.FC = () => {
   const navigate = useNavigate()
@@ -49,8 +49,8 @@ const Login: React.FC = () => {
       {/* Left brand panel */}
       <div className="auth-brand">
         <div className="auth-brand-content">
-          <div className="auth-brand-logo">✦</div>
-          <h1 className="auth-brand-title">FlowAI Studio</h1>
+          <div className="auth-brand-logo"><BrandLogo title="Agent Flow Platform" /></div>
+          <h1 className="auth-brand-title">Agent Flow Platform</h1>
           <p className="auth-brand-desc">
             可视化 AI 应用低代码编排平台
             <br />
@@ -58,7 +58,7 @@ const Login: React.FC = () => {
           </p>
         </div>
         <div className="auth-brand-footer">
-          <span>© 2024 FlowAI Studio</span>
+          <span>© 2026 Agent Flow Platform</span>
         </div>
       </div>
 

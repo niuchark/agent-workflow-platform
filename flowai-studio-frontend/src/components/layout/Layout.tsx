@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Layout as AntLayout, Menu, Button, Avatar, Dropdown, Typography } from 'antd'
+import { useEffect, useMemo, useState } from 'react'
+import { Layout as AntLayout, Menu, Button, Avatar, Dropdown, Typography, Grid } from 'antd'
 import { useLocation, useNavigate, Outlet } from 'react-router-dom'
 import {
   MenuFoldOutlined,
@@ -12,7 +12,6 @@ import {
   ApiOutlined,
   BugOutlined,
   ShopOutlined,
-  RadarChartOutlined,
   ThunderboltOutlined,
   CaretDownOutlined,
   TeamOutlined,
@@ -22,10 +21,11 @@ import {
   NodeIndexOutlined,
 } from '@ant-design/icons'
 import { useStore } from '../../store'
-import './Layout.css'
+import BrandLogo from '../BrandLogo'
 
 const { Header, Sider, Content } = AntLayout
 const { Title } = Typography
+const { useBreakpoint } = Grid
 
 const routeMeta: Record<string, { title: string }> = {
   '/apps': { title: '工作台' },
@@ -45,8 +45,14 @@ const routeMeta: Record<string, { title: string }> = {
 const Layout: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
+  const screens = useBreakpoint()
+  const isMobile = screens.lg === false
   const { globalConfig, toggleSidebar, user, logout } = useStore()
   const [collapsed, setCollapsed] = useState(globalConfig.sidebarCollapsed)
+
+  useEffect(() => {
+    if (isMobile) setCollapsed(true)
+  }, [isMobile])
 
   const handleToggle = () => {
     setCollapsed(!collapsed)
@@ -77,22 +83,46 @@ const Layout: React.FC = () => {
     if (key === 'logout') { logout(); navigate('/login') }
   }
 
-  const handleMenuClick = ({ key }: { key: string }) => { navigate(key) }
+  const handleMenuClick = ({ key }: { key: string }) => {
+    navigate(key)
+    if (isMobile) setCollapsed(true)
+  }
 
   const selectedKey = '/' + (location.pathname.split('/')[1] || 'apps')
   const pageMeta = useMemo(() => routeMeta[selectedKey] || routeMeta['/apps'], [selectedKey])
+  const isEditorRoute = /^\/apps\/[^/]+\/editor\/?$/.test(location.pathname)
 
   return (
     <AntLayout className="layout-container">
-      <Sider trigger={null} collapsible collapsed={collapsed} width={220} collapsedWidth={64} className="sidebar">
+      <a href="#main-content" className="skip-link">跳转到主要内容</a>
+      {isMobile && !collapsed && (
+        <button type="button" className="sidebar-scrim" onClick={handleToggle} aria-label="关闭导航菜单" />
+      )}
+      <Sider
+        trigger={null}
+        collapsible
+        collapsed={collapsed}
+        width={220}
+        collapsedWidth={isMobile ? 0 : 64}
+        className="sidebar"
+      >
         <div className="sidebar-shell">
           <div className="logo">
-            <div className="logo-mark"><RadarChartOutlined /></div>
+            <div className="logo-mark"><BrandLogo title="Agent Flow Platform" /></div>
             {!collapsed && (
               <div className="logo-copy">
-                <h1 className="logo-text">FlowAI Studio</h1>
-                <span>AI Workflow Builder</span>
+                <h1 className="logo-text">Agent Flow Platform</h1>
+                <span>Agent workflow builder</span>
               </div>
+            )}
+            {isMobile && !collapsed && (
+              <Button
+                type="text"
+                icon={<MenuFoldOutlined />}
+                className="sidebar-mobile-close"
+                onClick={handleToggle}
+                aria-label="关闭导航菜单"
+              />
             )}
           </div>
           {!collapsed && <div className="sidebar-section-label">Navigation</div>}
@@ -101,7 +131,7 @@ const Layout: React.FC = () => {
             <div className="sidebar-footer-card">
               <div className="sidebar-footer-icon"><ThunderboltOutlined /></div>
               <div>
-                <strong>FlowAI Studio</strong>
+                <strong>Agent Flow Platform</strong>
                 <p>用 AI 工作流自动化你的业务流程。</p>
               </div>
             </div>
@@ -111,22 +141,29 @@ const Layout: React.FC = () => {
       <AntLayout className="layout-main">
         <Header className="header">
           <div className="header-left">
-            <Button type="text" icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={handleToggle} className="trigger" />
+            <Button
+              type="text"
+              icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+              onClick={handleToggle}
+              className="trigger"
+              aria-label={collapsed ? '展开导航菜单' : '收起导航菜单'}
+              aria-expanded={!collapsed}
+            />
             <div className="header-copy"><Title level={3}>{pageMeta.title}</Title></div>
           </div>
           <div className="header-right">
             <div className="header-online-dot"><span className="online-dot" /><span className="online-text">在线</span></div>
             <Dropdown menu={{ items: userMenu, onClick: handleUserMenuClick }} trigger={['click']} placement="bottomRight">
-              <div className="profile-chip">
-                <Avatar size={26} icon={<UserOutlined />} style={{ background: 'linear-gradient(135deg, #7c3aed, #a855f7)', flexShrink: 0 }} />
+              <button type="button" className="profile-chip" aria-label="打开用户菜单">
+                <Avatar size={26} icon={<UserOutlined />} className="!shrink-0 !bg-brand-100 !text-brand-700" />
                 <div className="profile-copy"><span className="username">{user?.username || '用户'}</span></div>
                 <CaretDownOutlined className="profile-caret" />
-              </div>
+              </button>
             </Dropdown>
           </div>
         </Header>
-        <Content className="content">
-          <div className="content-container"><Outlet /></div>
+        <Content id="main-content" className={`content${isEditorRoute ? ' content--editor' : ''}`} tabIndex={-1}>
+          <div className={`content-container${isEditorRoute ? ' content-container--editor' : ''}`}><Outlet /></div>
         </Content>
       </AntLayout>
     </AntLayout>

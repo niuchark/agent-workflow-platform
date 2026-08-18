@@ -1,5 +1,5 @@
 # ============================================================
-# FlowAI Studio Backend - Multi-stage Docker Build
+# Agent Flow Platform Backend - Multi-stage Docker Build
 # ============================================================
 # Stage 1: Builder - 安装依赖 + 编译
 # Stage 2: Runner - 精简运行镜像

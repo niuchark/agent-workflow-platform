@@ -5,7 +5,7 @@ import BaseNode from './BaseNode';
 
 const StartNode = ({ id, data }: { id: string; data: any }) => {
   return (
-    <BaseNode id={id} label={data.label || '开始'} icon={<PlayCircleOutlined />} color="#7c3aed">
+    <BaseNode id={id} label={data.label || '开始'} icon={<PlayCircleOutlined />} color="#0284c7">
       <Handle type="source" position={Position.Right} />
     </BaseNode>
   );

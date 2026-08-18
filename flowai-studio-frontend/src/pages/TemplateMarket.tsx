@@ -13,12 +13,29 @@ import {
   CheckCircleOutlined,
   RocketOutlined,
   CrownOutlined,
+  MessageOutlined,
+  EditOutlined,
+  BarChartOutlined,
+  ReadOutlined,
+  CodeOutlined,
 } from '@ant-design/icons'
 import { useStore } from '../store'
 import { TemplateCategory, TemplateSort, TEMPLATE_CATEGORY_OPTIONS } from '../types'
-import './TemplateMarket.css'
 
 const categoryMap = Object.fromEntries(TEMPLATE_CATEGORY_OPTIONS.map(c => [c.value, c]))
+const categoryIconMap = {
+  productivity: <RocketOutlined />,
+  'customer-service': <MessageOutlined />,
+  'content-creation': <EditOutlined />,
+  'data-analysis': <BarChartOutlined />,
+  education: <ReadOutlined />,
+  development: <CodeOutlined />,
+  other: <AppstoreOutlined />,
+}
+
+const getCategoryIcon = (category?: TemplateCategory) => (
+  category ? categoryIconMap[category] : <AppstoreOutlined />
+)
 
 const TemplateMarket: React.FC = () => {
   const {
@@ -216,7 +233,7 @@ const TemplateMarket: React.FC = () => {
         >
           {TEMPLATE_CATEGORY_OPTIONS.map(opt => (
             <Select.Option key={opt.value} value={opt.value}>
-              {opt.icon} {opt.label}
+              {getCategoryIcon(opt.value)} {opt.label}
             </Select.Option>
           ))}
         </Select>
@@ -247,7 +264,7 @@ const TemplateMarket: React.FC = () => {
               className={`template-category-tab ${category === cat.category ? 'active' : ''}`}
               onClick={() => handleCategoryChange(cat.category)}
             >
-              {meta?.icon || '📦'} {meta?.label || cat.category}
+              {getCategoryIcon(cat.category)} {meta?.label || cat.category}
               <span className="template-category-count">{cat.count}</span>
             </button>
           )
@@ -275,7 +292,7 @@ const TemplateMarket: React.FC = () => {
                       ) : (
                         <div className="template-card-cover-placeholder">
                           <span className="template-card-cover-icon">
-                            {categoryMap[template.category]?.icon || '📦'}
+                            {getCategoryIcon(template.category)}
                           </span>
                         </div>
                       )}
@@ -388,7 +405,7 @@ const TemplateMarket: React.FC = () => {
             >
               {(Array.isArray(apps) ? apps : []).map((app: any) => (
                 <Select.Option key={app.id} value={app.id}>
-                  {app.icon || '📋'} {app.name}
+                  {app.icon || <AppstoreOutlined />} {app.name}
                 </Select.Option>
               ))}
             </Select>
@@ -430,7 +447,7 @@ const TemplateMarket: React.FC = () => {
           <div className="template-detail">
             <div className="template-detail-header">
               <span className="template-detail-icon">
-                {detailTemplate.icon || categoryMap[detailTemplate.category]?.icon || '📦'}
+                {detailTemplate.icon || getCategoryIcon(detailTemplate.category)}
               </span>
               <div>
                 <h3>{detailTemplate.name}</h3>
@@ -450,7 +467,7 @@ const TemplateMarket: React.FC = () => {
             </div>
             <div className="template-detail-section">
               <h4>分类</h4>
-              <Tag>{categoryMap[detailTemplate.category]?.icon} {categoryMap[detailTemplate.category]?.label || detailTemplate.category}</Tag>
+              <Tag>{getCategoryIcon(detailTemplate.category)} {categoryMap[detailTemplate.category]?.label || detailTemplate.category}</Tag>
             </div>
             {detailTemplate.tags?.length > 0 && (
               <div className="template-detail-section">

@@ -32,7 +32,7 @@ async function main() {
     update: {},
     create: {
       name: '默认知识库',
-      description: '系统自动创建的默认知识库，包含 FlowAI Studio 的功能介绍。',
+      description: '系统自动创建的默认知识库，包含 Agent Flow Platform 的功能介绍。',
       embeddingModel: 'text-embedding-v3',
       embeddingDimension: 1024,
       chunkSize: 500,
@@ -45,7 +45,7 @@ async function main() {
 
   // 3. 为默认知识库创建一篇文档
   const docContent = `
-FlowAI Studio 是一个先进的全栈可视化 AI 应用低代码编排平台。它旨在降低 AI 应用开发的门槛，使开发者和业务人员能够通过直观的拖拽式交互，快速构建、测试和部署复杂的 AI 工作流。
+Agent Flow Platform 是一个先进的全栈可视化 AI 应用低代码编排平台。它旨在降低 AI 应用开发的门槛，使开发者和业务人员能够通过直观的拖拽式交互，快速构建、测试和部署复杂的 AI 工作流。
 
 核心特性包括：
 - 深度可视化的工作流编排：基于 React Flow 构建，支持节点的自由拖拽、缩放及自动布局。
@@ -60,7 +60,7 @@ FlowAI Studio 是一个先进的全栈可视化 AI 应用低代码编排平台�
 - 向量存储: pgvector (PostgreSQL 原生向量扩展)
 - AI: 通义千问 API (Qwen)
   `;
-  const docName = 'FlowAI Studio 功能介绍.md';
+  const docName = 'Agent Flow Platform 功能介绍.md';
 
   const document = await prisma.document.upsert({
     where: { name_knowledgeBaseId: { name: docName, knowledgeBaseId: defaultKb.id } },
@@ -155,7 +155,7 @@ FlowAI Studio 是一个先进的全栈可视化 AI 应用低代码编排平台�
         variables: [
           {
             key: 'question',
-            value: 'FlowAI Studio 有什么核心特性？',
+            value: 'Agent Flow Platform 有什么核心特性？',
           },
         ],
       },

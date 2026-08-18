@@ -289,7 +289,7 @@ export class WorkflowDslService {
         name,
         ...(description && { description }),
         exportedAt: new Date().toISOString(),
-        engine: 'FlowAI Studio',
+        engine: 'Agent Flow Platform',
       },
       spec: {
         nodes: cleanNodes,
@@ -345,7 +345,7 @@ export class WorkflowDslService {
       throw new BadRequestException(
         `Unsupported DSL version: ${version}. ` +
         `This engine supports versions: ${this.SUPPORTED_VERSIONS.join(', ')}. ` +
-        `Please upgrade your FlowAI Studio or use a compatible DSL version.`,
+        `Please upgrade your Agent Flow Platform or use a compatible DSL version.`,
       );
     }
   }

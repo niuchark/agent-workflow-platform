@@ -21,7 +21,6 @@ import NodePanel from '../components/workflow/NodePanel'
 import ConfigPanel from '../components/workflow/ConfigPanel'
 import RunPanel from '../components/workflow/RunPanel'
 import AppShareSettings from '../components/AppShareSettings'
-import './AppEditor.css'
 
 type RightPanel = 'config' | 'debug' | 'share'
 

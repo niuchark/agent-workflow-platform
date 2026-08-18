@@ -1,10 +1,21 @@
 import React, { useEffect, useState } from 'react'
 import { Form, Input, Select, Slider, InputNumber, Switch, Divider, Card, Button, Space, Tag, Empty, Typography } from 'antd'
-import { PlusOutlined, DeleteOutlined, RobotOutlined } from '@ant-design/icons'
+import { PlusOutlined, DeleteOutlined, RobotOutlined, SettingOutlined } from '@ant-design/icons'
 import { useStore } from '../../store'
 
 const { Option, OptGroup } = Select
 const { Text } = Typography
+
+const NODE_TYPE_META: Record<string, { label: string; description: string }> = {
+  start: { label: '开始节点', description: '定义工作流的起点和初始输入。' },
+  userInput: { label: '用户输入', description: '收集用户问题或变量，作为后续节点输入。' },
+  llm: { label: 'LLM 节点', description: '配置模型、提示词和生成参数。' },
+  agent: { label: 'Agent 节点', description: '管理智能体模式、工具、记忆和执行策略。' },
+  rag: { label: 'RAG 节点', description: '设置知识库检索范围和召回策略。' },
+  skill: { label: '工具节点', description: '调用内置或自定义工具并传入参数。' },
+  condition: { label: '条件节点', description: '根据判断逻辑决定工作流分支走向。' },
+  output: { label: '输出节点', description: '组织最终返回给用户的结果。' },
+}
 
 const MODEL_GROUPS = [
   {
@@ -13,7 +24,7 @@ const MODEL_GROUPS = [
     models: [
       { id: 'qwen-turbo', name: 'Qwen Turbo', tag: '快速', tagColor: 'green' },
       { id: 'qwen-plus', name: 'Qwen Plus', tag: '高质量', tagColor: 'blue' },
-      { id: 'qwen-max', name: 'Qwen Max', tag: '最强', tagColor: 'purple' },
+      { id: 'qwen-max', name: 'Qwen Max', tag: '最强', tagColor: 'blue' },
       { id: 'qwen-long', name: 'Qwen Long', tag: '长文本', tagColor: 'orange' },
     ],
   },
@@ -23,7 +34,7 @@ const MODEL_GROUPS = [
     models: [
       { id: 'gpt-4o', name: 'GPT-4o', tag: '推荐', tagColor: 'gold' },
       { id: 'gpt-4o-mini', name: 'GPT-4o Mini', tag: '性价比', tagColor: 'green' },
-      { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', tag: '强大', tagColor: 'purple' },
+      { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', tag: '强大', tagColor: 'blue' },
       { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', tag: '经济', tagColor: 'default' },
     ],
   },
@@ -32,7 +43,7 @@ const MODEL_GROUPS = [
     label: '🤖 Anthropic Claude',
     models: [
       { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', tag: '推荐', tagColor: 'gold' },
-      { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus', tag: '最强', tagColor: 'purple' },
+      { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus', tag: '最强', tagColor: 'blue' },
       { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku', tag: '快速', tagColor: 'green' },
     ],
   },
@@ -107,6 +118,11 @@ const ConfigPanel: React.FC = () => {
     }
   }
 
+  const selectedNodeMeta = selectedNode ? NODE_TYPE_META[selectedNode.type] : null
+  const selectedNodeName = selectedNode
+    ? ((selectedNode.data as any)?.label || selectedNodeMeta?.label || '未命名节点')
+    : ''
+
   const addWorker = () => {
     const newWorker = {
       id: `worker_${Date.now()}`,
@@ -160,7 +176,7 @@ const ConfigPanel: React.FC = () => {
               <Space><Tag color="blue">单智能体</Tag><Text type="secondary" style={{ fontSize: 12 }}>一个 Agent 完成所有任务</Text></Space>
             </Option>
             <Option value="supervisor">
-              <Space><Tag color="purple">多智能体</Tag><Text type="secondary" style={{ fontSize: 12 }}>Supervisor 协调多个 Worker</Text></Space>
+              <Space><Tag color="blue">多智能体</Tag><Text type="secondary" style={{ fontSize: 12 }}>Supervisor 协调多个 Worker</Text></Space>
             </Option>
           </Select>
         </Form.Item>
@@ -231,7 +247,7 @@ const ConfigPanel: React.FC = () => {
                 size="small"
                 title={
                   <Space>
-                    <Tag color="purple">Worker {index + 1}</Tag>
+                    <Tag color="blue">Worker {index + 1}</Tag>
                     <Input value={worker.name} onChange={(e) => updateWorker(index, 'name', e.target.value)} placeholder="Worker 名称" style={{ width: 120 }} size="small" />
                   </Space>
                 }
@@ -257,17 +273,15 @@ const ConfigPanel: React.FC = () => {
   }
 
   const renderConfigForm = () => {
-    if (!selectedNode) {
-      return <Empty description="选择节点以编辑配置" className="config-panel-empty" />
-    }
+      const commonFields = (
+        <Form.Item name="label" label="节点名称">
+          <Input placeholder="输入节点名称" />
+        </Form.Item>
+      )
 
-    const commonFields = (
-      <Form.Item name="label" label="节点名称">
-        <Input placeholder="输入节点名称" />
-      </Form.Item>
-    )
+      if (!selectedNode) return null
 
-    switch (selectedNode.type) {
+      switch (selectedNode.type) {
       case 'start':
         return <>{commonFields}<Text type="secondary">此节点为工作流的起点。</Text></>
       case 'userInput':
@@ -326,12 +340,32 @@ const ConfigPanel: React.FC = () => {
   return (
     <div className="config-panel">
       <div className="config-panel-header">
-        <h3>{selectedNode ? '节点配置' : '配置'}</h3>
+        <div className="config-panel-header-top">
+          <span className="config-panel-header-kicker">Workflow editor</span>
+          {selectedNodeMeta && (
+            <span className="config-panel-header-badge">{selectedNodeMeta.label}</span>
+          )}
+        </div>
+        <h3>{selectedNode ? selectedNodeName : '配置面板'}</h3>
+        <p className="config-panel-header-description">
+          {selectedNodeMeta?.description || '从画布中选择节点后，即可在这里编辑详细配置。'}
+        </p>
       </div>
       <div className="config-panel-body">
-        <Form form={form} layout="vertical" onValuesChange={handleValuesChange}>
-          {renderConfigForm()}
-        </Form>
+        {!selectedNode ? (
+          <div className="config-panel-empty">
+            <div className="config-panel-empty-icon">
+              <SettingOutlined />
+            </div>
+            <h4>选择一个节点开始编辑</h4>
+            <p>点击画布中的任意节点，这里会显示对应参数、提示词和运行选项。</p>
+            <div className="config-panel-empty-tip">修改会实时同步到当前工作流</div>
+          </div>
+        ) : (
+          <Form form={form} layout="vertical" onValuesChange={handleValuesChange}>
+            {renderConfigForm()}
+          </Form>
+        )}
       </div>
     </div>
   )

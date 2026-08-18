@@ -18,7 +18,6 @@ import ReactMarkdown from 'react-markdown'
 import { useStore } from '../store'
 import request from '../utils/axios'
 import { createParser } from 'eventsource-parser'
-import './Debug.css'
 
 const { Text, Paragraph } = Typography
 const { Option } = Select
@@ -507,7 +506,6 @@ const Debug: React.FC = () => {
               value={selectedKbId || undefined}
               onChange={setSelectedKbId}
               style={{ width: 200 }}
-              size="small"
             >
               {Array.isArray(knowledgeBases) && knowledgeBases.map(kb => (
                 <Option key={kb.id} value={kb.id}>{kb.name}</Option>

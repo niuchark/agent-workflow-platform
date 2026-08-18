@@ -21,7 +21,6 @@ import { useStore } from '../store'
 import { Application } from '../types'
 import { DEMO_APP_NAME, DEMO_NODES, DEMO_EDGES } from '../constants/demoWorkflow'
 import { importWorkflowDsl, validateWorkflowDsl } from '../utils/workflowDslApi'
-import './AppList.css'
 
 const { Search } = Input
 

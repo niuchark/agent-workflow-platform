@@ -5,7 +5,7 @@ import BaseNode from './BaseNode';
 
 const LLMNode = ({ id, data }: { id: string; data: any }) => {
   return (
-    <BaseNode id={id} label={data.label || '大语言模型'} icon={<RobotOutlined />} color="#7c3aed" width={240}>
+    <BaseNode id={id} label={data.label || '大语言模型'} icon={<RobotOutlined />} color="#0284c7" width={240}>
       <Handle type="source" position={Position.Right} />
       <Handle type="target" position={Position.Left} />
     </BaseNode>

@@ -1,5 +1,5 @@
 # ============================================================
-# FlowAI Studio Frontend - Multi-stage Docker Build
+# Agent Flow Platform Frontend - Multi-stage Docker Build
 # ============================================================
 # Stage 1: Builder - npm install + Vite build
 # Stage 2: Nginx 静态资源服务

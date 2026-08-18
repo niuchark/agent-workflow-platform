@@ -11,7 +11,6 @@ import {
   MinusCircleOutlined,
 } from '@ant-design/icons'
 import { useStore } from '../../store'
-import './RunPanel.css'
 
 const { TextArea } = Input
 

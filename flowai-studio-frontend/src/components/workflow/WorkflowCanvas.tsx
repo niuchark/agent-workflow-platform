@@ -16,7 +16,6 @@ import ConditionNode from './nodes/ConditionNode'
 import OutputNode from './nodes/OutputNode'
 import AgentNode from './nodes/AgentNode'
 import { NodeType, WorkflowNode } from '../../types'
-import './WorkflowCanvas.css'
 
 // 自定义节点类型
 const nodeTypes = {

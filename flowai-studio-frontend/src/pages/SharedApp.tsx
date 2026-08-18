@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Spin, Result, Button, Typography, Card } from 'antd'
-import { RadarChartOutlined, ArrowLeftOutlined } from '@ant-design/icons'
 import * as shareApi from '../utils/teamApi'
-import './SharedApp.css'
+import BrandLogo from '../components/BrandLogo'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -69,8 +68,8 @@ const SharedApp: React.FC = () => {
     <div className="shared-app-page">
       <div className="shared-app-header">
         <div className="shared-app-logo">
-          <RadarChartOutlined />
-          <span className="shared-app-logo-text">FlowAI Studio</span>
+          <BrandLogo title="Agent Flow Platform" />
+          <span className="shared-app-logo-text">Agent Flow Platform</span>
         </div>
       </div>
       <div className="shared-app-content">
@@ -80,7 +79,7 @@ const SharedApp: React.FC = () => {
               <img src={appData.icon} alt="" style={{ width: 48, height: 48 }} />
             ) : (
               <div className="shared-app-icon-default">
-                <RadarChartOutlined style={{ fontSize: 32, color: '#7c3aed' }} />
+                <BrandLogo title="Agent Flow Platform" />
               </div>
             )}
           </div>
@@ -88,7 +87,7 @@ const SharedApp: React.FC = () => {
             {appData?.name || '分享的应用'}
           </Title>
           <Paragraph type="secondary" style={{ textAlign: 'center' }}>
-            {appData?.description || '由 FlowAI Studio 创建的 AI 应用'}
+            {appData?.description || '由 Agent Flow Platform 创建的 AI 应用'}
           </Paragraph>
 
           <div className="shared-app-chat-container">
@@ -102,7 +101,7 @@ const SharedApp: React.FC = () => {
 
           <div className="shared-app-footer">
             <Text type="secondary" style={{ fontSize: 12 }}>
-              Powered by FlowAI Studio
+              Powered by Agent Flow Platform
             </Text>
           </div>
         </Card>

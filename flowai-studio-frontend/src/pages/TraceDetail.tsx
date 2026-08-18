@@ -7,7 +7,6 @@ import {
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { getTraceDetail, TraceDetail as TraceDetailType, SpanRecord } from '../utils/traceApi'
-import './TraceDetail.css'
 
 const STATUS_MAP: Record<string, { color: string; icon: React.ReactNode; label: string }> = {
   running: { color: 'processing', icon: <ClockCircleOutlined />, label: '运行中' },
@@ -185,7 +184,7 @@ const TraceDetailPage: React.FC = () => {
         <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/trace-list')}>
           返回列表
         </Button>
-        <h2 style={{ margin: '0 16px', fontSize: 18 }}>
+        <h2 className="trace-detail-title">
           追踪详情
           <Tag color={traceStatus.color} icon={traceStatus.icon} style={{ marginLeft: 12 }}>
             {traceStatus.label}

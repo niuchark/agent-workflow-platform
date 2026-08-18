@@ -11,7 +11,6 @@ import {
   getSlowTraces, getTraceStats,
   SlowTrace, TraceStats,
 } from '../utils/traceApi'
-import './TraceList.css'
 
 const STATUS_MAP: Record<string, { color: string; icon: React.ReactNode; label: string }> = {
   running: { color: 'processing', icon: <ClockCircleOutlined />, label: '运行中' },
