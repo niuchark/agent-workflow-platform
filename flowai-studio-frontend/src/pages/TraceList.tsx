@@ -9,7 +9,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import {
   getSlowTraces, getTraceStats,
-  TraceListItem, SlowTrace, TraceStats,
+  SlowTrace, TraceStats,
 } from '../utils/traceApi'
 import './TraceList.css'
 
@@ -38,6 +38,7 @@ const TraceList: React.FC = () => {
   const [slowTraces, setSlowTraces] = useState<SlowTrace[]>([])
   const [stats, setStats] = useState<TraceStats | null>(null)
   const [workflowIdFilter, setWorkflowIdFilter] = useState('')
+  const safeSlowTraces = Array.isArray(slowTraces) ? slowTraces : []
 
   const loadData = async () => {
     setLoading(true)
@@ -199,7 +200,7 @@ const TraceList: React.FC = () => {
           <Card title="追踪列表（按耗时排序）" size="small">
             <Table
               columns={columns}
-              dataSource={slowTraces}
+              dataSource={safeSlowTraces}
               rowKey="traceId"
               size="small"
               pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
