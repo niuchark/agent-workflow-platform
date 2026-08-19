@@ -5,6 +5,7 @@ import { ReactFlow,
   MiniMap,
   useReactFlow
 } from '@xyflow/react'
+import { Modal, message } from 'antd'
 import '@xyflow/react/dist/style.css'
 import { useStore } from '../../store'
 import StartNode from './nodes/StartNode'
@@ -15,7 +16,7 @@ import SkillNode from './nodes/SkillNode'
 import ConditionNode from './nodes/ConditionNode'
 import OutputNode from './nodes/OutputNode'
 import AgentNode from './nodes/AgentNode'
-import { NodeType, WorkflowNode } from '../../types'
+import { NodeType, WorkflowEdge, WorkflowNode } from '../../types'
 
 // 自定义节点类型
 const nodeTypes = {
@@ -84,6 +85,8 @@ const createNodeData = (type: NodeType): WorkflowNode['data'] => {
 }
 
 const WorkflowCanvas: React.FC = () => {
+  const [modal, modalContextHolder] = Modal.useModal()
+  const [messageApi, messageContextHolder] = message.useMessage()
   const { 
     nodes, 
     edges, 
@@ -91,8 +94,7 @@ const WorkflowCanvas: React.FC = () => {
     onEdgesChange,
     onConnect,
     setNodes,
-    setSelectedNode, 
-    executionStates 
+    setSelectedNode,
   } = useStore()
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null)
@@ -101,6 +103,37 @@ const WorkflowCanvas: React.FC = () => {
   const onNodeClick = useCallback((event: React.MouseEvent, node: any) => {
     setSelectedNode(node)
   }, [setSelectedNode])
+
+  const onBeforeDelete = useCallback(({ nodes: nodesToDelete, edges: edgesToDelete }: {
+    nodes: WorkflowNode[]
+    edges: WorkflowEdge[]
+  }) => new Promise<boolean>((resolve) => {
+    const nodeCount = nodesToDelete.length
+    const edgeCount = edgesToDelete.length
+    const title = nodeCount > 0
+      ? `删除选中的 ${nodeCount} 个节点？`
+      : `删除选中的 ${edgeCount} 条连线？`
+    const content = nodeCount > 0
+      ? '相关连线也会一并删除。保存工作流前仍可通过重新加载页面放弃本次修改。'
+      : '删除后需要重新连接节点才能恢复该执行路径。'
+
+    modal.confirm({
+      title,
+      content,
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: () => resolve(true),
+      onCancel: () => resolve(false),
+    })
+  }), [modal])
+
+  const onNodesDelete = useCallback((deletedNodes: WorkflowNode[]) => {
+    if (deletedNodes.length > 0) {
+      setSelectedNode(null)
+      messageApi.success(`已删除 ${deletedNodes.length} 个节点`)
+    }
+  }, [messageApi, setSelectedNode])
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault()
@@ -136,7 +169,10 @@ const WorkflowCanvas: React.FC = () => {
   )
 
   return (
-    <div className="workflow-canvas" ref={reactFlowWrapper}>
+    <>
+      {modalContextHolder}
+      {messageContextHolder}
+      <div className="workflow-canvas" ref={reactFlowWrapper}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -144,6 +180,10 @@ const WorkflowCanvas: React.FC = () => {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
+        onPaneClick={() => setSelectedNode(null)}
+        onBeforeDelete={onBeforeDelete}
+        onNodesDelete={onNodesDelete}
+        deleteKeyCode={['Backspace', 'Delete']}
         onDragOver={onDragOver}
         onDrop={onDrop}
         nodeTypes={nodeTypes}
@@ -154,7 +194,8 @@ const WorkflowCanvas: React.FC = () => {
         <Controls />
         <MiniMap />
       </ReactFlow>
-    </div>
+      </div>
+    </>
   )
 }
 

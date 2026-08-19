@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Button, message, Tag, Tooltip, Dropdown } from 'antd'
+import { Button, message, Tag, Tooltip, Dropdown, Modal } from 'antd'
 import {
   SaveOutlined,
   PlayCircleOutlined,
@@ -12,6 +12,7 @@ import {
   FileTextOutlined,
   FileMarkdownOutlined,
   CloseOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
@@ -34,6 +35,8 @@ const clampPanelWidth = (width: number) => Math.min(MAX_PANEL_WIDTH, Math.max(MI
 const AppEditor: React.FC = () => {
   const { appId } = useParams<{ appId: string }>()
   const navigate = useNavigate()
+  const [modal, modalContextHolder] = Modal.useModal()
+  const [messageApi, messageContextHolder] = message.useMessage()
   const {
     currentApp,
     fetchAppById,
@@ -46,6 +49,8 @@ const AppEditor: React.FC = () => {
     isLoading,
     saveWorkflow,
     executionStatus,
+    selectedNode,
+    deleteNode,
   } = useStore()
 
   const [rightPanel, setRightPanel] = useState<RightPanel>('config')
@@ -76,7 +81,7 @@ const AppEditor: React.FC = () => {
           await fetchWorkflowById(createdWorkflow.id)
         }
       } catch {
-        message.error('初始化编辑器失败')
+        messageApi.error('初始化编辑器失败')
       }
     }
     initEditor()
@@ -85,14 +90,14 @@ const AppEditor: React.FC = () => {
   const handleSave = async () => {
     const workflowId = currentWorkflow?.id
     if (!workflowId) {
-      message.error('未找到有效的工作流')
+      messageApi.error('未找到有效的工作流')
       return
     }
     try {
       await saveWorkflow(workflowId, { nodes, edges })
-      message.success('工作流保存成功')
+      messageApi.success('工作流保存成功')
     } catch {
-      message.error('保存失败，请重试')
+      messageApi.error('保存失败，请重试')
     }
   }
 
@@ -105,6 +110,23 @@ const AppEditor: React.FC = () => {
   const handlePanelSelect = (panel: RightPanel) => {
     setRightPanel(panel)
     setIsPanelOpen(true)
+  }
+
+  const handleDeleteSelectedNode = () => {
+    if (!selectedNode) return
+    const nodeName = String(selectedNode.data?.label || '未命名节点')
+
+    modal.confirm({
+      title: `删除节点「${nodeName}」？`,
+      content: '与该节点相连的连线也会一并删除。保存工作流前仍可通过重新加载页面放弃本次修改。',
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: () => {
+        deleteNode(selectedNode.id)
+        messageApi.success(`已删除节点「${nodeName}」`)
+      },
+    })
   }
 
   const handleResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -141,7 +163,7 @@ const AppEditor: React.FC = () => {
   const handleExport = async (format: 'yaml' | 'json') => {
     const workflowId = currentWorkflow?.id
     if (!workflowId) {
-      message.error('未找到有效的工作流')
+      messageApi.error('未找到有效的工作流')
       return
     }
     try {
@@ -159,9 +181,9 @@ const AppEditor: React.FC = () => {
       document.body.removeChild(a)
       window.URL.revokeObjectURL(url)
 
-      message.success(`已导出为 ${format.toUpperCase()} 格式`)
+      messageApi.success(`已导出为 ${format.toUpperCase()} 格式`)
     } catch {
-      message.error('导出失败，请重试')
+      messageApi.error('导出失败，请重试')
     }
   }
 
@@ -175,7 +197,10 @@ const AppEditor: React.FC = () => {
   const tag = executionStatus ? statusTagMap[executionStatus] : null
 
   return (
-    <div className="editor-root">
+    <>
+      {modalContextHolder}
+      {messageContextHolder}
+      <div className="editor-root">
       {/* ---- Top bar ---- */}
       <header className="editor-topbar">
         <div className="editor-topbar-left">
@@ -227,6 +252,18 @@ const AppEditor: React.FC = () => {
         </div>
 
         <div className="editor-topbar-right">
+          {selectedNode && (
+            <Tooltip title="删除所选节点（Delete / Backspace）">
+              <Button
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={handleDeleteSelectedNode}
+                className="editor-action-btn editor-delete-node-btn"
+                aria-label="删除所选节点"
+              />
+            </Tooltip>
+          )}
           <Dropdown
             menu={{
               items: [
@@ -323,7 +360,8 @@ const AppEditor: React.FC = () => {
           )}
         </div>
       </ReactFlowProvider>
-    </div>
+      </div>
+    </>
   )
 }
 

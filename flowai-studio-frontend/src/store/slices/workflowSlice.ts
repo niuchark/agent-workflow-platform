@@ -32,6 +32,7 @@ export interface WorkflowSlice {
   onEdgesChange: OnEdgesChange<WorkflowEdge>
   onConnect: OnConnect
   setSelectedNode: (node: WorkflowNode | null) => void
+  deleteNode: (nodeId: string) => void
   updateNodeData: (nodeId: string, data: any) => void
   setCanvasZoom: (zoom: number) => void
   setExecutionState: (nodeId: string, state: NodeExecution) => void
@@ -74,8 +75,20 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
   setEdges: (edges) => set({ edges }),
 
   onNodesChange: (changes) => {
-    set({
-      nodes: applyNodeChanges(changes, get().nodes),
+    set((state) => {
+      const removedNodeIds = new Set(
+        changes.filter((change) => change.type === 'remove').map((change) => change.id)
+      )
+      const executionStates = { ...state.executionStates }
+      removedNodeIds.forEach((id) => delete executionStates[id])
+
+      return {
+        nodes: applyNodeChanges(changes, state.nodes),
+        selectedNode: state.selectedNode && removedNodeIds.has(state.selectedNode.id)
+          ? null
+          : state.selectedNode,
+        executionStates,
+      }
     })
   },
 
@@ -92,6 +105,20 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
   },
   
   setSelectedNode: (node) => set({ selectedNode: node }),
+
+  deleteNode: (nodeId) => {
+    set((state) => {
+      const executionStates = { ...state.executionStates }
+      delete executionStates[nodeId]
+
+      return {
+        nodes: state.nodes.filter((node) => node.id !== nodeId),
+        edges: state.edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId),
+        selectedNode: state.selectedNode?.id === nodeId ? null : state.selectedNode,
+        executionStates,
+      }
+    })
+  },
   
   updateNodeData: (nodeId, data) => {
     set((state) => ({

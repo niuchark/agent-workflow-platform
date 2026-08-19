@@ -439,6 +439,7 @@
   .editor-panel-tab { @apply flex cursor-pointer items-center gap-1.5 border-0 border-b-2 border-transparent bg-transparent px-1 py-2 text-xs font-medium text-muted transition-colors hover:text-ink; }
   .editor-panel-tab--active { @apply border-brand-500 bg-transparent text-brand-700; }
   .editor-action-btn { @apply !rounded-lg !text-xs; }
+  .editor-delete-node-btn { @apply !border-red-200 !text-red-600 hover:!border-red-300 hover:!bg-red-50 hover:!text-red-700; }
   .editor-body { @apply relative flex h-full min-h-0 flex-1 overflow-hidden; }
   .editor-canvas-wrapper { @apply relative h-full min-h-0 min-w-0 flex-1 overflow-hidden; }
   .editor-inspector { @apply relative hidden h-full min-h-0 shrink-0 border-l border-line bg-white md:flex; min-width: 300px; max-width: min(560px, calc(100% - 3rem)); }
