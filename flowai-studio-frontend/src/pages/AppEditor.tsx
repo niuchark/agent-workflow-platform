@@ -117,6 +117,10 @@ const AppEditor: React.FC = () => {
     setIsPanelOpen(true)
   }
 
+  const handleCanvasNodeSelect = () => {
+    handlePanelSelect('config')
+  }
+
   const handleDeleteSelectedNode = () => {
     if (!selectedNode) return
     const nodeName = String(selectedNode.data?.label || '未命名节点')
@@ -365,7 +369,7 @@ const AppEditor: React.FC = () => {
             />
           </aside>
           <div className="editor-canvas-wrapper">
-            <WorkflowCanvas />
+            <WorkflowCanvas onNodeSelect={handleCanvasNodeSelect} />
           </div>
           {isPanelOpen && (
             <aside

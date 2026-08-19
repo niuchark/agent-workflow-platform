@@ -497,6 +497,7 @@
   .config-panel, .run-panel { @apply flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-white; }
   .node-panel-header, .run-panel-header, .config-panel-header { @apply shrink-0 border-b border-slate-100 px-4 py-3.5; }
   .node-panel-header h3, .run-panel-header h3 { @apply m-0 text-xs font-semibold uppercase tracking-wide text-muted; }
+  .node-panel-header p { @apply m-0 mt-1 text-[11px] leading-4 text-subtle; }
   .node-panel-content { @apply flex-1 overflow-y-auto p-2; }
   .node-item { @apply mb-1 flex cursor-grab items-center rounded-xl border border-transparent px-3 py-2.5 transition hover:border-brand-100 hover:bg-brand-50 active:cursor-grabbing active:scale-[0.98]; }
   .node-item-icon { @apply mr-2.5 flex text-base; }
@@ -532,6 +533,26 @@
   .field-help-button { @apply inline-flex size-6 cursor-help items-center justify-center rounded-full border-0 bg-transparent p-0 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600 focus-visible:bg-brand-50 focus-visible:text-brand-700; }
   .field-help-button .anticon { @apply text-xs; }
   .user-prompt-help-content { @apply block max-w-64 text-xs leading-5; }
+  .condition-builder-summary { @apply mb-4 flex items-start gap-3 rounded-xl border border-brand-100 bg-brand-50/70 p-3; }
+  .condition-builder-summary-icon { @apply mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-sm text-brand-600 shadow-sm; }
+  .condition-builder-summary-title { @apply text-xs font-semibold text-slate-800; }
+  .condition-builder-summary-copy { @apply mt-1 text-[11px] leading-4 text-muted; }
+  .condition-builder { @apply grid gap-3; }
+  .condition-rule-list { @apply grid gap-3; }
+  .condition-rule-card { @apply overflow-hidden rounded-xl border border-slate-200 bg-slate-50/70; }
+  .condition-rule-header { @apply flex items-center justify-between border-b border-slate-200 bg-white px-3 py-2; }
+  .condition-rule-index { @apply text-xs font-semibold text-slate-700; }
+  .condition-rule-remove { @apply !flex !size-8 !min-w-8 !items-center !justify-center !rounded-lg; }
+  .condition-rule-fields { @apply grid gap-0 px-3 pb-1 pt-3; }
+  .condition-rule-fields .ant-form-item { @apply mb-3; }
+  .condition-rule-fields .ant-form-item-label { @apply pb-1.5; }
+  .condition-rule-fields .ant-form-item-explain-error { @apply mt-1 text-xs; }
+  .condition-builder-empty { @apply flex flex-col items-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm font-medium text-slate-600; }
+  .condition-builder-empty > .anticon { @apply mb-2 text-xl text-slate-400; }
+  .condition-builder-empty p { @apply mb-0 mt-1 text-xs font-normal leading-5 text-muted; }
+  .condition-builder-variable-hint { @apply rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-700; }
+  .condition-builder-add { @apply !h-10 !rounded-lg; }
+  .condition-builder > .ant-form-item-explain-error { @apply text-xs; }
   .variable-template-form-item.ant-form-item-has-error .variable-field-picker:not(.ant-select-disabled) .ant-select-selector,
   .variable-field-toolbar .ant-select-status-error:not(.ant-select-disabled) .ant-select-selector { @apply !border-slate-200 !shadow-none; }
   .variable-template-form-item.ant-form-item-has-error .variable-field-picker.ant-select-focused:not(.ant-select-disabled) .ant-select-selector,
@@ -597,6 +618,9 @@
 .react-flow__edgeupdater:active { cursor: grabbing; }
 .react-flow__edge-label { padding: 2px 8px; border: 1px solid var(--c-border); border-radius: 6px; background: white; color: var(--c-text-secondary); font-size: 11px; }
 .react-flow__handle { width: 9px; height: 9px; border: 2px solid var(--c-accent); border-radius: 999px; background: white; }
+.condition-handle-label { position: absolute; right: -30px; z-index: 2; min-width: 20px; transform: translateY(-50%); border: 1px solid; border-radius: 999px; background: white; padding: 1px 5px; font-size: 10px; font-weight: 600; line-height: 14px; text-align: center; pointer-events: none; }
+.condition-handle-label--true { border-color: color-mix(in srgb, var(--c-green) 35%, white); background: var(--c-green-light); color: var(--c-green); }
+.condition-handle-label--false { border-color: color-mix(in srgb, var(--c-red) 30%, white); background: var(--c-red-light); color: var(--c-red); }
 .react-flow__controls, .react-flow__minimap { overflow: hidden; border: 1px solid var(--c-border); border-radius: 10px; box-shadow: var(--c-shadow-sm); }
 .react-flow__controls-button { border-bottom-color: #f1f5f9; background: white; fill: #64748b; }
 .react-flow__controls-button:hover { background: #f0f9ff; fill: #0284c7; }

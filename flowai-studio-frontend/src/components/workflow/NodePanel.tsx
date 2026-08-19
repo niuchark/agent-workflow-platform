@@ -1,5 +1,4 @@
 import { useCallback } from 'react'
-import { useReactFlow } from '@xyflow/react'
 import {
   PlayCircleOutlined,
   UserOutlined,
@@ -30,8 +29,6 @@ const nodeTypes: NodeType[] = [
 ]
 
 const NodePanel: React.FC = () => {
-  const { setNodes } = useReactFlow()
-
   const onDragStart = useCallback((event: React.DragEvent, nodeType: string) => {
     event.dataTransfer.setData('application/reactflow', nodeType)
     event.dataTransfer.effectAllowed = 'copy'
@@ -41,6 +38,7 @@ const NodePanel: React.FC = () => {
     <div className="node-panel">
       <div className="node-panel-header">
         <h3>节点库</h3>
+        <p>拖拽下方节点到右侧画布中</p>
       </div>
       <div className="node-panel-content">
         {nodeTypes.map((nodeType) => (

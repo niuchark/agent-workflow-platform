@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Form, Input, Select, Slider, InputNumber, Switch, Divider, Card, Button, Space, Tag, Empty, Typography, AutoComplete, Alert, Tooltip } from 'antd'
-import { PlusOutlined, DeleteOutlined, RobotOutlined, SettingOutlined, QuestionCircleOutlined } from '@ant-design/icons'
+import { PlusOutlined, DeleteOutlined, RobotOutlined, SettingOutlined, QuestionCircleOutlined, BranchesOutlined } from '@ant-design/icons'
 import { useStore } from '../../store'
 import { useNavigate } from 'react-router-dom'
 import { inferLegacyProvider, useModelCatalog } from '../../utils/useModelCatalog'
@@ -50,6 +50,28 @@ const PROVIDER_LABELS: Record<UserModelProvider, string> = {
   ollama: 'Ollama',
 }
 
+const CONDITION_OPERATOR_OPTIONS = [
+  { value: 'contains', label: '包含' },
+  { value: '===', label: '等于' },
+  { value: '!==', label: '不等于' },
+  { value: '>', label: '大于' },
+  { value: '>=', label: '大于等于' },
+  { value: '<', label: '小于' },
+  { value: '<=', label: '小于等于' },
+]
+
+const normalizeConditions = (conditions: unknown) => {
+  if (Array.isArray(conditions)) return conditions
+  if (typeof conditions !== 'string' || !conditions.trim()) return []
+
+  try {
+    const parsed = JSON.parse(conditions)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
 const UserPromptLabel = () => (
   <span className="field-label-with-help">
     <span>用户提示词</span>
@@ -87,11 +109,18 @@ const ConfigPanel: React.FC = () => {
   useEffect(() => {
     if (selectedNode) {
       const data = selectedNode.data as any
+      const normalizedConditions = selectedNode.type === 'condition'
+        ? normalizeConditions(data.conditions)
+        : data.conditions
       form.setFieldsValue({
         ...data,
+        conditions: normalizedConditions,
         provider: data.provider || inferLegacyProvider(data.model),
         supervisorProvider: data.supervisorProvider || inferLegacyProvider(data.supervisorModel),
       })
+      if (selectedNode.type === 'condition' && typeof data.conditions === 'string') {
+        updateNodeData(selectedNode.id, { ...data, conditions: normalizedConditions })
+      }
       if (selectedNode.type === 'agent' && (selectedNode.data as any).workers) {
         setWorkers(((selectedNode.data as any).workers || []).map((worker: any) => ({
           ...worker,
@@ -102,7 +131,7 @@ const ConfigPanel: React.FC = () => {
       form.resetFields()
       setWorkers([])
     }
-  }, [selectedNode, form])
+  }, [selectedNode, form, updateNodeData])
 
   const handleValuesChange = (_changedValues: any, allValues: any) => {
     if (selectedNode) {
@@ -118,6 +147,20 @@ const ConfigPanel: React.FC = () => {
     () => selectedNode ? getAvailableVariables(nodes, edges, selectedNode.id) : [],
     [edges, nodes, selectedNode],
   )
+  const conditionVariableGroups = useMemo(() => {
+    const groups = new Map<string, Array<{ label: string; value: string }>>()
+
+    availableVariables.forEach((variable) => {
+      const options = groups.get(variable.nodeLabel) || []
+      options.push({
+        label: `${variable.nodeLabel} · ${variable.fieldLabel}`,
+        value: variable.token,
+      })
+      groups.set(variable.nodeLabel, options)
+    })
+
+    return [...groups.entries()].map(([label, options]) => ({ label, options }))
+  }, [availableVariables])
 
   const addWorker = () => {
     const newWorker = {
@@ -370,8 +413,105 @@ const ConfigPanel: React.FC = () => {
         return (
           <>
             {commonFields}
-            <Text type="secondary">配置分支判断逻辑。</Text>
-            <Form.Item name="conditions" label="判断条件 (JSON)"><Input.TextArea rows={6} placeholder='[{"variable": "{{llm_1.result}}", "operator": "contains", "value": "yes"}]' /></Form.Item>
+            <div className="condition-builder-summary">
+              <span className="condition-builder-summary-icon" aria-hidden="true"><BranchesOutlined /></span>
+              <div>
+                <div className="condition-builder-summary-title">满足以下所有条件（AND）</div>
+                <div className="condition-builder-summary-copy">全部满足时走“是”分支；任一不满足时走“否”分支。</div>
+              </div>
+            </div>
+            <Form.List
+              name="conditions"
+              rules={[{
+                validator: async (_, conditions) => {
+                  if (!conditions?.length) throw new Error('请至少添加一个判断条件')
+                },
+              }]}
+            >
+              {(fields, { add, remove }, { errors }) => (
+                <div className="condition-builder">
+                  {fields.length === 0 ? (
+                    <div className="condition-builder-empty">
+                      <BranchesOutlined aria-hidden="true" />
+                      <span>还没有判断条件</span>
+                      <p>添加条件后，从已连接的上游节点中选择变量。</p>
+                    </div>
+                  ) : (
+                    <div className="condition-rule-list" aria-live="polite">
+                      {fields.map((field, index) => (
+                        <div className="condition-rule-card" key={field.key}>
+                          <div className="condition-rule-header">
+                            <span className="condition-rule-index">条件 {index + 1}</span>
+                            <Button
+                              type="text"
+                              danger
+                              icon={<DeleteOutlined />}
+                              className="condition-rule-remove"
+                              aria-label={`删除条件 ${index + 1}`}
+                              onClick={() => remove(field.name)}
+                            />
+                          </div>
+                          <div className="condition-rule-fields">
+                            <Form.Item
+                              name={[field.name, 'variable']}
+                              label="上游变量"
+                              rules={[{ required: true, message: '请选择用于判断的上游变量' }]}
+                            >
+                              <Select
+                                showSearch
+                                optionFilterProp="label"
+                                placeholder={availableVariables.length ? '选择节点输出' : '暂无可用的上游变量'}
+                                options={conditionVariableGroups}
+                                disabled={!availableVariables.length}
+                                aria-label={`条件 ${index + 1} 的上游变量`}
+                              />
+                            </Form.Item>
+                            <Form.Item
+                              name={[field.name, 'operator']}
+                              label="判断方式"
+                              rules={[{ required: true, message: '请选择判断方式' }]}
+                            >
+                              <Select
+                                placeholder="选择判断方式"
+                                options={CONDITION_OPERATOR_OPTIONS}
+                                aria-label={`条件 ${index + 1} 的判断方式`}
+                              />
+                            </Form.Item>
+                            <Form.Item
+                              name={[field.name, 'value']}
+                              label="比较值"
+                              rules={[{ required: true, message: '请输入要比较的值' }]}
+                            >
+                              <Input
+                                placeholder="例如：已完成"
+                                aria-label={`条件 ${index + 1} 的比较值`}
+                              />
+                            </Form.Item>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {!availableVariables.length && (
+                    <div className="condition-builder-variable-hint">请先把条件节点连接到会产生结果的上游节点。</div>
+                  )}
+                  <Button
+                    type="dashed"
+                    block
+                    icon={<PlusOutlined />}
+                    className="condition-builder-add"
+                    onClick={() => add({
+                      variable: availableVariables[0]?.token,
+                      operator: 'contains',
+                      value: '',
+                    })}
+                  >
+                    添加条件
+                  </Button>
+                  <Form.ErrorList errors={errors} />
+                </div>
+              )}
+            </Form.List>
           </>
         )
       case 'output':

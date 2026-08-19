@@ -87,7 +87,11 @@ const createNodeData = (type: NodeType): WorkflowNode['data'] => {
   }
 }
 
-const WorkflowCanvas: React.FC = () => {
+interface WorkflowCanvasProps {
+  onNodeSelect?: (node: WorkflowNode) => void
+}
+
+const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({ onNodeSelect }) => {
   const [modal, modalContextHolder] = Modal.useModal()
   const [messageApi, messageContextHolder] = message.useMessage()
   const { 
@@ -110,7 +114,8 @@ const WorkflowCanvas: React.FC = () => {
   const onNodeClick = useCallback((event: React.MouseEvent, node: any) => {
     setSelectedEdgeId(null)
     setSelectedNode(node)
-  }, [setSelectedNode])
+    onNodeSelect?.(node)
+  }, [onNodeSelect, setSelectedNode])
 
   const onEdgeClick = useCallback(() => {
     setSelectedNode(null)
