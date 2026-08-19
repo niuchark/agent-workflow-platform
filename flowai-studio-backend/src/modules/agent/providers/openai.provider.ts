@@ -101,7 +101,7 @@ export class OpenAIProvider extends BaseLLMProvider {
       const response = await axios.post(
         `${this.baseUrl}/chat/completions`,
         body,
-        { headers, timeout: this.config.timeout || 60000 },
+        { headers, timeout: this.config.timeout || 60000, maxRedirects: 0 },
       );
 
       const choice = response.data.choices[0];
@@ -119,7 +119,7 @@ export class OpenAIProvider extends BaseLLMProvider {
       return result;
     } catch (error) {
       this.logger.error(`OpenAI API call failed: ${error.response?.data?.error?.message || error.message}`);
-      throw new Error(`OpenAI API call failed: ${error.response?.data?.error?.message || error.message}`);
+      throw new Error('MODEL_UPSTREAM_UNAVAILABLE: OpenAI-compatible 模型调用失败');
     }
   }
 
@@ -138,7 +138,7 @@ export class OpenAIProvider extends BaseLLMProvider {
     const response = await axios.post(
       `${this.baseUrl}/chat/completions`,
       body,
-      { headers, responseType: 'stream', timeout: this.config.timeout || 60000 },
+      { headers, responseType: 'stream', timeout: this.config.timeout || 60000, maxRedirects: 0 },
     );
 
     let buffer = '';
@@ -168,6 +168,7 @@ export class OpenAIProvider extends BaseLLMProvider {
       await axios.get(`${this.baseUrl}/models`, {
         headers: { Authorization: `Bearer ${this.apiKey}` },
         timeout: 5000,
+        maxRedirects: 0,
       });
       return true;
     } catch {

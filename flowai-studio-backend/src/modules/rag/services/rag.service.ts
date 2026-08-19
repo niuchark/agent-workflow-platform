@@ -24,7 +24,7 @@
  * - Flowise: 支持 vector + keyword + HuggingFace/Cohere Reranker + 内存缓存
  * - 本设计: RRF 融合 + Cohere + Ollama + L1/L2 多级缓存 + 互斥锁防击穿
  */
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../common/services/prisma.service';
 import { CacheService } from '../../../common/services/cache.service';
 import { CreateKnowledgeBaseDto } from '../dto/create-kb.dto';
@@ -42,6 +42,8 @@ import { BM25KeywordService } from './bm25-keyword.service';
 import { RRFFusionService } from './rrf-fusion.service';
 import { RerankerFactory, RerankerType } from '../providers/reranker/reranker.factory';
 import { CacheTTL, CachePrefix } from '../../../common/decorators/cache.decorator';
+import { ModelCredentialService } from '../../model-credential/model-credential.service';
+import { UserModelProvider } from '../../model-credential/model-credential.types';
 import * as fs from 'fs';
 
 @Injectable()
@@ -56,6 +58,7 @@ export class RAGService {
     private rrfFusionService: RRFFusionService,
     private rerankerFactory: RerankerFactory,
     private cacheService: CacheService,
+    private modelCredentialService: ModelCredentialService,
   ) {}
 
   // ============================================================
@@ -63,6 +66,15 @@ export class RAGService {
   // ============================================================
 
   async createKnowledgeBase(userId: string, createKnowledgeBaseDto: CreateKnowledgeBaseDto) {
+    // 在创建数据前验证当前用户的 Embedding 凭证，避免创建一个无法工作的知识库。
+    const embeddingProvider = await this.embeddingFactory.createForUser(
+      userId,
+      (createKnowledgeBaseDto.embeddingProvider || this.inferProviderType(createKnowledgeBaseDto.embeddingModel || 'text-embedding-v3')) as UserModelProvider,
+      {
+        model: createKnowledgeBaseDto.embeddingModel || 'text-embedding-v3',
+        dimensions: createKnowledgeBaseDto.embeddingDimension || 1024,
+      },
+    );
     const kb = await this.prisma.knowledgeBase.create({
       data: {
         ...createKnowledgeBaseDto,
@@ -73,8 +85,7 @@ export class RAGService {
     // 初始化向量存储后端（创建集合/索引）
     try {
       const store = this.getVectorStoreForKB(kb);
-      const provider = this.getEmbeddingProviderForKB(kb);
-      await store.initialize(kb.id, provider.getDimensions());
+      await store.initialize(kb.id, embeddingProvider.getDimensions());
     } catch (error) {
       this.logger.warn(
         `VectorStore initialization skipped for KB ${kb.id}: ${error instanceof Error ? error.message : error}`,
@@ -152,6 +163,18 @@ export class RAGService {
 
   async updateKnowledgeBase(userId: string, id: string, updateKnowledgeBaseDto: UpdateKnowledgeBaseDto) {
     const kb = await this.findKnowledgeBaseById(userId, id);
+
+    if (
+      updateKnowledgeBaseDto.embeddingProvider !== undefined ||
+      updateKnowledgeBaseDto.embeddingModel !== undefined ||
+      updateKnowledgeBaseDto.embeddingDimension !== undefined
+    ) {
+      const nextProvider = updateKnowledgeBaseDto.embeddingProvider || kb.embeddingProvider || this.inferProviderType(updateKnowledgeBaseDto.embeddingModel || kb.embeddingModel);
+      await this.embeddingFactory.createForUser(userId, nextProvider as UserModelProvider, {
+        model: updateKnowledgeBaseDto.embeddingModel || kb.embeddingModel,
+        dimensions: updateKnowledgeBaseDto.embeddingDimension || kb.embeddingDimension,
+      });
+    }
 
     const updated = await this.prisma.knowledgeBase.update({
       where: { id },
@@ -268,11 +291,11 @@ export class RAGService {
     });
 
     // 异步处理文档分块和向量化
-    this.processAndEmbedDocument(document.id, content, knowledgeBaseId).catch((error) => {
+    this.processAndEmbedDocument(userId, document.id, content, knowledgeBaseId).catch((error) => {
       this.logger.error(`Document processing failed for ${document.id}: ${error instanceof Error ? error.message : error}`);
       this.prisma.document.update({
         where: { id: document.id },
-        data: { status: 'failed', error: error instanceof Error ? error.message : 'Unknown error' },
+        data: { status: 'failed', error: '模型服务调用失败，请检查凭证和模型配置' },
       }).catch(() => {});
     });
 
@@ -290,13 +313,13 @@ export class RAGService {
    * - 写入 document_chunks 时同时保留全文索引
    * - 全文搜索基于 document_chunks.content 列的 tsvector 索引
    */
-  private async processAndEmbedDocument(documentId: string, content: string, knowledgeBaseId: string): Promise<void> {
+  private async processAndEmbedDocument(userId: string, documentId: string, content: string, knowledgeBaseId: string): Promise<void> {
     // 获取知识库配置
     const kb = await this.prisma.knowledgeBase.findUnique({ where: { id: knowledgeBaseId } });
     if (!kb) throw new Error('Knowledge base not found');
 
     // 根据知识库配置获取对应的 Provider 和 Store
-    const embeddingProvider = this.getEmbeddingProviderForKB(kb);
+    const embeddingProvider = await this.getEmbeddingProviderForKB(userId, kb);
     const vectorStore = this.getVectorStoreForKB(kb);
 
     // 1. 文本分块
@@ -465,6 +488,7 @@ export class RAGService {
    * - 本设计: 检索 + Rerank + L1/L2 缓存 + 自适应降级
    */
   async retrieve(
+    userId: string,
     query: string,
     knowledgeBaseId: string,
     topK?: number,
@@ -476,6 +500,9 @@ export class RAGService {
     const kb = await this.prisma.knowledgeBase.findUnique({ where: { id: knowledgeBaseId } });
     if (!kb) {
       throw new NotFoundException('Knowledge base not found');
+    }
+    if (kb.userId !== userId) {
+      throw new ForbiddenException('Access denied');
     }
 
     const effectiveTopK = topK || kb.topK || 5;
@@ -501,16 +528,16 @@ export class RAGService {
         results = await this.retrieveKeyword(query, knowledgeBaseId, effectiveTopK, kb);
         break;
       case 'hybrid':
-        results = await this.retrieveHybrid(query, knowledgeBaseId, effectiveTopK, kb, vectorWeight, rrfK);
+        results = await this.retrieveHybrid(userId, query, knowledgeBaseId, effectiveTopK, kb, vectorWeight, rrfK);
         break;
       case 'vector':
       default:
-        results = await this.retrieveVector(query, knowledgeBaseId, effectiveTopK, kb);
+        results = await this.retrieveVector(userId, query, knowledgeBaseId, effectiveTopK, kb);
         break;
     }
 
     // 5. Reranker 重排序（如知识库启用）
-    results = await this.applyReranker(query, results, kb, effectiveTopK);
+    results = await this.applyReranker(userId, query, results, kb, effectiveTopK);
 
     // 6. 写入检索缓存（短 TTL，因为检索结果随文档增删变化）
     await this.cacheService.set(cacheKey, results, CacheTTL.KNOWLEDGE_BASE_RETRIEVAL);
@@ -531,7 +558,7 @@ export class RAGService {
    * - FastGPT: 支持 Rerank TopN 配置
    * - 本设计: TopN 配置 + 降级保护 + 耗时日志
    */
-  private async applyReranker(query: string, results: any[], kb: any, topK: number): Promise<any[]> {
+  private async applyReranker(userId: string, query: string, results: any[], kb: any, topK: number): Promise<any[]> {
     const rerankerEnabled = (kb as any).rerankerEnabled ?? false;
     const rerankerProvider = (kb as any).rerankerProvider ?? 'none';
     const rerankerModel = (kb as any).rerankerModel ?? '';
@@ -545,13 +572,21 @@ export class RAGService {
       return results;
     }
 
+    // 第一版用户凭证只支持 Ollama Reranker；Cohere 配置保留但不再读取服务器 Key。
+    if (rerankerProvider !== 'ollama') {
+      this.logger.warn(`Reranker provider ${rerankerProvider} is not supported by user credentials`);
+      return results;
+    }
+
     try {
       const startTime = Date.now();
 
+      const ollamaCredential = await this.modelCredentialService.resolveStored(userId, 'ollama');
       const reranker = this.rerankerFactory.create(
         rerankerProvider as RerankerType,
         {
           model: rerankerModel || undefined,
+          baseUrl: ollamaCredential.baseUrl,
         },
       );
 
@@ -596,8 +631,8 @@ export class RAGService {
   /**
    * 纯向量检索
    */
-  private async retrieveVector(query: string, knowledgeBaseId: string, topK: number, kb: any): Promise<any[]> {
-    const embeddingProvider = this.getEmbeddingProviderForKB(kb);
+  private async retrieveVector(userId: string, query: string, knowledgeBaseId: string, topK: number, kb: any): Promise<any[]> {
+    const embeddingProvider = await this.getEmbeddingProviderForKB(userId, kb);
     const vectorStore = this.getVectorStoreForKB(kb);
 
     // 生成查询向量
@@ -656,6 +691,7 @@ export class RAGService {
    * - 两路都失败时，返回空结果
    */
   private async retrieveHybrid(
+    userId: string,
     query: string,
     knowledgeBaseId: string,
     topK: number,
@@ -667,7 +703,7 @@ export class RAGService {
     // 并行执行双路检索
     const [vectorResults, keywordResults] = await Promise.allSettled([
       // 向量检索
-      this.retrieveVectorForHybrid(query, knowledgeBaseId, topK, kb),
+      this.retrieveVectorForHybrid(userId, query, knowledgeBaseId, topK, kb),
       // 关键词检索（多取一些，因为融合后可能部分重叠）
       this.retrieveKeywordForHybrid(query, knowledgeBaseId, topK * 2),
     ]);
@@ -748,12 +784,13 @@ export class RAGService {
    * 为混合检索执行向量检索（返回 RetrievalResult 格式）
    */
   private async retrieveVectorForHybrid(
+    userId: string,
     query: string,
     knowledgeBaseId: string,
     topK: number,
     kb: any,
   ): Promise<RetrievalResult[]> {
-    const embeddingProvider = this.getEmbeddingProviderForKB(kb);
+    const embeddingProvider = await this.getEmbeddingProviderForKB(userId, kb);
     const vectorStore = this.getVectorStoreForKB(kb);
 
     const embedResult = await embeddingProvider.embed(query);
@@ -850,10 +887,10 @@ export class RAGService {
   /**
    * 根据知识库配置获取对应的 EmbeddingProvider
    */
-  private getEmbeddingProviderForKB(kb: { embeddingProvider?: string; embeddingModel: string; embeddingDimension: number }): EmbeddingProvider {
+  private async getEmbeddingProviderForKB(userId: string, kb: { embeddingProvider?: string; embeddingModel: string; embeddingDimension: number }): Promise<EmbeddingProvider> {
     const providerType = kb.embeddingProvider || this.inferProviderType(kb.embeddingModel);
 
-    return this.embeddingFactory.create(providerType, {
+    return this.embeddingFactory.createForUser(userId, providerType as UserModelProvider, {
       model: kb.embeddingModel,
       dimensions: kb.embeddingDimension,
     });

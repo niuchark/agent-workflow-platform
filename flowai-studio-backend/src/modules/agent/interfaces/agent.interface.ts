@@ -35,6 +35,8 @@ export interface WorkerAgentConfig {
   systemPrompt: string;
   /** 使用的 LLM 模型 */
   model: string;
+  /** 模型供应商；旧配置为空时按模型名称推断 */
+  provider?: 'qwen' | 'openai' | 'ollama';
   /** 温度参数 */
   temperature: number;
   /** 最大 token 数 */
@@ -53,6 +55,7 @@ export interface SupervisorAgentConfig {
   systemPrompt: string;
   /** 使用的 LLM 模型 */
   model: string;
+  provider?: 'qwen' | 'openai' | 'ollama';
   /** 温度参数 */
   temperature: number;
   /** 最大迭代轮数 */

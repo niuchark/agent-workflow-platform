@@ -15,8 +15,6 @@
 #                                    → Redis
 # ============================================================
 
-version: '3.8'
-
 services:
   # ============================================================
   # PostgreSQL + pgvector — 主数据库 + 向量存储
@@ -82,11 +80,8 @@ services:
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       JWT_EXPIRES_IN: 7d
-      QWEN_API_KEY: ${QWEN_API_KEY}
-      QWEN_BASE_URL: ${QWEN_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
-      QWEN_EMBEDDING_API_KEY: ${QWEN_EMBEDDING_API_KEY:-${QWEN_API_KEY}}
-      QWEN_EMBEDDING_MODEL: ${QWEN_EMBEDDING_MODEL:-text-embedding-v3}
-      QWEN_EMBEDDING_DIMENSION: ${QWEN_EMBEDDING_DIMENSION:-1024}
+      MODEL_CREDENTIAL_ENCRYPTION_KEY: ${MODEL_CREDENTIAL_ENCRYPTION_KEY:?MODEL_CREDENTIAL_ENCRYPTION_KEY is required}
+      MODEL_PRIVATE_BASE_URL_ALLOWLIST: ${MODEL_PRIVATE_BASE_URL_ALLOWLIST:-http://ollama:11434}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
     ports:
       - "3000:3000"

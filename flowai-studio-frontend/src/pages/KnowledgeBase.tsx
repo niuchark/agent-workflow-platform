@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Input, Table, message, Modal, Upload, Space, Typography, Empty, Spin, Select, Slider, InputNumber, Divider, Tag, Tooltip, Switch } from 'antd'
+import { Alert, Button, Input, Table, message, Modal, Upload, Space, Typography, Empty, Spin, Select, Slider, InputNumber, Divider, Tag, Tooltip, Switch } from 'antd'
 import {
   PlusOutlined,
   DeleteOutlined,
@@ -19,13 +19,17 @@ import {
   InfoCircleOutlined,
 } from '@ant-design/icons'
 import { useStore } from '../store'
-import { DocumentChunk, EmbeddingProviderType, VectorStoreType, RerankerProviderType, EMBEDDING_MODELS, VECTOR_STORE_OPTIONS, RETRIEVAL_MODE_OPTIONS, RERANKER_PROVIDER_OPTIONS, COHERE_RERANK_MODELS, OLLAMA_RERANK_MODELS } from '../types'
+import { DocumentChunk, EmbeddingProviderType, VectorStoreType, RerankerProviderType, EMBEDDING_MODELS, VECTOR_STORE_OPTIONS, RETRIEVAL_MODE_OPTIONS, OLLAMA_RERANK_MODELS } from '../types'
+import { useNavigate } from 'react-router-dom'
+import { useModelCatalog } from '../utils/useModelCatalog'
 
 const { Text } = Typography
 const { TextArea } = Input
 const { Dragger } = Upload
 
 const KnowledgeBase: React.FC = () => {
+  const navigate = useNavigate()
+  const { availableProviders, loading: modelCatalogLoading } = useModelCatalog()
   const {
     knowledgeBases,
     isLoading,
@@ -302,12 +306,22 @@ const KnowledgeBase: React.FC = () => {
                   embeddingDimension: defaultModel.dimension,
                 })
               }} style={{ width: '100%' }}
-                options={[
+                loading={modelCatalogLoading}
+                options={([
                   { label: '通义千问 (Qwen)', value: 'qwen' },
-                  { label: 'OpenAI', value: 'openai' },
+                  { label: 'OpenAI-compatible', value: 'openai' },
                   { label: 'Ollama (本地)', value: 'ollama' },
-                ]}
+                ] as Array<{ label: string; value: EmbeddingProviderType }>).map((option) => ({
+                  ...option,
+                  disabled: !availableProviders.includes(option.value as any) && option.value !== formData.embeddingProvider,
+                  label: !availableProviders.includes(option.value as any) ? `${option.label}（凭证未配置/不可用）` : option.label,
+                }))}
               />
+              {availableProviders.length === 0 && !modelCatalogLoading && (
+                <Button type="link" size="small" style={{ paddingInline: 0 }} onClick={() => navigate('/model-settings')}>
+                  先配置模型服务
+                </Button>
+              )}
             </div>
             <div className="kb-field">
               <label className="kb-field-label"><CloudServerOutlined /> 向量存储</label>
@@ -397,10 +411,11 @@ const KnowledgeBase: React.FC = () => {
             </div>
             <div className="kb-field">
               <label className="kb-field-label">
-                <Switch
+                  <Switch
                   size="small"
                   checked={formData.rerankerEnabled}
-                  onChange={(checked) => setFormData({ ...formData, rerankerEnabled: checked, rerankerProvider: checked ? 'cohere' : 'none' })}
+                  disabled={!availableProviders.includes('ollama')}
+                  onChange={(checked) => setFormData({ ...formData, rerankerEnabled: checked, rerankerProvider: checked ? 'ollama' : 'none', rerankerModel: checked ? 'bge-reranker-v2-m3' : '' })}
                 />
                 <span style={{ marginLeft: 8 }}>启用重排序</span>
                 <Tooltip title="检索后对候选文档重排序，提高 Top-K 精度。推荐混合检索 + Reranker 组合使用。">
@@ -410,22 +425,23 @@ const KnowledgeBase: React.FC = () => {
             </div>
             {formData.rerankerEnabled && (
               <>
+                {formData.rerankerProvider === 'cohere' && (
+                  <div className="kb-field" style={{ gridColumn: '1 / -1' }}>
+                    <Alert type="warning" showIcon message="已有 Cohere 配置会被保留，但当前用户凭证功能暂不支持调用 Cohere。" />
+                  </div>
+                )}
                 <div className="kb-field">
                   <label className="kb-field-label">Reranker 服务</label>
                   <Select value={formData.rerankerProvider} onChange={(val: RerankerProviderType) => {
-                    const defaultModels: Record<string, string> = { cohere: 'rerank-v3.5', ollama: 'bge-reranker-v2-m3', none: '' }
-                    setFormData({ ...formData, rerankerProvider: val, rerankerModel: defaultModels[val] || '' })
+                    setFormData({ ...formData, rerankerProvider: val, rerankerModel: val === 'ollama' ? 'bge-reranker-v2-m3' : '' })
                   }} style={{ width: '100%' }}
-                    options={RERANKER_PROVIDER_OPTIONS.map((opt) => ({
-                      label: <Tooltip title={opt.description}><span style={{ color: opt.color }}>{opt.label}</span></Tooltip>,
-                      value: opt.value,
-                    }))}
+                    options={[{ label: 'Ollama（复用当前用户配置）', value: 'ollama' }]}
                   />
                 </div>
                 <div className="kb-field">
                   <label className="kb-field-label">Reranker 模型</label>
                   <Select value={formData.rerankerModel || undefined} onChange={(val) => setFormData({ ...formData, rerankerModel: val })} style={{ width: '100%' }}
-                    options={(formData.rerankerProvider === 'cohere' ? COHERE_RERANK_MODELS : OLLAMA_RERANK_MODELS).map((m) => ({ label: m.label, value: m.value }))}
+                    options={OLLAMA_RERANK_MODELS.map((m) => ({ label: m.label, value: m.value }))}
                     placeholder="选择模型"
                   />
                 </div>

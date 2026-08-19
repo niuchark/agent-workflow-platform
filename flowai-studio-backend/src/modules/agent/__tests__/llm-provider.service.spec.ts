@@ -83,7 +83,7 @@ describe('QwenProvider', () => {
 
       await expect(provider.chat({
         messages: [{ role: 'user', content: '测试' }],
-      })).rejects.toThrow('Qwen API call failed');
+      })).rejects.toThrow('MODEL_UPSTREAM_UNAVAILABLE: Qwen 模型调用失败');
     });
   });
 

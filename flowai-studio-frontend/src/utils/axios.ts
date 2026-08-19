@@ -96,12 +96,12 @@ request.interceptors.response.use(
         
         case 502:
           // 网关错误
-          error.message = '网关错误，请稍后重试'
+          error.message = data.message || '网关错误，请稍后重试'
           break
         
         case 503:
           // 服务不可用
-          error.message = '服务暂时不可用，请稍后重试'
+          error.message = data.message || '服务暂时不可用，请稍后重试'
           break
         
         default:

@@ -19,6 +19,8 @@ import { EmbeddingProvider, EmbeddingProviderConfig } from '../interfaces/embedd
 import { QwenEmbeddingProvider } from '../providers/embedding/qwen-embedding.provider';
 import { OpenAIEmbeddingProvider } from '../providers/embedding/openai-embedding.provider';
 import { OllamaEmbeddingProvider } from '../providers/embedding/ollama-embedding.provider';
+import { ModelCredentialService } from '../../model-credential/model-credential.service';
+import { UserModelProvider } from '../../model-credential/model-credential.types';
 
 /**
  * Provider 注册表类型
@@ -49,7 +51,10 @@ export class EmbeddingFactory {
   /** 默认 Provider 配置 */
   private readonly defaultConfigs = new Map<string, DefaultProviderConfig>();
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    private readonly modelCredentials: ModelCredentialService,
+  ) {
     // 注册内置 Provider
     this.registerProvider('qwen', QwenEmbeddingProvider);
     this.registerProvider('openai', OpenAIEmbeddingProvider);
@@ -57,6 +62,26 @@ export class EmbeddingFactory {
 
     // 从环境变量加载默认配置
     this.loadDefaultConfigs();
+  }
+
+  /** 使用用户凭证创建 Embedding Provider，避免将 API Key 放进全局缓存键。 */
+  async createForUser(
+    userId: string,
+    providerType: UserModelProvider,
+    configOverride?: Partial<EmbeddingProviderConfig>,
+  ): Promise<EmbeddingProvider> {
+    const Constructor = this.providerRegistry.get(providerType);
+    if (!Constructor) throw new Error(`Unknown embedding provider type: ${providerType}`);
+    const credential = await this.modelCredentials.resolveStored(userId, providerType, true);
+    return new Constructor({
+      apiKey: credential.apiKey || 'ollama',
+      baseUrl: credential.baseUrl,
+      model: configOverride?.model || (providerType === 'ollama' ? 'nomic-embed-text' : providerType === 'openai' ? 'text-embedding-3-small' : 'text-embedding-v3'),
+      dimensions: configOverride?.dimensions || 1024,
+      timeout: configOverride?.timeout,
+      maxConcurrency: configOverride?.maxConcurrency,
+      maxRetries: configOverride?.maxRetries,
+    });
   }
 
   /**

@@ -104,6 +104,7 @@ export class RAGController {
    */
   @Post('retrieve')
   retrieve(
+    @CurrentUser('userId') userId: string,
     @Body('query') query: string,
     @Body('knowledgeBaseId') knowledgeBaseId: string,
     @Body('topK') topK?: number,
@@ -112,6 +113,7 @@ export class RAGController {
     @Body('rrfK') rrfK?: number,
   ) {
     return this.ragService.retrieve(
+      userId,
       query,
       knowledgeBaseId,
       topK,

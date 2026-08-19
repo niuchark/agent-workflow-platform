@@ -1,19 +1,21 @@
-import { Injectable, Inject, forwardRef } from '@nestjs/common';
+import { BadGatewayException, HttpException, Injectable, Inject, forwardRef, UnprocessableEntityException } from '@nestjs/common';
 import { Response } from 'express';
-import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../common/services/prisma.service';
 import { StreamRunDto, RunDto, ChatDto } from './dto/ai.dto';
 import { RAGService } from '../rag/services/rag.service';
 import { WorkflowExecutorService } from '../workflow/services/workflow-executor.service';
 import { Subject } from 'rxjs';
-import axios from 'axios';
+import { LLMProviderFactory } from '../agent/providers/llm-provider.factory';
+import { ModelCredentialService } from '../model-credential/model-credential.service';
+import { UserModelProvider } from '../model-credential/model-credential.types';
 
 @Injectable()
 export class AiService {
   constructor(
     private prisma: PrismaService,
-    private configService: ConfigService,
     private ragService: RAGService,
+    private readonly providerFactory: LLMProviderFactory,
+    private readonly modelCredentials: ModelCredentialService,
     @Inject(forwardRef(() => WorkflowExecutorService))
     private workflowExecutor: WorkflowExecutorService,
   ) {}
@@ -146,8 +148,8 @@ export class AiService {
 
     try {
       const { message, history = [], sessionId = Date.now().toString(), knowledgeBaseId } = chatDto;
-      const apiKey = this.configService.get<string>('QWEN_API_KEY');
-      const baseUrl = this.configService.get<string>('QWEN_BASE_URL');
+      const selection = await this.resolveChatSelection(userId, chatDto.provider, chatDto.model);
+      const provider = await this.providerFactory.createForUser(userId, selection.provider);
 
       // 1. 保存用户消息（非阻塞，失败不影响对话）
       this.prisma.chatHistory.create({
@@ -160,7 +162,7 @@ export class AiService {
       // 2. RAG 检索（失败时降级为无知识库模式）
       if (knowledgeBaseId) {
         try {
-          references = await this.ragService.retrieve(message, knowledgeBaseId, 5);
+          references = await this.ragService.retrieve(userId, message, knowledgeBaseId, 5);
           context = references.map((ref: any) => ref.content).join('\n\n');
         } catch (ragError) {
           console.error('RAG 检索失败，降级为普通对话:', ragError.message);
@@ -178,83 +180,51 @@ export class AiService {
       messages.push(...history);
       messages.push({ role: 'user', content: message });
 
-      // 4. 调用 Qwen 流式 API
-      const response = await axios.post(
-        `${baseUrl}/chat/completions`,
-        { model: 'qwen-turbo', messages, stream: true },
-        {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          responseType: 'stream',
-          timeout: 30000,
-        },
-      );
-
+      // 4. 通过当前用户的 Provider 流式调用
       let fullAssistantContent = '';
-
-      response.data.on('data', (chunk: Buffer) => {
-        const lines = chunk.toString().split('\n').filter((line) => line.trim() !== '');
-        for (const line of lines) {
-          if (line.includes('[DONE]')) continue;
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              const content = data.choices[0]?.delta?.content || '';
-              if (content) {
-                fullAssistantContent += content;
-                res.write(`data: ${JSON.stringify({ type: 'text', content })}\n\n`);
-              }
-            } catch {
-              // 忽略解析错误
-            }
-          }
+      for await (const content of provider.chatStream({
+        messages,
+        model: selection.model,
+      })) {
+        if (content) {
+          fullAssistantContent += content;
+          res.write(`data: ${JSON.stringify({ type: 'text', content })}\n\n`);
         }
-      });
+      }
 
-      response.data.on('end', async () => {
-        // 保存助手回复（非阻塞）
-        this.prisma.chatHistory.create({
-          data: {
-            sessionId,
-            role: 'assistant',
-            content: fullAssistantContent,
-            userId,
-            references: JSON.stringify(references),
-          },
-        }).catch((e) => console.error('保存助手消息失败:', e.message));
+      this.prisma.chatHistory.create({
+        data: {
+          sessionId,
+          role: 'assistant',
+          content: fullAssistantContent,
+          userId,
+          references: JSON.stringify(references),
+        },
+      }).catch((e) => console.error('保存助手消息失败:', e.message));
 
-        res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
-        res.end();
-      });
-
-      response.data.on('error', (err: Error) => {
-        console.error('Qwen 流式响应错误:', err.message);
-        const safeMsg = (err.message || '流式响应异常').replace(/[\n\r]/g, ' ');
-        res.write(`data: ${JSON.stringify({ type: 'error', message: safeMsg })}\n\n`);
-        res.end();
-      });
+      res.write(`data: ${JSON.stringify({ type: 'done', references })}\n\n`);
+      res.end();
 
     } catch (error) {
       console.error('Chat error:', error);
-      const safeMsg = (error instanceof Error ? error.message : 'Unknown error').replace(/[\n\r]/g, ' ');
-      res.write(`data: ${JSON.stringify({ type: 'error', message: safeMsg })}\n\n`);
+      const response = error instanceof HttpException ? error.getResponse() as any : undefined;
+      const code = response?.code || 'MODEL_UPSTREAM_UNAVAILABLE';
+      const message = String(response?.message || '模型服务调用失败，请稍后重试').replace(/[\n\r]/g, ' ');
+      res.write(`data: ${JSON.stringify({ type: 'error', code, message })}\n\n`);
       res.end();
     }
   }
 
   async chatWithLLM(
+    userId: string,
     userPrompt: string,
     systemPrompt?: string,
     history: any[] = [],
     model = 'qwen-turbo',
     temperature = 0.7,
     maxTokens = 2048,
+    explicitProvider?: string,
   ): Promise<string> {
-    const apiKey = this.configService.get<string>('QWEN_API_KEY');
-    const baseUrl = this.configService.get<string>('QWEN_BASE_URL');
-
     const messages = [];
     if (systemPrompt) {
       messages.push({ role: 'system', content: systemPrompt });
@@ -263,25 +233,17 @@ export class AiService {
     messages.push({ role: 'user', content: userPrompt });
 
     try {
-      const response = await axios.post(
-        `${baseUrl}/chat/completions`,
-        {
-          model,
-          messages,
-          temperature,
-          max_tokens: maxTokens,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-        },
-      );
-      return response.data.choices[0].message.content;
+      const providerType = this.providerFactory.inferUserProvider(model, explicitProvider);
+      const provider = await this.providerFactory.createForUser(userId, providerType);
+      const response = await provider.chat({ messages, model, temperature, maxTokens });
+      return response.content;
     } catch (error) {
       console.error('Error calling LLM API:', error.response?.data || error.message);
-      throw new Error('Failed to get response from LLM.');
+      if (error instanceof HttpException) throw error;
+      throw new BadGatewayException({
+        code: 'MODEL_UPSTREAM_UNAVAILABLE',
+        message: '模型服务调用失败，请检查模型和服务状态',
+      });
     }
   }
 
@@ -289,16 +251,15 @@ export class AiService {
    * chatWithLLM 的增强版，同时返回 Token 使用量
    */
   async chatWithLLMAndUsage(
+    userId: string,
     userPrompt: string,
     systemPrompt?: string,
     history: any[] = [],
     model = 'qwen-turbo',
     temperature = 0.7,
     maxTokens = 2048,
+    explicitProvider?: string,
   ): Promise<{ content: string; usage: { promptTokens: number; completionTokens: number; totalTokens: number } }> {
-    const apiKey = this.configService.get<string>('QWEN_API_KEY');
-    const baseUrl = this.configService.get<string>('QWEN_BASE_URL');
-
     const messages = [];
     if (systemPrompt) {
       messages.push({ role: 'system', content: systemPrompt });
@@ -307,40 +268,52 @@ export class AiService {
     messages.push({ role: 'user', content: userPrompt });
 
     try {
-      const response = await axios.post(
-        `${baseUrl}/chat/completions`,
-        {
-          model,
-          messages,
-          temperature,
-          max_tokens: maxTokens,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-        },
-      );
-
-      const usage = response.data.usage || {
-        prompt_tokens: 0,
-        completion_tokens: 0,
-        total_tokens: 0,
-      };
+      const providerType = this.providerFactory.inferUserProvider(model, explicitProvider);
+      const provider = await this.providerFactory.createForUser(userId, providerType);
+      const response = await provider.chat({ messages, model, temperature, maxTokens });
+      const usage = response.usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
 
       return {
-        content: response.data.choices[0].message.content,
+        content: response.content,
         usage: {
-          promptTokens: usage.prompt_tokens || 0,
-          completionTokens: usage.completion_tokens || 0,
-          totalTokens: usage.total_tokens || 0,
+          promptTokens: usage.promptTokens || 0,
+          completionTokens: usage.completionTokens || 0,
+          totalTokens: usage.totalTokens || 0,
         },
       };
     } catch (error) {
       console.error('Error calling LLM API:', error.response?.data || error.message);
-      throw new Error('Failed to get response from LLM.');
+      if (error instanceof HttpException) throw error;
+      throw new BadGatewayException({
+        code: 'MODEL_UPSTREAM_UNAVAILABLE',
+        message: '模型服务调用失败，请检查模型和服务状态',
+      });
     }
+  }
+
+  private async resolveChatSelection(
+    userId: string,
+    requestedProvider?: UserModelProvider,
+    requestedModel?: string,
+  ): Promise<{ provider: UserModelProvider; model: string }> {
+    const defaults: Record<UserModelProvider, string> = {
+      qwen: 'qwen-turbo',
+      openai: 'gpt-4o-mini',
+      ollama: 'qwen2.5:7b',
+    };
+    if (requestedProvider) {
+      return { provider: requestedProvider, model: requestedModel || defaults[requestedProvider] };
+    }
+    const configured = (await this.modelCredentials.list(userId))
+      .filter((item: any) => item.isEnabled && item.status === 'valid');
+    if (configured.length !== 1) {
+      throw new UnprocessableEntityException({
+        code: 'MODEL_SELECTION_REQUIRED',
+        message: configured.length === 0 ? '请先配置并测试模型服务' : '请选择要使用的模型服务和模型',
+      });
+    }
+    const provider = configured[0].provider as UserModelProvider;
+    return { provider, model: requestedModel || defaults[provider] };
   }
 
   async getChatHistory(userId: string, sessionId: string) {

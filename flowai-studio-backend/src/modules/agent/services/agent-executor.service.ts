@@ -31,6 +31,7 @@ import {
   ToolDefinition,
 } from '../interfaces/agent.interface';
 import { LLMChatParams } from '../interfaces/llm-provider.interface';
+import { TokenUsageService } from './token-usage.service';
 
 @Injectable()
 export class AgentExecutorService {
@@ -41,6 +42,7 @@ export class AgentExecutorService {
     private readonly skillService: SkillService,
     private readonly ragService: RAGService,
     private readonly prisma: PrismaService,
+    private readonly tokenUsageService: TokenUsageService,
   ) {}
 
   /**
@@ -148,11 +150,14 @@ export class AgentExecutorService {
 
     // RAG 上下文（如果启用）
     if (agentConfig.ragEnabled && agentConfig.knowledgeBaseIds.length > 0) {
-      await this.enrichWithRAG(state, agentConfig.knowledgeBaseIds, input);
+      await this.enrichWithRAG(state, agentConfig.knowledgeBaseIds, input, this.requireUserId(options));
     }
 
     // 获取对应模型的 Provider
-    const provider = this.providerFactory.getProviderForModel(agentConfig.model);
+    const provider = await this.providerFactory.createForUser(
+      this.requireUserId(options),
+      this.providerFactory.inferUserProvider(agentConfig.model, agentConfig.provider),
+    );
 
     // ReAct 循环
     while (state.iteration < maxIterations && !state.finished) {
@@ -186,6 +191,7 @@ export class AgentExecutorService {
         maxTokens: agentConfig.maxTokens,
         tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
       });
+      this.recordTokenUsage(llmResponse, agentConfig.provider || this.providerFactory.inferUserProvider(agentConfig.model), agentConfig.model, options);
 
       // 如果有工具调用 → 执行工具
       if (llmResponse.toolCalls && llmResponse.toolCalls.length > 0) {
@@ -398,7 +404,10 @@ export class AgentExecutorService {
     });
 
     // 获取 Supervisor 模型的 Provider
-    const supervisorProvider = this.providerFactory.getProviderForModel(supervisorConfig.model);
+    const supervisorProvider = await this.providerFactory.createForUser(
+      this.requireUserId(options),
+      this.providerFactory.inferUserProvider(supervisorConfig.model, supervisorConfig.provider),
+    );
 
     // ReAct 循环（Supervisor 视角）
     while (state.iteration < maxIterations && !state.finished) {
@@ -428,6 +437,7 @@ export class AgentExecutorService {
         temperature: supervisorConfig.temperature,
         tools: delegateTools,
       });
+      this.recordTokenUsage(supervisorResponse, supervisorConfig.provider || this.providerFactory.inferUserProvider(supervisorConfig.model), supervisorConfig.model, options);
 
       if (
         supervisorResponse.toolCalls &&
@@ -607,11 +617,14 @@ export class AgentExecutorService {
 
     // RAG 上下文
     if (workerConfig.ragEnabled && workerConfig.knowledgeBaseIds.length > 0) {
-      await this.enrichWithRAG(state, workerConfig.knowledgeBaseIds, task);
+      await this.enrichWithRAG(state, workerConfig.knowledgeBaseIds, task, this.requireUserId(options));
     }
 
     // 获取 Worker 模型的 Provider
-    const provider = this.providerFactory.getProviderForModel(workerConfig.model);
+    const provider = await this.providerFactory.createForUser(
+      this.requireUserId(options),
+      this.providerFactory.inferUserProvider(workerConfig.model, workerConfig.provider),
+    );
 
     // ReAct 循环
     while (state.iteration < maxIterations && !state.finished) {
@@ -627,6 +640,7 @@ export class AgentExecutorService {
         maxTokens: workerConfig.maxTokens,
         tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
       });
+      this.recordTokenUsage(llmResponse, workerConfig.provider || this.providerFactory.inferUserProvider(workerConfig.model), workerConfig.model, options);
 
       if (llmResponse.toolCalls && llmResponse.toolCalls.length > 0) {
         state.messages.push({
@@ -823,10 +837,11 @@ export class AgentExecutorService {
     state: AgentState,
     knowledgeBaseIds: string[],
     query: string,
+    userId: string,
   ): Promise<void> {
     for (const kbId of knowledgeBaseIds) {
       try {
-        const results = await this.ragService.retrieve(query, kbId, 5);
+        const results = await this.ragService.retrieve(userId, query, kbId, 5);
         const documents = results.map((r: any) => ({
           content: r.content,
           score: r.score,
@@ -862,6 +877,32 @@ export class AgentExecutorService {
         );
       }
     }
+  }
+
+  private requireUserId(options?: AgentRunOptions): string {
+    const userId = options?.context?._userId as string | undefined;
+    if (!userId) throw new Error('MODEL_CREDENTIAL_REQUIRED: agent execution user is missing');
+    return userId;
+  }
+
+  private recordTokenUsage(
+    response: { usage?: { promptTokens: number; completionTokens: number; totalTokens: number } },
+    provider: string,
+    model: string,
+    options?: AgentRunOptions,
+  ): void {
+    if (!response.usage || response.usage.totalTokens <= 0) return;
+    const context = options?.context || {};
+    this.tokenUsageService.recordFromResponse({
+      userId: this.requireUserId(options),
+      applicationId: context._applicationId,
+      workflowId: context._workflowId,
+      executionId: context._executionId,
+      provider,
+      model,
+      usage: response.usage,
+      callType: 'agent',
+    });
   }
 
   // ============================================================

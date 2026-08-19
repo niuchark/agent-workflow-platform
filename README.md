@@ -75,7 +75,11 @@ npx prisma db seed
 # 启动后端开发服务器
 npm run start:dev
 ```
-*注意：请务必在 .env 文件中填入有效的 QWEN_API_KEY 以启用 AI 节点功能。*
+启动后请登录系统，在侧栏「模型服务」中为当前用户配置并测试 Qwen、OpenAI-compatible 或 Ollama。服务端环境变量中的模型 Key 不再作为业务调用兜底。
+
+生产环境必须设置 `MODEL_CREDENTIAL_ENCRYPTION_KEY`。可使用 `openssl rand -base64 32` 生成，并将其与数据库备份一同安全保管；密钥丢失后，数据库中已加密的用户模型 Key 无法恢复。私网 Ollama 等地址需由管理员通过 `MODEL_PRIVATE_BASE_URL_ALLOWLIST` 配置精确 Origin 白名单。
+
+生产发布使用 `npx prisma migrate deploy`；Docker 镜像启动时也会自动执行该命令。若旧数据库曾使用 `prisma db push` 创建，可能出现 Prisma `P3005`。此时应先备份并在数据库副本上核对结构，再用 `prisma migrate resolve --applied <旧迁移名>` 为已有的历史迁移建立基线；不要把 `20260819000000_add_model_credentials` 标为已执行，最后再运行 `migrate deploy` 创建用户凭证表。
 
 ### 3. 前端配置与启动
 ```bash

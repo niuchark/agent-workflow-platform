@@ -30,6 +30,8 @@ import { ClaudeProvider } from './claude.provider';
 import { GeminiProvider } from './gemini.provider';
 import { QwenProvider } from './qwen.provider';
 import { OllamaProvider } from './ollama.provider';
+import { ModelCredentialService } from '../../model-credential/model-credential.service';
+import { UserModelProvider } from '../../model-credential/model-credential.types';
 
 interface LLMProviderRegistryEntry {
   type: LLMProviderType;
@@ -50,9 +52,51 @@ export class LLMProviderFactory {
   /** 模型 → Provider 的路由表 */
   private modelRouteMap = new Map<string, LLMProviderType>();
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly modelCredentials: ModelCredentialService,
+  ) {
     this.registerDefaults();
     this.buildModelRouteMap();
+  }
+
+  /** 使用当前用户的加密凭证创建一次性 Provider，不缓存明文密钥。 */
+  async createForUser(
+    userId: string,
+    providerType: UserModelProvider,
+    overrides?: Partial<LLMProviderConfig>,
+  ): Promise<ILLMProvider> {
+    const createResolved = async () => {
+      // 每次真实上游请求前都重新读取状态、解密并执行 DNS/SSRF 校验。
+      const credential = await this.modelCredentials.resolveStored(userId, providerType, true);
+      return this.create(providerType, {
+        apiKey: credential.apiKey,
+        baseUrl: credential.baseUrl,
+        ...overrides,
+      });
+    };
+    const initial = await createResolved();
+    return {
+      name: initial.name,
+      defaultModel: initial.defaultModel,
+      supportedModels: initial.supportedModels,
+      chat: async (params) => (await createResolved()).chat(params),
+      chatStream: async function* (params) {
+        const provider = await createResolved();
+        for await (const chunk of provider.chatStream(params)) yield chunk;
+      },
+      healthCheck: async () => (await createResolved()).healthCheck(),
+      estimateTokens: (text) => initial.estimateTokens(text),
+      buildToolDefinitions: (skills) => initial.buildToolDefinitions(skills),
+    };
+  }
+
+  inferUserProvider(modelId: string, explicit?: string): UserModelProvider {
+    if (explicit === 'qwen' || explicit === 'openai' || explicit === 'ollama') return explicit;
+    if (modelId.startsWith('gpt-') || modelId.startsWith('o1-')) return 'openai';
+    if (modelId.startsWith('qwen-') || modelId.startsWith('qwen2')) return 'qwen';
+    if (modelId.includes(':')) return 'ollama';
+    return 'qwen';
   }
 
   /**

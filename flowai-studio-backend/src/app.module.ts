@@ -13,6 +13,7 @@ import { SkillModule } from './modules/skill/skill.module';
 import { AiModule } from './modules/ai/ai.module';
 import { McpModule } from './modules/mcp/mcp.module';
 import { TeamModule } from './modules/team/team.module';
+import { ModelCredentialModule } from './modules/model-credential/model-credential.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { TeamModule } from './modules/team/team.module';
     AiModule,
     McpModule,
     TeamModule,
+    ModelCredentialModule,
   ],
 })
 export class AppModule {}

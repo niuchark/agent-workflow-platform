@@ -32,10 +32,39 @@ model User {
   ownedTeams      Team[]              @relation("TeamOwner")
   teamMemberships TeamMember[]
   apiKeys         ApiKey[]
+  modelCredentials ModelCredential[]
   tokenUsageRecords TokenUsageRecord[]
 
 
   @@map("users")
+}
+
+// ============================================================
+// 用户模型服务凭证（BYOK）
+// ============================================================
+
+model ModelCredential {
+  id                String   @id @default(uuid())
+  provider          String
+  baseUrl           String
+  encryptedApiKey   String?
+  encryptionIv      String?
+  encryptionTag     String?
+  keyPrefix         String?
+  keySuffix         String?
+  status            String   @default("untested") // untested, valid, invalid, disabled
+  isEnabled         Boolean  @default(false)
+  lastTestedAt      DateTime?
+  lastTestMessage   String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId])
+  @@map("model_credentials")
 }
 
 // ============================================================

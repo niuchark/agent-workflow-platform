@@ -12,6 +12,7 @@ import Debug from '../pages/Debug'
 import TeamManagement from '../pages/TeamManagement'
 import TeamDetail from '../pages/TeamDetail'
 import ApiKeyManagement from '../pages/ApiKeyManagement'
+import ModelSettings from '../pages/ModelSettings'
 import SharedApp from '../pages/SharedApp'
 import CostStatistics from '../pages/CostStatistics'
 import RateLimitMonitor from '../pages/RateLimitMonitor'
@@ -52,6 +53,7 @@ export const router = createBrowserRouter(
         <Route path="/teams" element={<TeamManagement />} />
         <Route path="/teams/:teamId" element={<TeamDetail />} />
         <Route path="/api-keys" element={<ApiKeyManagement />} />
+        <Route path="/model-settings" element={<ModelSettings />} />
         <Route path="/cost-statistics" element={<CostStatistics />} />
         <Route path="/rate-limit" element={<RateLimitMonitor />} />
         <Route path="/trace-list" element={<TraceList />} />

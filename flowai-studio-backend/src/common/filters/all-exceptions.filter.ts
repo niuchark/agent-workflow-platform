@@ -28,11 +28,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
       } else if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
-        const res = exceptionResponse as { message?: string | string[]; error?: string };
+        const res = exceptionResponse as { message?: string | string[]; error?: string; code?: string };
         message = Array.isArray(res.message) ? res.message[0] : (res.message || res.error || 'Error');
+        if (res.code) code = res.code;
       }
-      
-      code = this.getErrorCode(status);
+      if (code === 'INTERNAL_ERROR') code = this.getErrorCode(status);
     } else if (exception instanceof Error) {
       message = exception.message;
     }

@@ -157,6 +157,7 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
           'Authorization': `Bearer ${this.config.apiKey}`,
         },
         timeout: this.config.timeout,
+        maxRedirects: 0,
       },
     );
 

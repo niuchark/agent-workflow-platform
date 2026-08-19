@@ -17,6 +17,12 @@ import {
 
 const { Title, Text } = Typography
 
+const formatDate = (value?: string) => {
+  if (!value) return '—'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('zh-CN')
+}
+
 const TeamDetail: React.FC = () => {
   const { teamId } = useParams<{ teamId: string }>()
   const navigate = useNavigate()
@@ -169,10 +175,10 @@ const TeamDetail: React.FC = () => {
     },
     {
       title: '加入时间',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
+      dataIndex: 'joinedAt',
+      key: 'joinedAt',
       width: 160,
-      render: (date: string) => new Date(date).toLocaleDateString('zh-CN'),
+      render: (date: string) => formatDate(date),
     },
     {
       title: '操作',
@@ -229,10 +235,10 @@ const TeamDetail: React.FC = () => {
     },
     {
       title: '添加时间',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
+      dataIndex: 'addedAt',
+      key: 'addedAt',
       width: 160,
-      render: (date: string) => new Date(date).toLocaleDateString('zh-CN'),
+      render: (date: string) => formatDate(date),
     },
     {
       title: '操作',
@@ -321,6 +327,10 @@ const TeamDetail: React.FC = () => {
             children: (
               <div className="team-tab-content">
                 <div className="team-tab-toolbar">
+                  <div className="team-tab-toolbar-copy">
+                    <h3>团队成员</h3>
+                    <Text type="secondary">管理成员及其在团队中的访问角色</Text>
+                  </div>
                   <Button
                     type="primary"
                     icon={<PlusOutlined />}
@@ -335,6 +345,8 @@ const TeamDetail: React.FC = () => {
                   rowKey="id"
                   pagination={false}
                   size="middle"
+                  className="team-detail-table"
+                  scroll={{ x: 680 }}
                 />
               </div>
             ),
@@ -345,6 +357,12 @@ const TeamDetail: React.FC = () => {
             children: (
               <div className="team-tab-content">
                 <div className="team-tab-toolbar">
+                  <div className="team-tab-toolbar-copy">
+                    <h3>团队应用</h3>
+                    <Text type="secondary">
+                      {availableApps.length === 0 ? '所有应用已添加到团队' : '配置团队可访问的应用及权限'}
+                    </Text>
+                  </div>
                   <Button
                     type="primary"
                     icon={<PlusOutlined />}
@@ -353,11 +371,6 @@ const TeamDetail: React.FC = () => {
                   >
                     添加应用
                   </Button>
-                  {availableApps.length === 0 && (
-                    <Text type="secondary" style={{ marginLeft: 8 }}>
-                      所有应用已添加到团队
-                    </Text>
-                  )}
                 </div>
                 <Table
                   dataSource={teamApps}
@@ -365,6 +378,8 @@ const TeamDetail: React.FC = () => {
                   rowKey="id"
                   pagination={false}
                   size="middle"
+                  className="team-detail-table"
+                  scroll={{ x: 680 }}
                 />
               </div>
             ),

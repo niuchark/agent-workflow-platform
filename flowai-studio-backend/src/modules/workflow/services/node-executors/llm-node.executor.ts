@@ -12,34 +12,36 @@ export class LLMNodeExecutor implements INodeExecutor {
 
   async execute(node: any, context: Record<string, any>): Promise<Record<string, any>> {
     const nodeData = node.data as any;
-    const { model, systemPrompt, userPrompt, temperature, maxTokens } = nodeData;
+    const { model, provider, systemPrompt, userPrompt, temperature, maxTokens } = nodeData;
 
     // 替换上下文变量
     const resolvedUserPrompt = this.resolveVariables(userPrompt, context);
 
     // 使用增强版 chatWithLLMAndUsage 获取 usage 信息
+    const userId = context._userId as string | undefined;
+    if (!userId) throw new Error('MODEL_CREDENTIAL_REQUIRED: workflow user is missing');
     const { content, usage } = await this.aiService.chatWithLLMAndUsage(
+      userId,
       resolvedUserPrompt,
       systemPrompt,
       [], // 暂不支持多轮对话历史
       model,
       temperature,
       maxTokens,
+      provider,
     );
 
     // 记录 Token 使用量（异步，非阻塞）
     const workflowId = context._workflowId as string | undefined;
     const executionId = context._executionId as string | undefined;
     const applicationId = context._applicationId as string | undefined;
-    const userId = context._userId as string | undefined;
-
     if (userId && usage.totalTokens > 0) {
       this.tokenUsageService.recordFromResponse({
         userId,
         applicationId,
         workflowId,
         executionId,
-        provider: this.inferProvider(model),
+        provider: provider || this.inferProvider(model),
         model,
         usage,
         callType: 'chat',
@@ -57,7 +59,8 @@ export class LLMNodeExecutor implements INodeExecutor {
     if (model.startsWith('claude-')) return 'claude';
     if (model.startsWith('gemini-')) return 'gemini';
     if (model.startsWith('qwen-')) return 'qwen';
-    return 'unknown';
+    if (model.includes(':')) return 'ollama';
+    return 'qwen';
   }
 
   private resolveVariables(template: string, context: Record<string, any>): string {

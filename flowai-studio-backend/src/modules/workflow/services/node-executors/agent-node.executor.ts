@@ -70,6 +70,7 @@ export class AgentNodeExecutor implements INodeExecutor {
         description: data.description || '',
         systemPrompt: data.systemPrompt || '',
         model: data.model || 'qwen-turbo',
+        provider: data.provider || this.inferProvider(data.model || 'qwen-turbo'),
         temperature: data.temperature ?? 0.7,
         maxTokens: data.maxTokens ?? 2048,
         toolIds: data.toolIds || [],
@@ -81,7 +82,8 @@ export class AgentNodeExecutor implements INodeExecutor {
 
       config.supervisor = {
         systemPrompt: data.supervisorPrompt || '',
-        model: data.model || 'qwen-plus',
+        model: data.supervisorModel || data.model || 'qwen-plus',
+        provider: data.supervisorProvider || data.provider || this.inferProvider(data.supervisorModel || data.model || 'qwen-plus'),
         temperature: data.temperature ?? 0.3,
         maxIterations,
         workers: workers.map((w, i) => ({
@@ -90,6 +92,7 @@ export class AgentNodeExecutor implements INodeExecutor {
           description: w.description || '',
           systemPrompt: w.systemPrompt || '',
           model: w.model || data.model || 'qwen-turbo',
+          provider: w.provider || data.provider || this.inferProvider(w.model || data.model || 'qwen-turbo'),
           temperature: w.temperature ?? 0.7,
           maxTokens: w.maxTokens ?? 2048,
           toolIds: w.toolIds || [],
@@ -100,6 +103,12 @@ export class AgentNodeExecutor implements INodeExecutor {
     }
 
     return config;
+  }
+
+  private inferProvider(model: string): 'qwen' | 'openai' | 'ollama' {
+    if (model.startsWith('gpt-') || model.startsWith('o1-')) return 'openai';
+    if (model.includes(':')) return 'ollama';
+    return 'qwen';
   }
 
   /**

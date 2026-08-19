@@ -56,6 +56,32 @@
     @apply flex min-w-0 flex-col;
   }
 
+  .model-settings-page { @apply flex min-w-0 flex-col; }
+  .model-settings-heading { @apply mb-5 flex flex-wrap items-start justify-between gap-3; }
+  .model-settings-title { @apply m-0 font-display text-xl font-semibold tracking-tight text-ink; }
+  .model-settings-subtitle { @apply !mb-0 !mt-1 text-sm text-muted; }
+  .model-settings-security { @apply inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700; }
+  .model-settings-alert { @apply mb-5; }
+  .model-settings-loading { @apply flex min-h-72 items-center justify-center; }
+  .model-provider-grid { @apply grid grid-cols-1 gap-4 xl:grid-cols-2; }
+  .model-provider-card { @apply rounded-2xl border-line; }
+  .model-provider-card .ant-card-body { @apply flex h-full flex-col p-5; }
+  .model-provider-card-header { @apply mb-5 flex items-start gap-3; }
+  .model-provider-icon { @apply flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-xl text-brand-600; }
+  .model-provider-copy { @apply min-w-0 flex-1; }
+  .model-provider-copy p { @apply !mb-0 !mt-1 text-sm text-muted; }
+  .model-provider-title-row { @apply flex flex-wrap items-center justify-between gap-2; }
+  .model-provider-title-main { @apply flex min-w-0 flex-wrap items-center gap-2; }
+  .model-provider-title-row h3 { @apply m-0 text-base font-semibold text-ink; }
+  .model-provider-apply-key { @apply !h-8 !border-brand-200 !text-xs !text-brand-700 hover:!border-brand-400 hover:!text-brand-800; }
+  .model-clear-key { @apply !mt-1 !h-auto !p-0; }
+  .model-test-result { @apply mb-4 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 text-sm; }
+  .model-test-result--valid { @apply border-emerald-200 bg-emerald-50 text-emerald-700; }
+  .model-test-result--invalid { @apply border-red-200 bg-red-50 text-red-700; }
+  .model-test-result--untested, .model-test-result--disabled { @apply border-amber-200 bg-amber-50 text-amber-700; }
+  .model-provider-actions { @apply mt-auto flex flex-wrap items-center gap-2 border-t border-line pt-4; }
+  .debug-model-controls { @apply flex flex-wrap items-center gap-2; }
+
   .app-toolbar, .skill-toolbar, .team-toolbar, .apikey-toolbar,
   .cost-statistics-toolbar, .rate-limit-toolbar, .trace-list-toolbar,
   .trace-detail-toolbar, .template-market-header, .kb-page-header,
@@ -177,7 +203,17 @@
   .apikey-tip { @apply mt-3 text-xs leading-5 text-amber-800; }
   .team-detail-info h2 { @apply m-0 font-display text-xl font-semibold text-ink; }
   .team-detail-info p { @apply m-0 mt-1 text-sm text-muted; }
-  .team-tab-toolbar { @apply mb-4 flex flex-wrap items-center justify-between gap-3; }
+  .team-tab-toolbar { @apply flex flex-wrap items-center justify-between gap-3 border-b border-brand-200 bg-brand-50 px-4 py-4 sm:px-5; }
+  .team-tab-toolbar-copy { @apply min-w-0; }
+  .team-tab-toolbar-copy h3 { @apply m-0 text-sm font-semibold text-brand-900; }
+  .team-tab-toolbar-copy .ant-typography { @apply mt-0.5 block text-xs leading-5 text-slate-600; }
+  .team-tab-toolbar .ant-btn { @apply min-h-10 shrink-0; }
+  .team-detail-table { @apply min-w-0; }
+  .team-detail-table .ant-table-container { @apply rounded-none; }
+  .team-table .ant-table-thead > tr > th,
+  .team-detail-table .ant-table-thead > tr > th { @apply !border-b !border-slate-300 !bg-slate-100 px-4 py-3 !text-slate-700 sm:px-5; }
+  .team-detail-table .ant-table-tbody > tr > td { @apply px-4 py-3.5 sm:px-5; }
+  .team-detail-table .ant-table-tbody > tr:last-child > td { @apply border-b-0; }
 
   /* Shared statistics */
   .page-stats-row, .kb-stats-row, .cost-stat-cards {
@@ -478,6 +514,28 @@
   .config-panel-empty h4 { @apply m-0 mb-2 text-sm font-semibold text-ink; }
   .config-panel-empty p { @apply m-0 text-xs leading-5 text-muted; }
   .config-panel-empty-tip { @apply mt-4 rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-muted; }
+  .variable-field { @apply grid gap-2; }
+  .variable-template-form-item .ant-form-item-explain { @apply hidden; }
+  .variable-field-messages { @apply grid gap-1.5; }
+  .variable-field-message { @apply flex items-start gap-1.5 text-xs leading-5 text-red-600; overflow-wrap: anywhere; }
+  .variable-field-message .anticon { @apply mt-1 shrink-0 text-[11px]; }
+  .variable-field-toolbar { @apply mt-2 grid min-w-0 gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3; }
+  .variable-field-toolbar-heading { @apply flex min-w-0 items-center justify-between gap-3 px-0.5; }
+  .variable-field-toolbar-title { @apply inline-flex min-w-0 items-center gap-1.5 text-xs font-medium text-slate-700; }
+  .variable-field-toolbar-title .anticon { @apply text-brand-600; }
+  .variable-field-picker { @apply w-full min-w-0; }
+  .variable-field-picker .ant-select-selector { @apply !min-h-10 !items-center !rounded-lg !bg-white; }
+  .variable-field-hint, .variable-field-empty-hint { @apply text-[11px] leading-4 text-muted; }
+  .variable-field-hint { @apply shrink-0; }
+  .variable-field-empty-hint { @apply px-0.5 pt-0.5; }
+  .field-label-with-help { @apply inline-flex items-center gap-1; }
+  .field-help-button { @apply inline-flex size-6 cursor-help items-center justify-center rounded-full border-0 bg-transparent p-0 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600 focus-visible:bg-brand-50 focus-visible:text-brand-700; }
+  .field-help-button .anticon { @apply text-xs; }
+  .user-prompt-help-content { @apply block max-w-64 text-xs leading-5; }
+  .variable-template-form-item.ant-form-item-has-error .variable-field-picker:not(.ant-select-disabled) .ant-select-selector,
+  .variable-field-toolbar .ant-select-status-error:not(.ant-select-disabled) .ant-select-selector { @apply !border-slate-200 !shadow-none; }
+  .variable-template-form-item.ant-form-item-has-error .variable-field-picker.ant-select-focused:not(.ant-select-disabled) .ant-select-selector,
+  .variable-field-toolbar .ant-select-status-error.ant-select-focused:not(.ant-select-disabled) .ant-select-selector { @apply !border-brand-500 !shadow-focus; }
   .run-section, .run-results { @apply grid gap-2; }
   .run-section-label { @apply text-[11px] font-semibold uppercase tracking-wide text-muted; }
   .run-input-textarea { @apply !rounded-lg !bg-slate-50 !font-mono !text-xs; }

@@ -56,6 +56,7 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
         },
         {
           timeout: this.config.timeout,
+          maxRedirects: 0,
         },
       );
 
@@ -121,6 +122,7 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
     try {
       const response = await axios.get(`${this.config.baseUrl}/api/tags`, {
         timeout: 5000,
+        maxRedirects: 0,
       });
       // 检查指定模型是否存在
       const models: string[] = (response.data.models ?? []).map((m: any) => m.name);

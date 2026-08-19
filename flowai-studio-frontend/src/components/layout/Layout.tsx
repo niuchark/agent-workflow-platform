@@ -19,6 +19,7 @@ import {
   BarChartOutlined,
   SafetyOutlined,
   NodeIndexOutlined,
+  CloudServerOutlined,
 } from '@ant-design/icons'
 import { useStore } from '../../store'
 import BrandLogo from '../BrandLogo'
@@ -36,6 +37,7 @@ const routeMeta: Record<string, { title: string }> = {
   '/debug': { title: '调试中心' },
   '/teams': { title: '团队管理' },
   '/api-keys': { title: 'API 密钥' },
+  '/model-settings': { title: '模型服务' },
   '/cost-statistics': { title: '成本统计' },
   '/rate-limit': { title: '限流监控' },
   '/trace-list': { title: '全链路追踪' },
@@ -68,6 +70,7 @@ const Layout: React.FC = () => {
     { key: '/debug', icon: <BugOutlined />, label: '调试中心' },
     { key: '/teams', icon: <TeamOutlined />, label: '团队管理' },
     { key: '/api-keys', icon: <KeyOutlined />, label: 'API 密钥' },
+    { key: '/model-settings', icon: <CloudServerOutlined />, label: '模型服务' },
     { key: '/cost-statistics', icon: <BarChartOutlined />, label: '成本统计' },
     { key: '/rate-limit', icon: <SafetyOutlined />, label: '限流监控' },
     { key: '/trace-list', icon: <NodeIndexOutlined />, label: '全链路追踪' },

@@ -11,8 +11,12 @@ export class RAGNodeExecutor implements INodeExecutor {
     const { knowledgeBaseId, query, topK, similarityThreshold } = nodeData;
 
     const resolvedQuery = this.resolveVariables(query, context);
+    const userId = context._userId;
+    if (!userId) {
+      throw new Error('RAG node execution requires an authenticated user');
+    }
 
-    const documents = await this.ragService.retrieve(resolvedQuery, knowledgeBaseId, topK);
+    const documents = await this.ragService.retrieve(userId, resolvedQuery, knowledgeBaseId, topK);
 
     return { documents };
   }

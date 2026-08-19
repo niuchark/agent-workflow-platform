@@ -118,6 +118,7 @@ export class OllamaReranker implements RerankerProvider {
     try {
       const response = await fetch(`${this.config.baseUrl}/api/tags`, {
         signal: AbortSignal.timeout(5000),
+        redirect: 'error',
       });
       if (!response.ok) return false;
 
@@ -182,6 +183,7 @@ export class OllamaReranker implements RerankerProvider {
         },
       }),
       signal: AbortSignal.timeout(this.config.timeout),
+      redirect: 'error',
     });
 
     if (!response.ok) {

@@ -11,7 +11,7 @@ export const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('7d'),
 
   // 通义千问API配置
-  QWEN_API_KEY: z.string().min(1, 'QWEN_API_KEY is required'),
+  QWEN_API_KEY: z.string().optional(),
   QWEN_BASE_URL: z.string().default('https://dashscope.aliyuncs.com/compatible-mode/v1'),
 
   // 通义千问向量模型配置
@@ -61,6 +61,18 @@ export const envSchema = z.object({
 
   // Redis 配置
   REDIS_URL: z.string().default('redis://localhost:6379'),
+
+  // 用户模型凭证加密与私网 Base URL 白名单
+  MODEL_CREDENTIAL_ENCRYPTION_KEY: z.string().optional(),
+  MODEL_PRIVATE_BASE_URL_ALLOWLIST: z.string().default(''),
+}).superRefine((config, ctx) => {
+  if (config.NODE_ENV === 'production' && !config.MODEL_CREDENTIAL_ENCRYPTION_KEY) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['MODEL_CREDENTIAL_ENCRYPTION_KEY'],
+      message: 'MODEL_CREDENTIAL_ENCRYPTION_KEY is required in production',
+    });
+  }
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

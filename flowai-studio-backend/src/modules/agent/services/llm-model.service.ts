@@ -14,35 +14,46 @@ import {
   LLMModelInfo,
   LLMProviderType,
 } from '../interfaces/llm-provider.interface';
+import { ModelCredentialService } from '../../model-credential/model-credential.service';
+import { UserModelProvider } from '../../model-credential/model-credential.types';
 
 @Injectable()
 export class LLMModelService {
   private readonly logger = new Logger(LLMModelService.name);
 
-  constructor(private readonly providerFactory: LLMProviderFactory) {}
+  constructor(
+    private readonly providerFactory: LLMProviderFactory,
+    private readonly modelCredentials: ModelCredentialService,
+  ) {}
 
   /**
    * 获取所有可用模型（按 Provider 分组）
    */
-  getModelsGroupByProvider(): Record<string, {
+  async getModelsGroupByProvider(userId: string): Promise<Record<string, {
     provider: LLMProviderType;
     description: string;
     models: LLMModelInfo[];
-  }> {
-    const providerTypes = this.providerFactory.getRegisteredTypes();
+  }>> {
+    const summaries = await this.modelCredentials.list(userId);
     const result: Record<string, {
       provider: LLMProviderType;
       description: string;
       models: LLMModelInfo[];
     }> = {};
 
-    for (const { type, description } of providerTypes) {
+    for (const summary of summaries) {
+      const type = summary.provider as UserModelProvider;
+      const description = `${type} 用户模型服务`;
+      if (!summary.isEnabled || summary.status !== 'valid') {
+        result[type] = { provider: type, description, models: [] };
+        continue;
+      }
       try {
-        const provider = this.providerFactory.create(type);
+        const discovered = await this.modelCredentials.listModels(userId, type);
         result[type] = {
           provider: type,
           description,
-          models: provider.supportedModels,
+          models: discovered.map((model: any) => this.toModelInfo(type, model.id, model.displayName)),
         };
       } catch {
         result[type] = {
@@ -59,8 +70,9 @@ export class LLMModelService {
   /**
    * 获取所有模型（扁平列表）
    */
-  getAllModels(): LLMModelInfo[] {
-    return this.providerFactory.getAllModels();
+  async getAllModels(userId: string): Promise<LLMModelInfo[]> {
+    const groups = await this.getModelsGroupByProvider(userId);
+    return Object.values(groups).flatMap((group) => group.models);
   }
 
   /**
@@ -73,11 +85,15 @@ export class LLMModelService {
   /**
    * 健康检查所有 Provider
    */
-  async healthCheck(): Promise<Record<LLMProviderType, {
+  async healthCheck(userId: string): Promise<Record<string, {
     available: boolean;
     models: number;
   }>> {
-    return this.providerFactory.healthCheckAll();
+    const groups = await this.getModelsGroupByProvider(userId);
+    return Object.fromEntries(Object.entries(groups).map(([provider, group]) => [
+      provider,
+      { available: group.models.length > 0, models: group.models.length },
+    ]));
   }
 
   /**
@@ -101,17 +117,31 @@ export class LLMModelService {
   /**
    * 发现 Ollama 本地模型
    */
-  async discoverOllamaModels(): Promise<LLMModelInfo[]> {
+  async discoverOllamaModels(userId: string): Promise<LLMModelInfo[]> {
     try {
-      const provider = this.providerFactory.create('ollama');
-      // OllamaProvider 有 discoverLocalModels 方法
-      if ('discoverLocalModels' in provider) {
-        return await (provider as any).discoverLocalModels();
-      }
-      return provider.supportedModels;
+      const models = await this.modelCredentials.listModels(userId, 'ollama');
+      return models.map((model: any) => this.toModelInfo('ollama', model.id, model.displayName));
     } catch {
       this.logger.warn('Failed to discover Ollama models');
       return [];
     }
+  }
+
+  private toModelInfo(provider: UserModelProvider, id: string, displayName: string): LLMModelInfo {
+    const known = this.providerFactory.getModelInfo(id);
+    if (known && known.provider === provider) return known;
+    return {
+      id,
+      displayName,
+      provider,
+      capabilities: {
+        functionCalling: provider !== 'ollama',
+        vision: false,
+        streaming: true,
+        jsonMode: provider !== 'ollama',
+        maxContextTokens: 32768,
+        maxOutputTokens: 8192,
+      },
+    };
   }
 }

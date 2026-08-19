@@ -30,7 +30,10 @@ describe('LLMProviderFactory', () => {
       }),
     };
 
-    factory = new LLMProviderFactory(mockConfigService as ConfigService);
+    factory = new LLMProviderFactory(
+      mockConfigService as ConfigService,
+      { resolveStored: jest.fn() } as any,
+    );
   });
 
   describe('Provider Registration', () => {

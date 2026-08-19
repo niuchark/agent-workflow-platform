@@ -82,6 +82,7 @@ export class OllamaProvider extends BaseLLMProvider {
         {
           headers: { 'Content-Type': 'application/json' },
           timeout: this.config.timeout || 120000, // 本地推理可能更慢
+          maxRedirects: 0,
         },
       );
 
@@ -100,7 +101,7 @@ export class OllamaProvider extends BaseLLMProvider {
       return result;
     } catch (error) {
       this.logger.error(`Ollama API call failed: ${error.response?.data || error.message}`);
-      throw new Error(`Ollama API call failed: ${error.message}`);
+      throw new Error('MODEL_UPSTREAM_UNAVAILABLE: Ollama 模型调用失败');
     }
   }
 
@@ -115,6 +116,7 @@ export class OllamaProvider extends BaseLLMProvider {
         headers: { 'Content-Type': 'application/json' },
         responseType: 'stream',
         timeout: this.config.timeout || 120000,
+        maxRedirects: 0,
       },
     );
 
@@ -142,7 +144,7 @@ export class OllamaProvider extends BaseLLMProvider {
 
   async healthCheck(): Promise<boolean> {
     try {
-      const response = await axios.get(`${this.baseUrl}/api/tags`, { timeout: 5000 });
+      const response = await axios.get(`${this.baseUrl}/api/tags`, { timeout: 5000, maxRedirects: 0 });
       return response.status === 200;
     } catch {
       return false;
@@ -155,7 +157,7 @@ export class OllamaProvider extends BaseLLMProvider {
    */
   async discoverLocalModels(): Promise<LLMModelInfo[]> {
     try {
-      const response = await axios.get(`${this.baseUrl}/api/tags`, { timeout: 5000 });
+      const response = await axios.get(`${this.baseUrl}/api/tags`, { timeout: 5000, maxRedirects: 0 });
       const models: LLMModelInfo[] = (response.data.models || []).map(
         (m: any, index: number) => ({
           id: m.name,

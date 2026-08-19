@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Typography, Input, Button, Select, Divider, message, Empty, Progress } from 'antd'
+import { Typography, Input, Button, Select, Divider, message, Empty, Progress, AutoComplete, Alert } from 'antd'
 import {
   SendOutlined,
   RobotOutlined,
@@ -18,6 +18,9 @@ import ReactMarkdown from 'react-markdown'
 import { useStore } from '../store'
 import request from '../utils/axios'
 import { createParser } from 'eventsource-parser'
+import { useNavigate } from 'react-router-dom'
+import { useModelCatalog } from '../utils/useModelCatalog'
+import { UserModelProvider } from '../utils/modelCredentialApi'
 
 const { Text, Paragraph } = Typography
 const { Option } = Select
@@ -45,6 +48,8 @@ interface NodeExecState {
 }
 
 const Debug: React.FC = () => {
+  const navigate = useNavigate()
+  const { availableProviders, modelsByProvider, loading: modelCatalogLoading } = useModelCatalog()
   const { isLoading, setIsLoading, apps, fetchApps, knowledgeBases, fetchKnowledgeBases } = useStore()
   const [input, setInput] = useState('')
   const isComposingRef = useRef(false) // 标记是否在输入法组合状态
@@ -54,6 +59,8 @@ const Debug: React.FC = () => {
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>('')
   const [workflows, setWorkflows] = useState<any[]>([])
   const [selectedKbId, setSelectedKbId] = useState<string>('')
+  const [selectedProvider, setSelectedProvider] = useState<UserModelProvider | undefined>()
+  const [selectedModel, setSelectedModel] = useState('')
   const [workflowInputsText, setWorkflowInputsText] = useState('{}')
   const [requiredInputFields, setRequiredInputFields] = useState<string[]>([])
   const [workflowResult, setWorkflowResult] = useState<any>(null)
@@ -69,6 +76,14 @@ const Debug: React.FC = () => {
     fetchApps()
     fetchKnowledgeBases()
   }, [fetchApps, fetchKnowledgeBases])
+
+  useEffect(() => {
+    if (!selectedProvider && availableProviders.length === 1) {
+      const provider = availableProviders[0]
+      setSelectedProvider(provider)
+      setSelectedModel(modelsByProvider[provider][0]?.id || '')
+    }
+  }, [availableProviders, modelsByProvider, selectedProvider])
 
   useEffect(() => {
     if (chatEndRef.current) {
@@ -159,6 +174,8 @@ const Debug: React.FC = () => {
         body: JSON.stringify({
           message: currentInput,
           history: messages.map(msg => ({ role: msg.role, content: msg.content })),
+          ...(selectedProvider ? { provider: selectedProvider } : {}),
+          ...(selectedModel ? { model: selectedModel } : {}),
           ...(selectedKbId ? { knowledgeBaseId: selectedKbId } : {}),
         }),
       })
@@ -500,6 +517,39 @@ const Debug: React.FC = () => {
 
           {/* 输入区域 */}
           <div className="debug-input-area">
+            {availableProviders.length === 0 && !modelCatalogLoading && (
+              <Alert
+                type="warning"
+                showIcon
+                message="尚无可用模型服务"
+                action={<Button size="small" onClick={() => navigate('/model-settings')}>去配置</Button>}
+              />
+            )}
+            <div className="debug-model-controls">
+              <Select
+                placeholder="选择模型服务"
+                loading={modelCatalogLoading}
+                value={selectedProvider}
+                onChange={(provider: UserModelProvider) => {
+                  setSelectedProvider(provider)
+                  setSelectedModel(modelsByProvider[provider][0]?.id || '')
+                }}
+                options={availableProviders.map((provider) => ({
+                  value: provider,
+                  label: provider === 'qwen' ? 'Qwen' : provider === 'openai' ? 'OpenAI-compatible' : 'Ollama',
+                }))}
+                style={{ width: 190 }}
+              />
+              <AutoComplete
+                placeholder={selectedProvider === 'openai' ? '选择或输入模型 ID' : '选择模型'}
+                value={selectedModel}
+                onChange={setSelectedModel}
+                disabled={!selectedProvider}
+                options={(selectedProvider ? modelsByProvider[selectedProvider] : []).map((model) => ({ value: model.id, label: model.displayName }))}
+                style={{ width: 220 }}
+                filterOption={(input, option) => String(option?.value || '').toLowerCase().includes(input.toLowerCase())}
+              />
+            </div>
             <Select
               placeholder="关联知识库（可选）"
               allowClear
@@ -533,7 +583,7 @@ const Debug: React.FC = () => {
                 icon={<SendOutlined />}
                 onClick={handleSendMessage}
                 loading={isStreaming}
-                disabled={!input.trim()}
+                disabled={!input.trim() || !selectedProvider || !selectedModel}
                 className="debug-send-btn"
               >
                 发送

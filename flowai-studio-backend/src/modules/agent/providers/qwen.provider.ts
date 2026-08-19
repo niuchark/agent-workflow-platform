@@ -99,6 +99,7 @@ export class QwenProvider extends BaseLLMProvider {
             'Content-Type': 'application/json',
           },
           timeout: this.config.timeout || 60000,
+          maxRedirects: 0,
         },
       );
 
@@ -117,7 +118,7 @@ export class QwenProvider extends BaseLLMProvider {
       return result;
     } catch (error) {
       this.logger.error(`Qwen API call failed: ${error.response?.data || error.message}`);
-      throw new Error(`Qwen API call failed: ${error.response?.data?.error?.message || error.message}`);
+      throw new Error('MODEL_UPSTREAM_UNAVAILABLE: Qwen 模型调用失败');
     }
   }
 
@@ -135,6 +136,7 @@ export class QwenProvider extends BaseLLMProvider {
         },
         responseType: 'stream',
         timeout: this.config.timeout || 60000,
+        maxRedirects: 0,
       },
     );
 
@@ -176,6 +178,7 @@ export class QwenProvider extends BaseLLMProvider {
             'Content-Type': 'application/json',
           },
           timeout: 10000,
+          maxRedirects: 0,
         },
       );
       return true;

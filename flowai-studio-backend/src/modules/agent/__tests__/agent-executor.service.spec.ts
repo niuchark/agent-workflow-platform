@@ -27,6 +27,7 @@ describe('AgentExecutorService', () => {
   let mockSkillService: any;
   let mockRAGService: any;
   let mockPrismaService: any;
+  let mockTokenUsageService: any;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -47,6 +48,8 @@ describe('AgentExecutorService', () => {
     mockProviderFactory = {
       getProviderForModel: jest.fn().mockReturnValue(mockProvider),
       create: jest.fn().mockReturnValue(mockProvider),
+      createForUser: jest.fn().mockResolvedValue(mockProvider),
+      inferUserProvider: jest.fn((model: string) => model.startsWith('gpt-') ? 'openai' : 'qwen'),
     };
 
     // Mock SkillService
@@ -69,14 +72,18 @@ describe('AgentExecutorService', () => {
         findUnique: jest.fn(),
       },
     };
+    mockTokenUsageService = { recordFromResponse: jest.fn() };
 
     agentExecutor = new AgentExecutorService(
       mockProviderFactory as any,
       mockSkillService as any,
       mockRAGService as any,
       mockPrismaService as any,
+      mockTokenUsageService as any,
     );
   });
+
+  const userOptions = { context: { _userId: 'user-test' } };
 
   // ============================================================
   // Single Agent
@@ -109,12 +116,12 @@ describe('AgentExecutorService', () => {
         toolCalls: undefined,
       });
 
-      const result = await agentExecutor.execute(singleConfig, '你好');
+      const result = await agentExecutor.execute(singleConfig, '你好', userOptions);
 
       expect(result.success).toBe(true);
       expect(result.result).toBe('这是最终答案');
       expect(result.iterations).toBe(1);
-      expect(mockProviderFactory.getProviderForModel).toHaveBeenCalledWith('qwen-turbo');
+      expect(mockProviderFactory.createForUser).toHaveBeenCalledWith('user-test', 'qwen');
     });
 
     it('should execute tool calls and return final answer', async () => {
@@ -133,7 +140,7 @@ describe('AgentExecutorService', () => {
 
       mockSkillService.executeSkill.mockResolvedValue({ result: 2 });
 
-      const result = await agentExecutor.execute(singleConfig, '计算1+1');
+      const result = await agentExecutor.execute(singleConfig, '计算1+1', userOptions);
 
       expect(result.success).toBe(true);
       expect(result.toolCallCount).toBe(1);
@@ -151,7 +158,7 @@ describe('AgentExecutorService', () => {
       const limitedConfig = { ...singleConfig, maxIterations: 3 };
       mockSkillService.executeSkill.mockResolvedValue({ result: 'looping' });
 
-      const result = await agentExecutor.execute(limitedConfig, '无限循环');
+      const result = await agentExecutor.execute(limitedConfig, '无限循环', userOptions);
 
       expect(result.iterations).toBe(3);
       expect(result.success).toBe(true); // 不会报错，只是达到上限
@@ -163,11 +170,27 @@ describe('AgentExecutorService', () => {
         toolCalls: undefined,
       });
 
-      const result = await agentExecutor.execute(singleConfig, '测试');
+      const result = await agentExecutor.execute(singleConfig, '测试', userOptions);
 
       expect(result.trace.length).toBeGreaterThan(0);
       expect(result.trace.some((t: any) => t.type === 'thinking')).toBe(true);
       expect(result.trace.some((t: any) => t.type === 'final_answer')).toBe(true);
+    });
+
+    it('records token usage with the execution user and actual provider', async () => {
+      mockProvider.chat.mockResolvedValue({
+        content: '答案',
+        usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      });
+
+      await agentExecutor.execute(singleConfig, '测试', userOptions);
+
+      expect(mockTokenUsageService.recordFromResponse).toHaveBeenCalledWith(expect.objectContaining({
+        userId: 'user-test',
+        provider: 'qwen',
+        model: 'qwen-turbo',
+        callType: 'agent',
+      }));
     });
   });
 
@@ -225,7 +248,7 @@ describe('AgentExecutorService', () => {
         ],
       });
 
-      const result = await agentExecutor.execute(supervisorConfig, '帮我搜索');
+      const result = await agentExecutor.execute(supervisorConfig, '帮我搜索', userOptions);
 
       expect(result.success).toBe(true);
       expect(result.result).toBe('最终答案');
@@ -268,10 +291,10 @@ describe('AgentExecutorService', () => {
         toolCalls: undefined,
       });
 
-      const result = await agentExecutor.execute(ragConfig, '查询知识');
+      const result = await agentExecutor.execute(ragConfig, '查询知识', userOptions);
 
       expect(result.ragCallCount).toBe(1);
-      expect(mockRAGService.retrieve).toHaveBeenCalledWith('查询知识', 'kb_001', 5);
+      expect(mockRAGService.retrieve).toHaveBeenCalledWith('user-test', '查询知识', 'kb_001', 5);
     });
 
     it('should handle RAG retrieval failure gracefully', async () => {
@@ -287,7 +310,7 @@ describe('AgentExecutorService', () => {
         singleAgent: { ...ragConfig.singleAgent!, knowledgeBaseIds: ['kb_404'] },
       };
 
-      const result = await agentExecutor.execute(failConfig, '查询');
+      const result = await agentExecutor.execute(failConfig, '查询', userOptions);
 
       expect(result.success).toBe(true);
       expect(result.ragCallCount).toBe(0);
@@ -322,7 +345,7 @@ describe('AgentExecutorService', () => {
         },
       };
 
-      const result = await agentExecutor.execute(config, '触发错误');
+      const result = await agentExecutor.execute(config, '触发错误', userOptions);
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('API 限流');
@@ -363,7 +386,7 @@ describe('AgentExecutorService', () => {
         },
       };
 
-      const result = await agentExecutor.execute(config, '调用坏工具');
+      const result = await agentExecutor.execute(config, '调用坏工具', userOptions);
 
       expect(result.success).toBe(true);
       expect(result.toolCallCount).toBe(1);
@@ -385,7 +408,7 @@ describe('AgentExecutorService', () => {
         }),
       };
 
-      mockProviderFactory.getProviderForModel.mockReturnValue(openaiProvider);
+      mockProviderFactory.createForUser.mockResolvedValue(openaiProvider);
 
       const config: AgentNodeConfig = {
         mode: 'single',
@@ -407,9 +430,9 @@ describe('AgentExecutorService', () => {
         },
       };
 
-      const result = await agentExecutor.execute(config, '你好');
+      const result = await agentExecutor.execute(config, '你好', userOptions);
 
-      expect(mockProviderFactory.getProviderForModel).toHaveBeenCalledWith('gpt-4o');
+      expect(mockProviderFactory.createForUser).toHaveBeenCalledWith('user-test', 'openai');
       expect(openaiProvider.chat).toHaveBeenCalled();
       expect(result.success).toBe(true);
     });

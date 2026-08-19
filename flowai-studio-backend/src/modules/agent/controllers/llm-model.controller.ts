@@ -3,10 +3,13 @@
  *
  * 提供模型列表、能力查询、健康检查、成本估算等 API
  */
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { LLMModelService } from '../services/llm-model.service';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 
 @Controller('llm')
+@UseGuards(JwtAuthGuard)
 export class LLMModelController {
   constructor(private readonly llmModelService: LLMModelService) {}
 
@@ -15,8 +18,8 @@ export class LLMModelController {
    * 获取所有可用模型（按 Provider 分组）
    */
   @Get('models')
-  getModels() {
-    return this.llmModelService.getModelsGroupByProvider();
+  getModels(@CurrentUser('userId') userId: string) {
+    return this.llmModelService.getModelsGroupByProvider(userId);
   }
 
   /**
@@ -24,8 +27,8 @@ export class LLMModelController {
    * 获取所有模型（扁平列表）
    */
   @Get('models/list')
-  getAllModels() {
-    return this.llmModelService.getAllModels();
+  getAllModels(@CurrentUser('userId') userId: string) {
+    return this.llmModelService.getAllModels(userId);
   }
 
   /**
@@ -42,8 +45,8 @@ export class LLMModelController {
    * 健康检查所有 LLM Provider
    */
   @Get('health')
-  async healthCheck() {
-    return this.llmModelService.healthCheck();
+  async healthCheck(@CurrentUser('userId') userId: string) {
+    return this.llmModelService.healthCheck(userId);
   }
 
   /**
@@ -68,7 +71,7 @@ export class LLMModelController {
    * 发现 Ollama 本地模型
    */
   @Get('ollama/discover')
-  async discoverOllamaModels() {
-    return this.llmModelService.discoverOllamaModels();
+  async discoverOllamaModels(@CurrentUser('userId') userId: string) {
+    return this.llmModelService.discoverOllamaModels(userId);
   }
 }

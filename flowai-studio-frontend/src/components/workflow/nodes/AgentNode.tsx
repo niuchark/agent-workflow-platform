@@ -21,7 +21,7 @@ const AgentNode: React.FC<AgentNodeProps> = ({ data, id }) => {
       color="#8b5cf6"
       width={200}
     >
-      <Handle type="target" position={Position.Top} />
+      <Handle type="target" position={Position.Left} />
       <div style={{ padding: '4px 0', fontSize: 12, color: '#666' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <span>{modeLabel}</span>
@@ -43,7 +43,7 @@ const AgentNode: React.FC<AgentNodeProps> = ({ data, id }) => {
           </div>
         )}
       </div>
-      <Handle type="source" position={Position.Bottom} />
+      <Handle type="source" position={Position.Right} />
     </BaseNode>
   )
 }

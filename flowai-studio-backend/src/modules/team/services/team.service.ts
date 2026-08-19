@@ -106,6 +106,8 @@ export class TeamService {
       members: team.members,
       applications: team.teamApplications.map((ta: any) => ({
         id: ta.id,
+        teamId: ta.teamId,
+        applicationId: ta.applicationId,
         permission: ta.permission,
         addedAt: ta.addedAt,
         application: ta.application,
@@ -258,6 +260,8 @@ export class TeamService {
 
     return {
       id: teamApp.id,
+      teamId: teamApp.teamId,
+      applicationId: teamApp.applicationId,
       permission: teamApp.permission,
       addedAt: teamApp.addedAt,
       application: teamApp.application,

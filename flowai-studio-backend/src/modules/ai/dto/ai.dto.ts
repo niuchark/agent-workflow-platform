@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsObject, IsUUID, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsObject, IsUUID, IsArray, IsIn } from 'class-validator';
 
 export class RunDto {
   @IsUUID('4', { message: 'Invalid application ID' })
@@ -36,5 +36,12 @@ export class ChatDto {
   @IsOptional()
   @IsUUID('4', { message: 'Invalid knowledge base ID' })
   knowledgeBaseId?: string;
-}
 
+  @IsOptional()
+  @IsIn(['qwen', 'openai', 'ollama'])
+  provider?: 'qwen' | 'openai' | 'ollama';
+
+  @IsOptional()
+  @IsString()
+  model?: string;
+}

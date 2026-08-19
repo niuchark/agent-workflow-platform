@@ -51,6 +51,7 @@ export interface UserInputNodeData extends BaseNodeData {
 }
 
 export interface LLMNodeData extends BaseNodeData {
+  provider: 'qwen' | 'openai' | 'ollama'
   model: string
   systemPrompt: string
   userPrompt: string
@@ -91,6 +92,7 @@ export interface WorkerConfig {
   name: string
   description: string
   systemPrompt: string
+  provider: 'qwen' | 'openai' | 'ollama'
   model: string
   temperature: number
   maxTokens: number
@@ -106,6 +108,7 @@ export interface AgentNodeData extends BaseNodeData {
   /** 执行策略 */
   strategy: AgentStrategy
   /** 模型 */
+  provider: 'qwen' | 'openai' | 'ollama'
   model: string
   /** 系统提示词 */
   systemPrompt: string

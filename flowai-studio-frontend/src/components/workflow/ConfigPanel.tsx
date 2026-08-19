@@ -1,9 +1,14 @@
-import React, { useEffect, useState } from 'react'
-import { Form, Input, Select, Slider, InputNumber, Switch, Divider, Card, Button, Space, Tag, Empty, Typography } from 'antd'
-import { PlusOutlined, DeleteOutlined, RobotOutlined, SettingOutlined } from '@ant-design/icons'
+import React, { useEffect, useMemo, useState } from 'react'
+import { Form, Input, Select, Slider, InputNumber, Switch, Divider, Card, Button, Space, Tag, Empty, Typography, AutoComplete, Alert, Tooltip } from 'antd'
+import { PlusOutlined, DeleteOutlined, RobotOutlined, SettingOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { useStore } from '../../store'
+import { useNavigate } from 'react-router-dom'
+import { inferLegacyProvider, useModelCatalog } from '../../utils/useModelCatalog'
+import { ProviderModel, UserModelProvider } from '../../utils/modelCredentialApi'
+import VariableTextArea from './VariableTextArea'
+import { getAvailableVariables } from './variableUtils'
 
-const { Option, OptGroup } = Select
+const { Option } = Select
 const { Text } = Typography
 
 const NODE_TYPE_META: Record<string, { label: string; description: string }> = {
@@ -17,84 +22,62 @@ const NODE_TYPE_META: Record<string, { label: string; description: string }> = {
   output: { label: '输出节点', description: '组织最终返回给用户的结果。' },
 }
 
-const MODEL_GROUPS = [
-  {
-    provider: 'qwen',
-    label: '🇨🇳 通义千问 (Qwen)',
-    models: [
-      { id: 'qwen-turbo', name: 'Qwen Turbo', tag: '快速', tagColor: 'green' },
-      { id: 'qwen-plus', name: 'Qwen Plus', tag: '高质量', tagColor: 'blue' },
-      { id: 'qwen-max', name: 'Qwen Max', tag: '最强', tagColor: 'blue' },
-      { id: 'qwen-long', name: 'Qwen Long', tag: '长文本', tagColor: 'orange' },
-    ],
-  },
-  {
-    provider: 'openai',
-    label: '🌐 OpenAI',
-    models: [
-      { id: 'gpt-4o', name: 'GPT-4o', tag: '推荐', tagColor: 'gold' },
-      { id: 'gpt-4o-mini', name: 'GPT-4o Mini', tag: '性价比', tagColor: 'green' },
-      { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', tag: '强大', tagColor: 'blue' },
-      { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', tag: '经济', tagColor: 'default' },
-    ],
-  },
-  {
-    provider: 'claude',
-    label: '🤖 Anthropic Claude',
-    models: [
-      { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', tag: '推荐', tagColor: 'gold' },
-      { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus', tag: '最强', tagColor: 'blue' },
-      { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku', tag: '快速', tagColor: 'green' },
-    ],
-  },
-  {
-    provider: 'gemini',
-    label: '✨ Google Gemini',
-    models: [
-      { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', tag: '100万上下文', tagColor: 'blue' },
-      { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', tag: '快速', tagColor: 'green' },
-      { id: 'gemini-1.0-pro', name: 'Gemini 1.0 Pro', tag: '稳定', tagColor: 'default' },
-    ],
-  },
-  {
-    provider: 'ollama',
-    label: '🏠 Ollama (本地)',
-    models: [
-      { id: 'qwen2.5:7b', name: 'Qwen2.5 7B', tag: '本地', tagColor: 'cyan' },
-      { id: 'llama3.1:8b', name: 'Llama 3.1 8B', tag: '本地', tagColor: 'cyan' },
-      { id: 'mistral:7b', name: 'Mistral 7B', tag: '本地', tagColor: 'cyan' },
-      { id: 'deepseek-coder-v2:16b', name: 'DeepSeek Coder V2 16B', tag: '本地', tagColor: 'cyan' },
-    ],
-  },
-]
-
 const ModelSelect: React.FC<{
   value?: string;
   onChange?: (value: string) => void;
+  provider: UserModelProvider;
+  models: ProviderModel[];
   style?: React.CSSProperties;
   size?: 'small' | 'middle' | 'large';
-}> = ({ value, onChange, style, size }) => (
-  <Select value={value} onChange={onChange} style={style} size={size} placeholder="选择模型" showSearch optionFilterProp="label">
-    {MODEL_GROUPS.map((group) => (
-      <OptGroup key={group.provider} label={group.label}>
-        {group.models.map((model) => (
-          <Option key={model.id} value={model.id} label={model.name}>
-            <Space>
-              <span>{model.name}</span>
-              <Tag color={model.tagColor} style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px' }}>{model.tag}</Tag>
-            </Space>
-          </Option>
-        ))}
-      </OptGroup>
-    ))}
-  </Select>
+}> = ({ value, onChange, provider, models, style, size }) => (
+  <AutoComplete
+    value={value}
+    onChange={onChange}
+    style={style}
+    size={size}
+    placeholder={provider === 'openai' ? '选择或输入模型 ID' : '选择模型'}
+    options={[
+      ...(value && !models.some((model) => model.id === value) ? [{ value, label: `${value}（当前不可用）` }] : []),
+      ...models.map((model) => ({ value: model.id, label: model.displayName })),
+    ]}
+    filterOption={(input, option) => String(option?.value || '').toLowerCase().includes(input.toLowerCase())}
+  />
+)
+
+const PROVIDER_LABELS: Record<UserModelProvider, string> = {
+  qwen: 'Qwen',
+  openai: 'OpenAI-compatible',
+  ollama: 'Ollama',
+}
+
+const UserPromptLabel = () => (
+  <span className="field-label-with-help">
+    <span>用户提示词</span>
+    <Tooltip
+      trigger={['hover', 'focus']}
+      title={(
+        <span className="user-prompt-help-content">
+          这是发送给大模型的输入。可以直接填写固定内容，也可以插入“用户输入”变量，
+          并在变量前后补充润色、总结或回答要求。
+        </span>
+      )}
+    >
+      <button type="button" className="field-help-button" aria-label="查看用户提示词说明">
+        <QuestionCircleOutlined aria-hidden="true" />
+      </button>
+    </Tooltip>
+  </span>
 )
 
 const ConfigPanel: React.FC = () => {
-  const { selectedNode, updateNodeData, knowledgeBases, fetchKnowledgeBases, skills, fetchSkills } = useStore()
+  const navigate = useNavigate()
+  const { availableProviders, modelsByProvider, loading: modelCatalogLoading } = useModelCatalog()
+  const { selectedNode, nodes, edges, updateNodeData, knowledgeBases, fetchKnowledgeBases, skills, fetchSkills } = useStore()
   const [form] = Form.useForm()
   const [workers, setWorkers] = useState<any[]>([])
   const agentMode = Form.useWatch('agentMode', form) || 'single'
+  const selectedProvider = (Form.useWatch('provider', form) || 'qwen') as UserModelProvider
+  const supervisorProvider = (Form.useWatch('supervisorProvider', form) || selectedProvider) as UserModelProvider
 
   useEffect(() => {
     fetchKnowledgeBases()
@@ -103,9 +86,17 @@ const ConfigPanel: React.FC = () => {
 
   useEffect(() => {
     if (selectedNode) {
-      form.setFieldsValue(selectedNode.data)
+      const data = selectedNode.data as any
+      form.setFieldsValue({
+        ...data,
+        provider: data.provider || inferLegacyProvider(data.model),
+        supervisorProvider: data.supervisorProvider || inferLegacyProvider(data.supervisorModel),
+      })
       if (selectedNode.type === 'agent' && (selectedNode.data as any).workers) {
-        setWorkers((selectedNode.data as any).workers || [])
+        setWorkers(((selectedNode.data as any).workers || []).map((worker: any) => ({
+          ...worker,
+          provider: worker.provider || inferLegacyProvider(worker.model),
+        })))
       }
     } else {
       form.resetFields()
@@ -123,6 +114,10 @@ const ConfigPanel: React.FC = () => {
   const selectedNodeName = selectedNode
     ? ((selectedNode.data as any)?.label || selectedNodeMeta?.label || '未命名节点')
     : ''
+  const availableVariables = useMemo(
+    () => selectedNode ? getAvailableVariables(nodes, edges, selectedNode.id) : [],
+    [edges, nodes, selectedNode],
+  )
 
   const addWorker = () => {
     const newWorker = {
@@ -131,6 +126,7 @@ const ConfigPanel: React.FC = () => {
       description: '',
       systemPrompt: '',
       model: 'qwen-turbo',
+      provider: 'qwen',
       temperature: 0.7,
       maxTokens: 2048,
       toolIds: [],
@@ -152,15 +148,27 @@ const ConfigPanel: React.FC = () => {
     }
   }
 
-  const updateWorker = (index: number, field: string, value: any) => {
+  const updateWorkerFields = (index: number, patch: Record<string, any>) => {
     const updatedWorkers = workers.map((w, i) =>
-      i === index ? { ...w, [field]: value } : w
+      i === index ? { ...w, ...patch } : w
     )
     setWorkers(updatedWorkers)
     if (selectedNode) {
       updateNodeData(selectedNode.id, { ...selectedNode.data, workers: updatedWorkers })
     }
   }
+
+  const updateWorker = (index: number, field: string, value: any) => {
+    updateWorkerFields(index, { [field]: value })
+  }
+
+  const providerOptions = (current?: UserModelProvider) => (
+    (['qwen', 'openai', 'ollama'] as UserModelProvider[]).map((provider) => ({
+      value: provider,
+      label: availableProviders.includes(provider) ? PROVIDER_LABELS[provider] : `${PROVIDER_LABELS[provider]}（不可用）`,
+      disabled: !availableProviders.includes(provider) && provider !== current,
+    }))
+  )
 
   const renderAgentConfig = (commonFields: React.ReactNode) => {
     return (
@@ -186,14 +194,22 @@ const ConfigPanel: React.FC = () => {
             <Option value="reflection">Reflection (反思优化)</Option>
           </Select>
         </Form.Item>
+        <Form.Item name="provider" label="模型服务" initialValue="qwen">
+          <Select loading={modelCatalogLoading} options={providerOptions(selectedProvider)} />
+        </Form.Item>
         <Form.Item name="model" label="模型" initialValue="qwen-turbo">
-          <ModelSelect style={{ width: '100%' }} />
+          <ModelSelect provider={selectedProvider} models={modelsByProvider[selectedProvider]} style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item name="systemPrompt" label="系统提示词">
           <Input.TextArea rows={4} placeholder="定义 Agent 的角色、能力和行为规范" />
         </Form.Item>
-        <Form.Item name="userPrompt" label="用户提示词" rules={[{ required: true }]}>
-          <Input.TextArea rows={4} placeholder="Agent 的任务输入，可使用 {{变量}} 引用上下文" />
+        <Form.Item className="variable-template-form-item" name="userPrompt" label={<UserPromptLabel />} rules={[{ required: true }]}>
+          <VariableTextArea
+            rows={4}
+            placeholder="输入交给智能体的内容；可直接填写，或插入用户输入变量"
+            availableVariables={availableVariables}
+            nodes={nodes}
+          />
         </Form.Item>
         <Form.Item name="temperature" label="温度" initialValue={0.7}>
           <Slider min={0} max={1} step={0.1} />
@@ -236,8 +252,11 @@ const ConfigPanel: React.FC = () => {
             <Form.Item name="supervisorPrompt" label="Supervisor 提示词">
               <Input.TextArea rows={4} placeholder="定义 Supervisor 的协调策略，留空使用默认" />
             </Form.Item>
+            <Form.Item name="supervisorProvider" label="Supervisor 模型服务" initialValue="qwen">
+              <Select loading={modelCatalogLoading} options={providerOptions(supervisorProvider)} />
+            </Form.Item>
             <Form.Item name="supervisorModel" label="Supervisor 模型" initialValue="qwen-plus">
-              <ModelSelect style={{ width: '100%' }} />
+              <ModelSelect provider={supervisorProvider} models={modelsByProvider[supervisorProvider]} style={{ width: '100%' }} />
             </Form.Item>
             <Divider orientation="left" style={{ margin: '12px 0 12px' }}>🤖 Workers ({workers.length})</Divider>
             {workers.map((worker, index) => (
@@ -257,7 +276,17 @@ const ConfigPanel: React.FC = () => {
                   <Input value={worker.description} onChange={(e) => updateWorker(index, 'description', e.target.value)} placeholder="Worker 职责描述" size="small" />
                   <Input.TextArea value={worker.systemPrompt} onChange={(e) => updateWorker(index, 'systemPrompt', e.target.value)} placeholder="Worker 系统提示词" rows={2} style={{ fontSize: 12 }} />
                   <Space>
-                    <ModelSelect value={worker.model} onChange={(v) => updateWorker(index, 'model', v)} size="small" style={{ width: 180 }} />
+                    <Select
+                      value={worker.provider}
+                      onChange={(value: UserModelProvider) => updateWorkerFields(index, {
+                        provider: value,
+                        model: modelsByProvider[value][0]?.id || '',
+                      })}
+                      options={providerOptions(worker.provider)}
+                      size="small"
+                      style={{ width: 120 }}
+                    />
+                    <ModelSelect provider={worker.provider || 'qwen'} models={modelsByProvider[worker.provider || 'qwen']} value={worker.model} onChange={(v) => updateWorker(index, 'model', v)} size="small" style={{ width: 180 }} />
                     <Text type="secondary" style={{ fontSize: 11 }}>温度:</Text>
                     <InputNumber value={worker.temperature} onChange={(v) => updateWorker(index, 'temperature', v)} min={0} max={1} step={0.1} size="small" style={{ width: 60 }} />
                   </Space>
@@ -289,11 +318,21 @@ const ConfigPanel: React.FC = () => {
         return (
           <>
             {commonFields}
+            <Form.Item name="provider" label="模型服务" initialValue="qwen">
+              <Select loading={modelCatalogLoading} options={providerOptions(selectedProvider)} />
+            </Form.Item>
             <Form.Item name="model" label="模型" initialValue="qwen-turbo">
-              <ModelSelect style={{ width: '100%' }} />
+              <ModelSelect provider={selectedProvider} models={modelsByProvider[selectedProvider]} style={{ width: '100%' }} />
             </Form.Item>
             <Form.Item name="systemPrompt" label="系统提示词"><Input.TextArea rows={4} placeholder="定义模型的角色和行为" /></Form.Item>
-            <Form.Item name="userPrompt" label="用户提示词" rules={[{ required: true }]}><Input.TextArea rows={6} placeholder="输入用户的问题，可使用 {{变量}} 引用上下文" /></Form.Item>
+            <Form.Item className="variable-template-form-item" name="userPrompt" label={<UserPromptLabel />} rules={[{ required: true }]}>
+              <VariableTextArea
+                rows={6}
+                placeholder="输入发送给大模型的内容；可直接填写，或插入用户输入变量"
+                availableVariables={availableVariables}
+                nodes={nodes}
+              />
+            </Form.Item>
             <Form.Item name="temperature" label="温度" initialValue={0.7}><Slider min={0} max={1} step={0.1} /></Form.Item>
             <Form.Item name="maxTokens" label="最大 Token 数" initialValue={1024}><InputNumber min={1} max={8192} step={256} style={{ width: '100%' }} /></Form.Item>
           </>
@@ -307,7 +346,13 @@ const ConfigPanel: React.FC = () => {
             <Form.Item name="knowledgeBaseId" label="知识库" rules={[{ required: true }]}>
               <Select placeholder="选择一个知识库">{Array.isArray(knowledgeBases) && knowledgeBases.map(kb => (<Option key={kb.id} value={kb.id}>{kb.name}</Option>))}</Select>
             </Form.Item>
-            <Form.Item name="query" label="检索查询" rules={[{ required: true }]}><Input.TextArea placeholder="输入检索内容，可使用 {{变量}}" /></Form.Item>
+            <Form.Item className="variable-template-form-item" name="query" label="检索查询" rules={[{ required: true }]}>
+              <VariableTextArea
+                placeholder="输入检索内容，或从下方插入上游变量"
+                availableVariables={availableVariables}
+                nodes={nodes}
+              />
+            </Form.Item>
             <Form.Item name="topK" label="Top K" initialValue={5}><Slider min={1} max={10} step={1} /></Form.Item>
           </>
         )
@@ -330,7 +375,20 @@ const ConfigPanel: React.FC = () => {
           </>
         )
       case 'output':
-        return <>{commonFields}<Form.Item name="outputValue" label="输出内容" rules={[{ required: true }]}><Input.TextArea rows={4} placeholder="最终输出给用户的内容，支持 {{变量}}" /></Form.Item></>
+        return (
+          <>
+            {commonFields}
+            <Form.Item className="variable-template-form-item" name="outputValue" label="输出内容" rules={[{ required: true }]}>
+              <VariableTextArea
+                rows={4}
+                placeholder="输入最终返回内容，或从下方插入上游变量"
+                availableVariables={availableVariables}
+                nodes={nodes}
+                variableLabel="插入输出变量"
+              />
+            </Form.Item>
+          </>
+        )
       default:
         return <Empty description={`暂不支持 ${selectedNode.type} 节点的配置`} />
     }
@@ -352,6 +410,16 @@ const ConfigPanel: React.FC = () => {
       </div>
       <div className="config-panel-body">
         <Form form={form} layout="vertical" onValuesChange={handleValuesChange} className="config-panel-form">
+          {selectedNode && availableProviders.length === 0 && !modelCatalogLoading && (
+            <Alert
+              type="warning"
+              showIcon
+              message="没有可用的模型服务"
+              description="已保存的模型会保留显示，但执行前需要先配置并测试对应凭证。"
+              action={<Button size="small" onClick={() => navigate('/model-settings')}>去配置</Button>}
+              style={{ marginBottom: 16 }}
+            />
+          )}
           {!selectedNode ? (
             <div className="config-panel-empty">
               <div className="config-panel-empty-icon">

@@ -40,6 +40,7 @@ const createNodeData = (type: NodeType): WorkflowNode['data'] => {
     case 'llm':
       return {
         label: '大模型',
+        provider: 'qwen',
         model: 'qwen-turbo',
         systemPrompt: '',
         userPrompt: '',
@@ -70,6 +71,7 @@ const createNodeData = (type: NodeType): WorkflowNode['data'] => {
         label: '智能体',
         agentMode: 'single',
         strategy: 'react',
+        provider: 'qwen',
         model: 'qwen-turbo',
         systemPrompt: '',
         userPrompt: '',
