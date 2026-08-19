@@ -27,8 +27,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: flowai_studio
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       # 自动启用 pgvector 扩展
@@ -54,8 +52,6 @@ services:
       --save 60 10000
       --maxmemory 256mb
       --maxmemory-policy allkeys-lru
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -83,8 +79,6 @@ services:
       MODEL_CREDENTIAL_ENCRYPTION_KEY: ${MODEL_CREDENTIAL_ENCRYPTION_KEY:?MODEL_CREDENTIAL_ENCRYPTION_KEY is required}
       MODEL_PRIVATE_BASE_URL_ALLOWLIST: ${MODEL_PRIVATE_BASE_URL_ALLOWLIST:-http://ollama:11434}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
-    ports:
-      - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -103,7 +97,7 @@ services:
     container_name: flowai-frontend
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "127.0.0.1:8080:80"
     depends_on:
       - backend
 
