@@ -1,9 +1,10 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { ReactFlow,
   Background,
   Controls,
   MiniMap,
-  useReactFlow
+  useReactFlow,
+  type Connection,
 } from '@xyflow/react'
 import { Modal, message } from 'antd'
 import '@xyflow/react/dist/style.css'
@@ -93,16 +94,54 @@ const WorkflowCanvas: React.FC = () => {
     onNodesChange,
     onEdgesChange,
     onConnect,
+    reconnectWorkflowEdge,
+    deleteEdge,
     setNodes,
     setSelectedNode,
   } = useStore()
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null)
+  const reconnectSuccessful = useRef(true)
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
   const { screenToFlowPosition } = useReactFlow()
 
   const onNodeClick = useCallback((event: React.MouseEvent, node: any) => {
+    setSelectedEdgeId(null)
     setSelectedNode(node)
   }, [setSelectedNode])
+
+  const onEdgeClick = useCallback(() => {
+    setSelectedNode(null)
+  }, [setSelectedNode])
+
+  const onReconnectStart = useCallback(() => {
+    reconnectSuccessful.current = false
+  }, [])
+
+  const onReconnect = useCallback((edge: WorkflowEdge, connection: Connection) => {
+    reconnectSuccessful.current = true
+    reconnectWorkflowEdge(edge, connection)
+    messageApi.success('连线已重新连接')
+  }, [messageApi, reconnectWorkflowEdge])
+
+  const onReconnectEnd = useCallback((_event: MouseEvent | TouchEvent, edge: WorkflowEdge) => {
+    if (reconnectSuccessful.current) {
+      return
+    }
+
+    modal.confirm({
+      title: '断开这条连线？',
+      content: '端点没有连接到新的节点接口。选择“断开”会删除这条连线，选择“保留连线”则恢复原连接。',
+      okText: '断开',
+      okType: 'danger',
+      cancelText: '保留连线',
+      onOk: () => {
+        deleteEdge(edge.id)
+        setSelectedEdgeId(null)
+        messageApi.success('已断开连线')
+      },
+    })
+  }, [deleteEdge, messageApi, modal])
 
   const onBeforeDelete = useCallback(({ nodes: nodesToDelete, edges: edgesToDelete }: {
     nodes: WorkflowNode[]
@@ -134,6 +173,13 @@ const WorkflowCanvas: React.FC = () => {
       messageApi.success(`已删除 ${deletedNodes.length} 个节点`)
     }
   }, [messageApi, setSelectedNode])
+
+  const onEdgesDelete = useCallback((deletedEdges: WorkflowEdge[]) => {
+    if (deletedEdges.length > 0) {
+      setSelectedEdgeId(null)
+      messageApi.success(`已删除 ${deletedEdges.length} 条连线`)
+    }
+  }, [messageApi])
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault()
@@ -179,10 +225,23 @@ const WorkflowCanvas: React.FC = () => {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onReconnectStart={onReconnectStart}
+        onReconnect={onReconnect}
+        onReconnectEnd={onReconnectEnd}
+        edgesReconnectable
+        reconnectRadius={20}
         onNodeClick={onNodeClick}
-        onPaneClick={() => setSelectedNode(null)}
+        onEdgeClick={onEdgeClick}
+        onSelectionChange={({ edges: selectedEdges }) => {
+          setSelectedEdgeId(selectedEdges[0]?.id ?? null)
+        }}
+        onPaneClick={() => {
+          setSelectedNode(null)
+          setSelectedEdgeId(null)
+        }}
         onBeforeDelete={onBeforeDelete}
         onNodesDelete={onNodesDelete}
+        onEdgesDelete={onEdgesDelete}
         deleteKeyCode={['Backspace', 'Delete']}
         onDragOver={onDragOver}
         onDrop={onDrop}
@@ -194,6 +253,11 @@ const WorkflowCanvas: React.FC = () => {
         <Controls />
         <MiniMap />
       </ReactFlow>
+      {selectedEdgeId && (
+        <div className="workflow-edge-hint" role="status">
+          拖动连线端点可重新连接 · Delete / Backspace 可断开
+        </div>
+      )}
       </div>
     </>
   )

@@ -94,6 +94,7 @@ const ConfigPanel: React.FC = () => {
   const { selectedNode, updateNodeData, knowledgeBases, fetchKnowledgeBases, skills, fetchSkills } = useStore()
   const [form] = Form.useForm()
   const [workers, setWorkers] = useState<any[]>([])
+  const agentMode = Form.useWatch('agentMode', form) || 'single'
 
   useEffect(() => {
     fetchKnowledgeBases()
@@ -162,8 +163,6 @@ const ConfigPanel: React.FC = () => {
   }
 
   const renderAgentConfig = (commonFields: React.ReactNode) => {
-    const agentMode = Form.useWatch('agentMode', form) || 'single'
-
     return (
       <>
         {commonFields}

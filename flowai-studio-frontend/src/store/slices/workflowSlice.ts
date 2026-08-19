@@ -2,12 +2,14 @@ import { StateCreator } from 'zustand'
 import { Workflow, WorkflowNode, WorkflowEdge, NodeExecution } from '../../types'
 import request from '../../utils/axios'
 import { 
+  Connection,
   OnNodesChange, 
   OnEdgesChange, 
   OnConnect, 
   applyNodeChanges, 
   applyEdgeChanges, 
-  addEdge 
+  addEdge,
+  reconnectEdge,
 } from '@xyflow/react'
 
 import { createParser } from 'eventsource-parser'
@@ -31,8 +33,10 @@ export interface WorkflowSlice {
   onNodesChange: OnNodesChange<WorkflowNode>
   onEdgesChange: OnEdgesChange<WorkflowEdge>
   onConnect: OnConnect
+  reconnectWorkflowEdge: (edge: WorkflowEdge, connection: Connection) => void
   setSelectedNode: (node: WorkflowNode | null) => void
   deleteNode: (nodeId: string) => void
+  deleteEdge: (edgeId: string) => void
   updateNodeData: (nodeId: string, data: any) => void
   setCanvasZoom: (zoom: number) => void
   setExecutionState: (nodeId: string, state: NodeExecution) => void
@@ -103,6 +107,12 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
       edges: addEdge(connection, get().edges),
     })
   },
+
+  reconnectWorkflowEdge: (edge, connection) => {
+    set((state) => ({
+      edges: reconnectEdge(edge, connection, state.edges),
+    }))
+  },
   
   setSelectedNode: (node) => set({ selectedNode: node }),
 
@@ -118,6 +128,12 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
         executionStates,
       }
     })
+  },
+
+  deleteEdge: (edgeId) => {
+    set((state) => ({
+      edges: state.edges.filter((edge) => edge.id !== edgeId),
+    }))
   },
   
   updateNodeData: (nodeId, data) => {

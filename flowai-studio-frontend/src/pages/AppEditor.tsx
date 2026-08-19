@@ -29,8 +29,12 @@ type RightPanel = 'config' | 'debug' | 'share'
 const DEFAULT_PANEL_WIDTH = 360
 const MIN_PANEL_WIDTH = 300
 const MAX_PANEL_WIDTH = 560
+const DEFAULT_NODE_PANEL_WIDTH = 176
+const MIN_NODE_PANEL_WIDTH = 120
+const MAX_NODE_PANEL_WIDTH = 300
 
 const clampPanelWidth = (width: number) => Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, width))
+const clampNodePanelWidth = (width: number) => Math.min(MAX_NODE_PANEL_WIDTH, Math.max(MIN_NODE_PANEL_WIDTH, width))
 
 const AppEditor: React.FC = () => {
   const { appId } = useParams<{ appId: string }>()
@@ -56,6 +60,7 @@ const AppEditor: React.FC = () => {
   const [rightPanel, setRightPanel] = useState<RightPanel>('config')
   const [isPanelOpen, setIsPanelOpen] = useState(true)
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
+  const [nodePanelWidth, setNodePanelWidth] = useState(DEFAULT_NODE_PANEL_WIDTH)
 
   // 使用 ref 防止 React StrictMode 下 useEffect 重复执行导致弹两次错误
   const initRef = useRef(false)
@@ -129,13 +134,18 @@ const AppEditor: React.FC = () => {
     })
   }
 
-  const handleResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
+  const startHorizontalResize = (
+    event: React.PointerEvent<HTMLDivElement>,
+    startWidth: number,
+    direction: 1 | -1,
+    updateWidth: (width: number) => void,
+    clampWidth: (width: number) => number
+  ) => {
     event.preventDefault()
     const startX = event.clientX
-    const startWidth = panelWidth
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
-      setPanelWidth(clampPanelWidth(startWidth + startX - moveEvent.clientX))
+      updateWidth(clampWidth(startWidth + (moveEvent.clientX - startX) * direction))
     }
 
     const handlePointerUp = () => {
@@ -149,6 +159,10 @@ const AppEditor: React.FC = () => {
     document.addEventListener('pointerup', handlePointerUp)
   }
 
+  const handleResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    startHorizontalResize(event, panelWidth, -1, setPanelWidth, clampPanelWidth)
+  }
+
   const handleResizeKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'ArrowLeft') {
       event.preventDefault()
@@ -157,6 +171,21 @@ const AppEditor: React.FC = () => {
     if (event.key === 'ArrowRight') {
       event.preventDefault()
       setPanelWidth((width) => clampPanelWidth(width - 16))
+    }
+  }
+
+  const handleNodePanelResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    startHorizontalResize(event, nodePanelWidth, 1, setNodePanelWidth, clampNodePanelWidth)
+  }
+
+  const handleNodePanelResizeKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault()
+      setNodePanelWidth((width) => clampNodePanelWidth(width - 16))
+    }
+    if (event.key === 'ArrowRight') {
+      event.preventDefault()
+      setNodePanelWidth((width) => clampNodePanelWidth(width + 16))
     }
   }
 
@@ -314,7 +343,27 @@ const AppEditor: React.FC = () => {
       {/* ---- Editor body ---- */}
       <ReactFlowProvider>
         <div className="editor-body">
-          <NodePanel />
+          <aside
+            className="editor-node-panel-shell"
+            style={{ width: nodePanelWidth }}
+            aria-label="节点库"
+          >
+            <NodePanel />
+            <div
+              className="editor-node-panel-resizer"
+              role="separator"
+              aria-label="调整节点库宽度"
+              aria-orientation="vertical"
+              aria-valuemin={MIN_NODE_PANEL_WIDTH}
+              aria-valuemax={MAX_NODE_PANEL_WIDTH}
+              aria-valuenow={nodePanelWidth}
+              title="拖动调整宽度，双击恢复默认宽度"
+              tabIndex={0}
+              onPointerDown={handleNodePanelResizeStart}
+              onKeyDown={handleNodePanelResizeKeyDown}
+              onDoubleClick={() => setNodePanelWidth(DEFAULT_NODE_PANEL_WIDTH)}
+            />
+          </aside>
           <div className="editor-canvas-wrapper">
             <WorkflowCanvas />
           </div>
