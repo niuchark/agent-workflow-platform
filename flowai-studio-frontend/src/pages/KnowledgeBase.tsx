@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Input, Table, message, Modal, Upload, Space, Typography, Empty, Spin, Select, Slider, InputNumber, Divider, Tag, Tooltip, Collapse, Switch } from 'antd'
+import { Button, Input, Table, message, Modal, Upload, Space, Typography, Empty, Spin, Select, Slider, InputNumber, Divider, Tag, Tooltip, Switch } from 'antd'
 import {
   PlusOutlined,
   DeleteOutlined,
@@ -221,9 +221,9 @@ const KnowledgeBase: React.FC = () => {
       render: (time: string) => <Text style={{ color: 'var(--c-text-secondary)', fontSize: 13 }}>{new Date(time).toLocaleDateString('zh-CN')}</Text>,
     },
     {
-      title: '操作', key: 'action', width: 180,
+      title: '操作', key: 'action', width: 224, fixed: 'right' as const,
       render: (_: any, record: any) => (
-        <Space size="small" wrap>
+        <Space size={8} className="kb-table-actions">
           <Button icon={<FolderOpenOutlined />} size="small" className="action-btn action-btn--docs" onClick={() => handleViewDocuments(record)}>管理文档</Button>
           <Button icon={<EditOutlined />} size="small" type="text" className="action-btn" onClick={() => handleEditKb(record)} />
           <Button danger icon={<DeleteOutlined />} size="small" type="text" className="action-btn action-btn--danger" onClick={() => handleDeleteKb(record.id)} />
@@ -255,7 +255,14 @@ const KnowledgeBase: React.FC = () => {
 
       <div className="kb-table-card">
         {safeKnowledgeBases.length > 0 ? (
-          <Table columns={kbColumns} dataSource={safeKnowledgeBases} rowKey="id" loading={isLoading} pagination={{ pageSize: 8, size: 'small' }} />
+          <Table
+            columns={kbColumns}
+            dataSource={safeKnowledgeBases}
+            rowKey="id"
+            loading={isLoading}
+            scroll={{ x: 1000 }}
+            pagination={{ pageSize: 8, size: 'small' }}
+          />
         ) : (
           <Empty description="还没有知识库，创建一个来上传文档吧" image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ padding: '48px 0' }} />
         )}

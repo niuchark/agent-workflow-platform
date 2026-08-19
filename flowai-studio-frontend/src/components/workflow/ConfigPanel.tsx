@@ -352,20 +352,18 @@ const ConfigPanel: React.FC = () => {
         </p>
       </div>
       <div className="config-panel-body">
-        {!selectedNode ? (
-          <div className="config-panel-empty">
-            <div className="config-panel-empty-icon">
-              <SettingOutlined />
+        <Form form={form} layout="vertical" onValuesChange={handleValuesChange} className="config-panel-form">
+          {!selectedNode ? (
+            <div className="config-panel-empty">
+              <div className="config-panel-empty-icon">
+                <SettingOutlined />
+              </div>
+              <h4>选择一个节点开始编辑</h4>
+              <p>点击画布中的任意节点，这里会显示对应参数、提示词和运行选项。</p>
+              <div className="config-panel-empty-tip">修改会实时同步到当前工作流</div>
             </div>
-            <h4>选择一个节点开始编辑</h4>
-            <p>点击画布中的任意节点，这里会显示对应参数、提示词和运行选项。</p>
-            <div className="config-panel-empty-tip">修改会实时同步到当前工作流</div>
-          </div>
-        ) : (
-          <Form form={form} layout="vertical" onValuesChange={handleValuesChange}>
-            {renderConfigForm()}
-          </Form>
-        )}
+          ) : renderConfigForm()}
+        </Form>
       </div>
     </div>
   )

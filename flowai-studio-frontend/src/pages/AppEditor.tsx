@@ -11,6 +11,7 @@ import {
   ExportOutlined,
   FileTextOutlined,
   FileMarkdownOutlined,
+  CloseOutlined,
 } from '@ant-design/icons'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
@@ -23,6 +24,12 @@ import RunPanel from '../components/workflow/RunPanel'
 import AppShareSettings from '../components/AppShareSettings'
 
 type RightPanel = 'config' | 'debug' | 'share'
+
+const DEFAULT_PANEL_WIDTH = 360
+const MIN_PANEL_WIDTH = 300
+const MAX_PANEL_WIDTH = 560
+
+const clampPanelWidth = (width: number) => Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, width))
 
 const AppEditor: React.FC = () => {
   const { appId } = useParams<{ appId: string }>()
@@ -42,6 +49,8 @@ const AppEditor: React.FC = () => {
   } = useStore()
 
   const [rightPanel, setRightPanel] = useState<RightPanel>('config')
+  const [isPanelOpen, setIsPanelOpen] = useState(true)
+  const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
 
   // 使用 ref 防止 React StrictMode 下 useEffect 重复执行导致弹两次错误
   const initRef = useRef(false)
@@ -90,6 +99,43 @@ const AppEditor: React.FC = () => {
   const handleRun = () => {
     // 切换到调试面板，由 RunPanel 统一管理输入参数和运行
     setRightPanel('debug')
+    setIsPanelOpen(true)
+  }
+
+  const handlePanelSelect = (panel: RightPanel) => {
+    setRightPanel(panel)
+    setIsPanelOpen(true)
+  }
+
+  const handleResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    const startX = event.clientX
+    const startWidth = panelWidth
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      setPanelWidth(clampPanelWidth(startWidth + startX - moveEvent.clientX))
+    }
+
+    const handlePointerUp = () => {
+      document.removeEventListener('pointermove', handlePointerMove)
+      document.removeEventListener('pointerup', handlePointerUp)
+      document.body.classList.remove('is-resizing-panel')
+    }
+
+    document.body.classList.add('is-resizing-panel')
+    document.addEventListener('pointermove', handlePointerMove)
+    document.addEventListener('pointerup', handlePointerUp)
+  }
+
+  const handleResizeKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault()
+      setPanelWidth((width) => clampPanelWidth(width + 16))
+    }
+    if (event.key === 'ArrowRight') {
+      event.preventDefault()
+      setPanelWidth((width) => clampPanelWidth(width - 16))
+    }
   }
 
   const handleExport = async (format: 'yaml' | 'json') => {
@@ -149,22 +195,31 @@ const AppEditor: React.FC = () => {
         </div>
 
         <div className="editor-topbar-center">
-          <div className="editor-panel-tabs">
+          <div className="editor-panel-tabs" role="tablist" aria-label="编辑器侧边面板">
             <button
-              className={`editor-panel-tab ${rightPanel === 'config' ? 'editor-panel-tab--active' : ''}`}
-              onClick={() => setRightPanel('config')}
+              role="tab"
+              aria-selected={isPanelOpen && rightPanel === 'config'}
+              aria-controls="editor-inspector"
+              className={`editor-panel-tab ${isPanelOpen && rightPanel === 'config' ? 'editor-panel-tab--active' : ''}`}
+              onClick={() => handlePanelSelect('config')}
             >
               <SettingOutlined /> 配置
             </button>
             <button
-              className={`editor-panel-tab ${rightPanel === 'debug' ? 'editor-panel-tab--active' : ''}`}
-              onClick={() => setRightPanel('debug')}
+              role="tab"
+              aria-selected={isPanelOpen && rightPanel === 'debug'}
+              aria-controls="editor-inspector"
+              className={`editor-panel-tab ${isPanelOpen && rightPanel === 'debug' ? 'editor-panel-tab--active' : ''}`}
+              onClick={() => handlePanelSelect('debug')}
             >
               <BugOutlined /> 调试
             </button>
             <button
-              className={`editor-panel-tab ${rightPanel === 'share' ? 'editor-panel-tab--active' : ''}`}
-              onClick={() => setRightPanel('share')}
+              role="tab"
+              aria-selected={isPanelOpen && rightPanel === 'share'}
+              aria-controls="editor-inspector"
+              className={`editor-panel-tab ${isPanelOpen && rightPanel === 'share' ? 'editor-panel-tab--active' : ''}`}
+              onClick={() => handlePanelSelect('share')}
             >
               <ShareAltOutlined /> 分享
             </button>
@@ -226,10 +281,45 @@ const AppEditor: React.FC = () => {
           <div className="editor-canvas-wrapper">
             <WorkflowCanvas />
           </div>
-          {rightPanel === 'config' ? <ConfigPanel /> : rightPanel === 'debug' ? <RunPanel /> : (
-            <div className="editor-share-panel">
-              <AppShareSettings appId={appId!} />
-            </div>
+          {isPanelOpen && (
+            <aside
+              id="editor-inspector"
+              className="editor-inspector"
+              style={{ width: panelWidth }}
+              aria-label={`${rightPanel === 'config' ? '配置' : rightPanel === 'debug' ? '调试' : '分享'}面板`}
+            >
+              <div
+                className="editor-inspector-resizer"
+                role="separator"
+                aria-label="调整侧边面板宽度"
+                aria-orientation="vertical"
+                aria-valuemin={MIN_PANEL_WIDTH}
+                aria-valuemax={MAX_PANEL_WIDTH}
+                aria-valuenow={panelWidth}
+                title="拖动调整宽度，双击恢复默认宽度"
+                tabIndex={0}
+                onPointerDown={handleResizeStart}
+                onKeyDown={handleResizeKeyDown}
+                onDoubleClick={() => setPanelWidth(DEFAULT_PANEL_WIDTH)}
+              />
+              <Tooltip title="关闭侧边面板">
+                <button
+                  type="button"
+                  className="editor-inspector-close"
+                  onClick={() => setIsPanelOpen(false)}
+                  aria-label="关闭侧边面板"
+                >
+                  <CloseOutlined />
+                </button>
+              </Tooltip>
+              <div className="editor-inspector-content">
+                {rightPanel === 'config' ? <ConfigPanel /> : rightPanel === 'debug' ? <RunPanel /> : (
+                  <div className="editor-share-panel">
+                    <AppShareSettings appId={appId!} />
+                  </div>
+                )}
+              </div>
+            </aside>
           )}
         </div>
       </ReactFlowProvider>
