@@ -46,6 +46,7 @@ const MAX_PANEL_WIDTH = 560
 const DEFAULT_NODE_PANEL_WIDTH = 176
 const MIN_NODE_PANEL_WIDTH = 120
 const MAX_NODE_PANEL_WIDTH = 300
+const EDITOR_DESKTOP_MEDIA_QUERY = '(min-width: 1024px)'
 
 const clampPanelWidth = (width: number) => Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, width))
 const clampNodePanelWidth = (width: number) => Math.min(MAX_NODE_PANEL_WIDTH, Math.max(MIN_NODE_PANEL_WIDTH, width))
@@ -72,11 +73,11 @@ const AppEditor: React.FC = () => {
   } = useStore()
 
   const [rightPanel, setRightPanel] = useState<RightPanel>('config')
-  const [isNarrowViewport, setIsNarrowViewport] = useState(() =>
-    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+  const [isCompactViewport, setIsCompactViewport] = useState(() =>
+    typeof window !== 'undefined' && !window.matchMedia(EDITOR_DESKTOP_MEDIA_QUERY).matches
   )
   const [isPanelOpen, setIsPanelOpen] = useState(() =>
-    typeof window === 'undefined' || !window.matchMedia('(max-width: 767px)').matches
+    typeof window === 'undefined' || window.matchMedia(EDITOR_DESKTOP_MEDIA_QUERY).matches
   )
   const [isNodePanelOpen, setIsNodePanelOpen] = useState(false)
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
@@ -113,11 +114,11 @@ const AppEditor: React.FC = () => {
   }, [appId, createWorkflow, fetchAppById, fetchWorkflowById, fetchWorkflows, messageApi])
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(max-width: 767px)')
+    const mediaQuery = window.matchMedia(EDITOR_DESKTOP_MEDIA_QUERY)
     const handleViewportChange = (event: MediaQueryListEvent) => {
-      setIsNarrowViewport(event.matches)
+      setIsCompactViewport(!event.matches)
       setIsNodePanelOpen(false)
-      setIsPanelOpen(!event.matches)
+      setIsPanelOpen(event.matches)
     }
 
     mediaQuery.addEventListener('change', handleViewportChange)
@@ -156,7 +157,6 @@ const AppEditor: React.FC = () => {
 
   const handleMobilePanelDismiss = () => {
     setIsNodePanelOpen(false)
-    if (isNarrowViewport) setIsPanelOpen(false)
   }
 
   const handleCanvasNodeSelect = () => {
@@ -373,12 +373,12 @@ const AppEditor: React.FC = () => {
       {/* ---- Editor body ---- */}
       <ReactFlowProvider>
         <div className="editor-body">
-          {(isNodePanelOpen || (isNarrowViewport && isPanelOpen)) && (
+          {isNodePanelOpen && (
             <button
               type="button"
               className="editor-panel-scrim"
               onClick={handleMobilePanelDismiss}
-              aria-label="关闭编辑器面板"
+              aria-label="关闭节点库"
             />
           )}
           <aside
@@ -386,6 +386,7 @@ const AppEditor: React.FC = () => {
             className={`editor-node-panel-shell ${isNodePanelOpen ? 'editor-node-panel-shell--mobile-open' : ''}`}
             style={{ width: nodePanelWidth }}
             aria-label="节点库"
+            aria-hidden={isCompactViewport && !isNodePanelOpen}
           >
             <NodePanel />
             <Tooltip title="关闭节点库">
@@ -395,7 +396,7 @@ const AppEditor: React.FC = () => {
                 onClick={() => setIsNodePanelOpen(false)}
                 aria-label="关闭节点库"
               >
-                <CloseOutlined />
+                <CloseOutlined aria-hidden="true" />
               </button>
             </Tooltip>
             <div
@@ -464,7 +465,7 @@ const AppEditor: React.FC = () => {
               aria-controls="editor-node-library"
               aria-expanded={isNodePanelOpen}
             >
-              <PlusSquareOutlined />
+              <PlusSquareOutlined aria-hidden="true" />
               <span>节点</span>
             </button>
             <div className="editor-mobile-panel-actions">
@@ -479,7 +480,7 @@ const AppEditor: React.FC = () => {
                     aria-controls="editor-inspector"
                     aria-expanded={isActive}
                   >
-                    <Icon />
+                    <Icon aria-hidden="true" />
                     <span>{label}</span>
                   </button>
                 )

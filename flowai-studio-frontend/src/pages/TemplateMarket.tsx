@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Input, Select, Tag, Card, Rate, Button, Modal, Form, Empty, Spin, Row, Col,
-  message, Dropdown, Tooltip, Badge,
+  Input, Select, Tag, Card, Button, Modal, Form, Empty, Spin, Row, Col,
+  message, Dropdown,
 } from 'antd'
 import {
   SearchOutlined,
-  DownloadOutlined,
+  ImportOutlined,
   PlusOutlined,
   MoreOutlined,
+  DeleteOutlined,
   AppstoreOutlined,
   CheckCircleOutlined,
   RocketOutlined,
@@ -21,7 +22,6 @@ import {
 import { useStore } from '../store'
 import {
   TemplateCategory,
-  TemplateSort,
   TEMPLATE_CATEGORY_OPTIONS,
   Workflow,
   WorkflowTemplate,
@@ -38,17 +38,17 @@ interface CreateTemplateValues {
 
 const categoryMap = Object.fromEntries(TEMPLATE_CATEGORY_OPTIONS.map(c => [c.value, c]))
 const categoryIconMap = {
-  productivity: <RocketOutlined />,
-  'customer-service': <MessageOutlined />,
-  'content-creation': <EditOutlined />,
-  'data-analysis': <BarChartOutlined />,
-  education: <ReadOutlined />,
-  development: <CodeOutlined />,
-  other: <AppstoreOutlined />,
+  productivity: <RocketOutlined aria-hidden="true" />,
+  'customer-service': <MessageOutlined aria-hidden="true" />,
+  'content-creation': <EditOutlined aria-hidden="true" />,
+  'data-analysis': <BarChartOutlined aria-hidden="true" />,
+  education: <ReadOutlined aria-hidden="true" />,
+  development: <CodeOutlined aria-hidden="true" />,
+  other: <AppstoreOutlined aria-hidden="true" />,
 }
 
 const getCategoryIcon = (category?: TemplateCategory) => (
-  category ? categoryIconMap[category] : <AppstoreOutlined />
+  category ? categoryIconMap[category] : <AppstoreOutlined aria-hidden="true" />
 )
 
 const TemplateMarket: React.FC = () => {
@@ -73,13 +73,13 @@ const TemplateMarket: React.FC = () => {
 
   const [keyword, setKeyword] = useState('')
   const [category, setCategory] = useState<TemplateCategory | undefined>(undefined)
-  const [sort, setSort] = useState<TemplateSort>('newest')
   const [page, setPage] = useState(1)
 
   // 导入模态
   const [importModalVisible, setImportModalVisible] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate | null>(null)
   const [importAppId, setImportAppId] = useState('')
+  const [importLoadingTemplateId, setImportLoadingTemplateId] = useState<string | null>(null)
 
   // 详情模态
   const [detailModalVisible, setDetailModalVisible] = useState(false)
@@ -98,8 +98,8 @@ const TemplateMarket: React.FC = () => {
   }, [fetchApps])
 
   const loadTemplates = useCallback(() => {
-    fetchTemplates({ keyword: keyword || undefined, category, sort, page, pageSize: 12 })
-  }, [keyword, category, sort, page, fetchTemplates])
+    fetchTemplates({ keyword: keyword || undefined, category, page, pageSize: 12 })
+  }, [keyword, category, page, fetchTemplates])
 
   useEffect(() => {
     loadTemplates()
@@ -119,11 +119,6 @@ const TemplateMarket: React.FC = () => {
     setPage(1)
   }
 
-  const handleSortChange = (value: TemplateSort) => {
-    setSort(value)
-    setPage(1)
-  }
-
   const handleViewDetail = async (template: WorkflowTemplate) => {
     try {
       const detail = await fetchTemplateById(template.id)
@@ -134,10 +129,31 @@ const TemplateMarket: React.FC = () => {
     }
   }
 
-  const handleImportClick = (template: WorkflowTemplate) => {
-    setSelectedTemplate(template)
-    setImportAppId('')
-    setImportModalVisible(true)
+  const handleImportClick = async (template: WorkflowTemplate) => {
+    if (importLoadingTemplateId) return
+
+    const hasWorkflowStructure = Array.isArray(template.nodes) && Array.isArray(template.edges)
+    if (hasWorkflowStructure) {
+      setSelectedTemplate(template)
+      setImportAppId('')
+      setImportModalVisible(true)
+      return
+    }
+
+    setImportLoadingTemplateId(template.id)
+    try {
+      const detail = await fetchTemplateById(template.id)
+      if (!Array.isArray(detail.nodes) || !Array.isArray(detail.edges)) {
+        throw new Error('Template structure is unavailable')
+      }
+      setSelectedTemplate(detail)
+      setImportAppId('')
+      setImportModalVisible(true)
+    } catch {
+      message.error('获取模板结构失败，请重试')
+    } finally {
+      setImportLoadingTemplateId(null)
+    }
   }
 
   const handleImportConfirm = async () => {
@@ -249,21 +265,19 @@ const TemplateMarket: React.FC = () => {
 
   const getCardMenu = (template: WorkflowTemplate) => ({
     items: [
-      { key: 'detail', label: '查看详情', icon: <AppstoreOutlined /> },
-      { key: 'import', label: '导入', icon: <DownloadOutlined /> },
       ...(template.status === 'draft'
-        ? [{ key: 'publish', label: '发布', icon: <RocketOutlined /> }]
+        ? [{ key: 'publish', label: '发布', icon: <RocketOutlined aria-hidden="true" /> }]
         : []),
       ...(template.status === 'published'
-        ? [{ key: 'archive', label: '下架', icon: <CheckCircleOutlined /> }]
+        ? [{ key: 'archive', label: '下架', icon: <CheckCircleOutlined aria-hidden="true" /> }]
         : []),
-      { type: 'divider' as const },
-      { key: 'delete', label: '删除', icon: <MoreOutlined />, danger: true },
+      ...(template.status === 'draft' || template.status === 'published'
+        ? [{ type: 'divider' as const }]
+        : []),
+      { key: 'delete', label: '删除', icon: <DeleteOutlined aria-hidden="true" />, danger: true },
     ],
     onClick: ({ key }: { key: string }) => {
       switch (key) {
-        case 'detail': handleViewDetail(template); break
-        case 'import': handleImportClick(template); break
         case 'publish': handlePublish(template.id); break
         case 'archive': handleArchive(template.id); break
         case 'delete': handleDelete(template.id); break
@@ -294,7 +308,7 @@ const TemplateMarket: React.FC = () => {
       {/* Filter bar */}
       <div className="template-filter-bar">
         <Input
-          prefix={<SearchOutlined style={{ color: 'var(--c-text-tertiary)' }} />}
+          prefix={<SearchOutlined className="template-search-icon" aria-hidden="true" />}
           placeholder="搜索模板名称或描述..."
           allowClear
           value={keyword}
@@ -313,15 +327,6 @@ const TemplateMarket: React.FC = () => {
               {getCategoryIcon(opt.value)} {opt.label}
             </Select.Option>
           ))}
-        </Select>
-        <Select
-          value={sort}
-          onChange={handleSortChange}
-          className="template-sort-select"
-        >
-          <Select.Option value="newest">最新</Select.Option>
-          <Select.Option value="popular">最热</Select.Option>
-          <Select.Option value="rating">评分最高</Select.Option>
         </Select>
       </div>
 
@@ -357,15 +362,13 @@ const TemplateMarket: React.FC = () => {
         <>
           <Row gutter={[16, 16]}>
             {safeTemplates.map((template) => (
-              <Col key={template.id} xs={24} sm={12} md={8} lg={6}>
+              <Col key={template.id} xs={24} sm={12} md={8} xl={6}>
                 <Card
                   className="template-card"
-                  hoverable
-                  onClick={() => handleViewDetail(template)}
                   cover={
                     <div className="template-card-cover">
                       {template.screenshot ? (
-                        <img src={template.screenshot} alt={template.name} />
+                        <img src={template.screenshot} alt={template.name} loading="lazy" />
                       ) : (
                         <div className="template-card-cover-placeholder">
                           <span className="template-card-cover-icon">
@@ -374,61 +377,61 @@ const TemplateMarket: React.FC = () => {
                         </div>
                       )}
                       {template.isOfficial && (
-                        <Badge
-                          className="template-official-badge"
-                          count={<CrownOutlined style={{ color: '#faad14', fontSize: 16 }} />}
-                        />
+                        <span className="template-official-badge">
+                          <CrownOutlined aria-hidden="true" />
+                          官方
+                        </span>
                       )}
                     </div>
                   }
-                  actions={[
-                    <Tooltip title="查看详情" key="detail">
-                      <AppstoreOutlined />
-                    </Tooltip>,
-                    <Tooltip title="一键导入" key="import">
-                      <DownloadOutlined onClick={(e) => {
-                        e.stopPropagation()
-                        handleImportClick(template)
-                      }} />
-                    </Tooltip>,
-                    <Dropdown
-                      menu={getCardMenu(template)}
-                      trigger={['click']}
-                      key="more"
-                    >
-                      <MoreOutlined onClick={(e) => e.stopPropagation()} />
-                    </Dropdown>,
-                  ]}
                 >
-                  <Card.Meta
-                    title={
+                  <div className="template-card-content">
+                    <div className="template-card-heading">
                       <div className="template-card-title">
                         {template.icon && <span className="template-card-icon">{template.icon}</span>}
                         <span>{template.name}</span>
                       </div>
-                    }
-                    description={
-                      <div className="template-card-desc">
-                        <p className="template-card-description">
-                          {template.description || '暂无描述'}
-                        </p>
-                        <div className="template-card-meta">
-                          <span className="template-card-rating">
-                            <Rate disabled allowHalf value={template.rating} style={{ fontSize: 12 }} />
-                            <span className="template-card-rating-num">{template.rating.toFixed(1)}</span>
-                          </span>
-                          <span className="template-card-downloads">
-                            <DownloadOutlined /> {template.downloadCount}
-                          </span>
-                        </div>
-                        <div className="template-card-tags">
-                          {template.tags?.slice(0, 3).map((tag) => (
-                            <Tag key={tag} className="template-tag">{tag}</Tag>
-                          ))}
-                        </div>
+                      <Dropdown
+                        menu={getCardMenu(template)}
+                        trigger={['click']}
+                      >
+                        <Button
+                          type="text"
+                          className="template-card-menu-button"
+                          icon={<MoreOutlined aria-hidden="true" />}
+                          aria-label={`管理模板：${template.name}`}
+                        />
+                      </Dropdown>
+                    </div>
+                    <p className="template-card-description">
+                      {template.description || '暂无描述'}
+                    </p>
+                    {template.tags?.length > 0 && (
+                      <div className="template-card-tags">
+                        {template.tags.slice(0, 2).map((tag) => (
+                          <Tag key={tag} className="template-tag">{tag}</Tag>
+                        ))}
                       </div>
-                    }
-                  />
+                    )}
+                    <div className="template-card-actions">
+                      <Button
+                        className="template-card-detail-action"
+                        onClick={() => handleViewDetail(template)}
+                      >
+                        查看详情
+                      </Button>
+                      <Button
+                        type="primary"
+                        className="template-card-import-action"
+                        icon={<ImportOutlined aria-hidden="true" />}
+                        loading={importLoadingTemplateId === template.id}
+                        disabled={Boolean(importLoadingTemplateId && importLoadingTemplateId !== template.id)}
+                        onClick={() => void handleImportClick(template)}
+                      >
+                        导入模板
+                      </Button>
+                    </div>
+                  </div>
                 </Card>
               </Col>
             ))}
@@ -565,7 +568,7 @@ const TemplateMarket: React.FC = () => {
         okText="导入"
         cancelText="取消"
       >
-        <Form layout="vertical" style={{ marginTop: 16 }}>
+        <Form layout="vertical" className="template-import-form">
           <Form.Item label="选择目标应用" required>
             <Select
               placeholder="请选择要将模板导入到的应用"
@@ -583,8 +586,8 @@ const TemplateMarket: React.FC = () => {
             <div className="import-template-preview">
               <p><strong>模板名称:</strong> {selectedTemplate.name}</p>
               <p><strong>分类:</strong> {categoryMap[selectedTemplate.category]?.label || selectedTemplate.category}</p>
-              <p><strong>包含节点:</strong> {Array.isArray(selectedTemplate.nodes) ? selectedTemplate.nodes.length : '?'} 个</p>
-              <p><strong>包含连线:</strong> {Array.isArray(selectedTemplate.edges) ? selectedTemplate.edges.length : '?'} 条</p>
+              <p><strong>包含节点:</strong> {selectedTemplate.nodes.length} 个</p>
+              <p><strong>包含连线:</strong> {selectedTemplate.edges.length} 条</p>
             </div>
           )}
         </Form>
@@ -600,13 +603,14 @@ const TemplateMarket: React.FC = () => {
             <Button onClick={() => setDetailModalVisible(false)}>关闭</Button>
             <Button
               type="primary"
-              icon={<DownloadOutlined />}
+              icon={<ImportOutlined aria-hidden="true" />}
+              disabled={Boolean(importLoadingTemplateId)}
               onClick={() => {
                 setDetailModalVisible(false)
-                if (detailTemplate) handleImportClick(detailTemplate)
+                if (detailTemplate) void handleImportClick(detailTemplate)
               }}
             >
-              一键导入
+              导入模板
             </Button>
           </div>
         }
@@ -620,14 +624,16 @@ const TemplateMarket: React.FC = () => {
               </span>
               <div>
                 <h3>{detailTemplate.name}</h3>
-                <div className="template-detail-meta">
-                  <Rate disabled allowHalf value={detailTemplate.rating} style={{ fontSize: 14 }} />
-                  <span>{detailTemplate.rating.toFixed(1)} ({detailTemplate.ratingCount} 评分)</span>
-                  <span><DownloadOutlined /> {detailTemplate.downloadCount} 次下载</span>
-                  {detailTemplate.isOfficial && (
-                    <Tag color="gold" icon={<CrownOutlined />}>官方</Tag>
-                  )}
-                </div>
+                {detailTemplate.isOfficial && (
+                  <div className="template-detail-meta">
+                    <Tag
+                      className="template-official-tag"
+                      icon={<CrownOutlined aria-hidden="true" />}
+                    >
+                      官方
+                    </Tag>
+                  </div>
+                )}
               </div>
             </div>
             <div className="template-detail-section">
@@ -647,8 +653,8 @@ const TemplateMarket: React.FC = () => {
             <div className="template-detail-section">
               <h4>工作流结构</h4>
               <div className="template-detail-structure">
-                <span>{Array.isArray(detailTemplate.nodes) ? detailTemplate.nodes.length : '?'} 个节点</span>
-                <span>{Array.isArray(detailTemplate.edges) ? detailTemplate.edges.length : '?'} 条连线</span>
+                <span>{detailTemplate.nodes.length} 个节点</span>
+                <span>{detailTemplate.edges.length} 条连线</span>
               </div>
             </div>
           </div>
