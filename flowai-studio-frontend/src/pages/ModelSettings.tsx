@@ -6,7 +6,6 @@ import {
   Form,
   Input,
   Popconfirm,
-  Space,
   Spin,
   Tag,
   Typography,
@@ -20,7 +19,6 @@ import {
   DisconnectOutlined,
   ExperimentOutlined,
   ExportOutlined,
-  SafetyCertificateOutlined,
 } from '@ant-design/icons'
 import {
   deleteModelCredential,
@@ -72,10 +70,10 @@ const PROVIDERS: Array<{
   },
 ]
 
-type FormState = Record<UserModelProvider, { baseUrl: string; apiKey: string; clearApiKey: boolean }>
+type FormState = Record<UserModelProvider, { baseUrl: string; apiKey: string }>
 
 const initialForms = (): FormState => Object.fromEntries(
-  PROVIDERS.map((item) => [item.provider, { baseUrl: item.defaultBaseUrl, apiKey: '', clearApiKey: false }]),
+  PROVIDERS.map((item) => [item.provider, { baseUrl: item.defaultBaseUrl, apiKey: '' }]),
 ) as FormState
 
 const statusPresentation = (summary?: ModelCredentialSummary) => {
@@ -85,6 +83,10 @@ const statusPresentation = (summary?: ModelCredentialSummary) => {
   if (summary.status === 'disabled') return { color: 'warning', text: '已停用' }
   return { color: 'processing', text: '待测试' }
 }
+
+const getErrorMessage = (error: unknown, fallback: string) => (
+  error instanceof Error && error.message ? error.message : fallback
+)
 
 const ModelSettings: React.FC = () => {
   const [credentials, setCredentials] = useState<ModelCredentialSummary[]>([])
@@ -109,8 +111,8 @@ const ModelSettings: React.FC = () => {
         }
         return next
       })
-    } catch (error: any) {
-      message.error(error.message || '加载模型服务配置失败')
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '加载模型服务配置失败'))
     } finally {
       setLoading(false)
     }
@@ -133,15 +135,14 @@ const ModelSettings: React.FC = () => {
       await saveModelCredential(provider, {
         baseUrl: value.baseUrl.trim(),
         ...(value.apiKey.trim() ? { apiKey: value.apiKey.trim() } : {}),
-        ...(value.clearApiKey ? { clearApiKey: true } : {}),
       })
       await testModelCredential(provider)
-      patchForm(provider, { apiKey: '', clearApiKey: false })
+      patchForm(provider, { apiKey: '' })
       message.success('保存并测试成功，模型服务已启用')
       await load()
-    } catch (error: any) {
+    } catch (error: unknown) {
       // 保存成功、测试失败时后端会保留配置并标记为不可用。
-      message.error(error.message || '连接测试失败')
+      message.error(getErrorMessage(error, '连接测试失败'))
       await load()
     } finally {
       setBusyProvider(null)
@@ -154,8 +155,8 @@ const ModelSettings: React.FC = () => {
       await testModelCredential(provider)
       message.success('连接测试成功')
       await load()
-    } catch (error: any) {
-      message.error(error.message || '连接测试失败')
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '连接测试失败'))
       await load()
     } finally {
       setBusyProvider(null)
@@ -168,8 +169,8 @@ const ModelSettings: React.FC = () => {
       await setModelCredentialEnabled(provider, false)
       message.success('模型服务已停用')
       await load()
-    } catch (error: any) {
-      message.error(error.message || '停用失败')
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '停用失败'))
     } finally {
       setBusyProvider(null)
     }
@@ -182,8 +183,8 @@ const ModelSettings: React.FC = () => {
       patchForm(provider, { ...initialForms()[provider] })
       message.success('模型服务配置已删除')
       await load()
-    } catch (error: any) {
-      message.error(error.message || '删除失败')
+    } catch (error: unknown) {
+      message.error(getErrorMessage(error, '删除失败'))
     } finally {
       setBusyProvider(null)
     }
@@ -196,7 +197,6 @@ const ModelSettings: React.FC = () => {
           <h2 className="model-settings-title">模型服务</h2>
           <Paragraph className="model-settings-subtitle">配置你自己的模型厂商凭证，调用费用由对应厂商账户承担。</Paragraph>
         </div>
-        <div className="model-settings-security"><SafetyCertificateOutlined /> Key 加密保存，永不回显明文</div>
       </div>
 
       <Alert
@@ -254,28 +254,18 @@ const ModelSettings: React.FC = () => {
                   {meta.requiresKey && (
                     <Form.Item
                       label="API Key"
-                      extra={summary?.hasApiKey ? `已保存：${summary.apiKeyMasked || '••••••••'}；留空不会覆盖` : '密钥仅发送到服务端加密保存'}
+                      extra={summary?.hasApiKey
+                        ? `已保存：${summary.apiKeyMasked || '••••••••'}。填写新 Key 会覆盖，留空保持不变`
+                        : '请输入模型厂商提供的 API Key'}
                     >
                       <Input.Password
                         value={form.apiKey}
-                        onChange={(event) => patchForm(meta.provider, { apiKey: event.target.value, clearApiKey: false })}
-                        placeholder={summary?.hasApiKey ? '留空以保留已有 Key' : '请输入 API Key'}
+                        onChange={(event) => patchForm(meta.provider, { apiKey: event.target.value })}
+                        placeholder={summary?.hasApiKey ? '输入新 Key 以覆盖（留空不变）' : '请输入 API Key'}
                         autoComplete="new-password"
                       />
-                      {summary?.hasApiKey && (
-                        <Button
-                          type="link"
-                          danger
-                          size="small"
-                          className="model-clear-key"
-                          onClick={() => patchForm(meta.provider, { apiKey: '', clearApiKey: !form.clearApiKey })}
-                        >
-                          {form.clearApiKey ? '取消清除 Key' : '保存时清除 Key'}
-                        </Button>
-                      )}
                     </Form.Item>
                   )}
-                  {form.clearApiKey && <Alert type="warning" showIcon message="本次保存将清除已有 Key，服务会保持停用。" />}
                 </Form>
 
                 {summary?.lastTestMessage && (

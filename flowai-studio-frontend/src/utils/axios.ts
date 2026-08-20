@@ -1,5 +1,8 @@
 import axios from 'axios'
 
+export const getResponseData = <T>(response: unknown): T =>
+  (response as { data: T }).data
+
 declare module 'axios' {
   interface AxiosRequestConfig {
     cacheBust?: boolean

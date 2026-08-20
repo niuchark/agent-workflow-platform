@@ -19,6 +19,15 @@ export function useModelCatalog() {
       setCredentials(summaries)
       const available = summaries.filter((item) => item.status === 'valid' && item.isEnabled)
       const results = await Promise.allSettled(available.map((item) => getProviderModels(item.provider)))
+      const failures = available.flatMap((item, index) => {
+        const result = results[index]
+        if (result?.status !== 'rejected') return []
+        const reason = result.reason as { message?: string; response?: { status?: number } }
+        return [`${item.provider}（${reason.response?.status || reason.message || '未知错误'}）`]
+      })
+      if (failures.length > 0) {
+        console.warn(`模型目录加载失败：${failures.join('、')}`)
+      }
       setModels(results.flatMap((result) => result.status === 'fulfilled' ? result.value : []))
     } catch {
       setCredentials([])

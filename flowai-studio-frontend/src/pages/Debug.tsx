@@ -541,7 +541,7 @@ const Debug: React.FC = () => {
                 style={{ width: 190 }}
               />
               <AutoComplete
-                placeholder={selectedProvider === 'openai' ? '选择或输入模型 ID' : '选择模型'}
+                placeholder="选择或输入模型 ID"
                 value={selectedModel}
                 onChange={setSelectedModel}
                 disabled={!selectedProvider}
@@ -625,7 +625,7 @@ const Debug: React.FC = () => {
               onClick={handleRunWorkflow}
               loading={isLoading}
               disabled={!selectedWorkflowId}
-              style={{ background: 'var(--c-green)', borderColor: 'var(--c-green)' }}
+              className="debug-wf-run-btn"
             >
               执行工作流
             </Button>

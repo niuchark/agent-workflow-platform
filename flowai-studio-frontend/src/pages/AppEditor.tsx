@@ -27,6 +27,19 @@ import AppShareSettings from '../components/AppShareSettings'
 
 type RightPanel = 'config' | 'debug' | 'share'
 
+const RIGHT_PANELS = [
+  { key: 'config', label: '配置', icon: SettingOutlined },
+  { key: 'debug', label: '调试', icon: BugOutlined },
+  { key: 'share', label: '分享', icon: ShareAltOutlined },
+] satisfies Array<{ key: RightPanel; label: string; icon: React.ComponentType }>
+
+const STATUS_TAGS: Record<string, { color: string; label: string }> = {
+  running: { color: 'processing', label: '运行中' },
+  success: { color: 'success', label: '成功' },
+  failed: { color: 'error', label: '失败' },
+  stopped: { color: 'default', label: '已停止' },
+}
+
 const DEFAULT_PANEL_WIDTH = 360
 const MIN_PANEL_WIDTH = 300
 const MAX_PANEL_WIDTH = 560
@@ -80,7 +93,7 @@ const AppEditor: React.FC = () => {
       if (!appId) return
       try {
         await fetchAppById(appId)
-        const workflows = (await fetchWorkflows(appId)) as any
+        const workflows = await fetchWorkflows(appId)
 
         if (workflows && workflows.length > 0) {
           await fetchWorkflowById(workflows[0].id)
@@ -97,7 +110,7 @@ const AppEditor: React.FC = () => {
       }
     }
     initEditor()
-  }, [appId])
+  }, [appId, createWorkflow, fetchAppById, fetchWorkflowById, fetchWorkflows, messageApi])
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 767px)')
@@ -126,9 +139,7 @@ const AppEditor: React.FC = () => {
   }
 
   const handleRun = () => {
-    // 切换到调试面板，由 RunPanel 统一管理输入参数和运行
-    setRightPanel('debug')
-    setIsPanelOpen(true)
+    handlePanelSelect('debug')
   }
 
   const handlePanelSelect = (panel: RightPanel) => {
@@ -251,14 +262,7 @@ const AppEditor: React.FC = () => {
     }
   }
 
-  const statusTagMap: Record<string, { color: string; label: string }> = {
-    running: { color: 'processing', label: '运行中' },
-    success: { color: 'success', label: '成功' },
-    failed: { color: 'error', label: '失败' },
-    stopped: { color: 'default', label: '已停止' },
-  }
-
-  const tag = executionStatus ? statusTagMap[executionStatus] : null
+  const tag = executionStatus ? STATUS_TAGS[executionStatus] : null
 
   return (
     <>
@@ -285,33 +289,21 @@ const AppEditor: React.FC = () => {
 
         <div className="editor-topbar-center">
           <div className="editor-panel-tabs" role="tablist" aria-label="编辑器侧边面板">
-            <button
-              role="tab"
-              aria-selected={isPanelOpen && rightPanel === 'config'}
-              aria-controls="editor-inspector"
-              className={`editor-panel-tab ${isPanelOpen && rightPanel === 'config' ? 'editor-panel-tab--active' : ''}`}
-              onClick={() => handlePanelSelect('config')}
-            >
-              <SettingOutlined /> 配置
-            </button>
-            <button
-              role="tab"
-              aria-selected={isPanelOpen && rightPanel === 'debug'}
-              aria-controls="editor-inspector"
-              className={`editor-panel-tab ${isPanelOpen && rightPanel === 'debug' ? 'editor-panel-tab--active' : ''}`}
-              onClick={() => handlePanelSelect('debug')}
-            >
-              <BugOutlined /> 调试
-            </button>
-            <button
-              role="tab"
-              aria-selected={isPanelOpen && rightPanel === 'share'}
-              aria-controls="editor-inspector"
-              className={`editor-panel-tab ${isPanelOpen && rightPanel === 'share' ? 'editor-panel-tab--active' : ''}`}
-              onClick={() => handlePanelSelect('share')}
-            >
-              <ShareAltOutlined /> 分享
-            </button>
+            {RIGHT_PANELS.map(({ key, label, icon: Icon }) => {
+              const isActive = isPanelOpen && rightPanel === key
+              return (
+                <button
+                  key={key}
+                  role="tab"
+                  aria-selected={isActive}
+                  aria-controls="editor-inspector"
+                  className={`editor-panel-tab ${isActive ? 'editor-panel-tab--active' : ''}`}
+                  onClick={() => handlePanelSelect(key)}
+                >
+                  <Icon /> {label}
+                </button>
+              )
+            })}
           </div>
         </div>
 
@@ -476,36 +468,22 @@ const AppEditor: React.FC = () => {
               <span>节点</span>
             </button>
             <div className="editor-mobile-panel-actions">
-              <button
-                type="button"
-                className={`editor-mobile-toolbar-btn ${isPanelOpen && rightPanel === 'config' ? 'editor-mobile-toolbar-btn--active' : ''}`}
-                onClick={() => handlePanelSelect('config')}
-                aria-controls="editor-inspector"
-                aria-expanded={isPanelOpen && rightPanel === 'config'}
-              >
-                <SettingOutlined />
-                <span>配置</span>
-              </button>
-              <button
-                type="button"
-                className={`editor-mobile-toolbar-btn ${isPanelOpen && rightPanel === 'debug' ? 'editor-mobile-toolbar-btn--active' : ''}`}
-                onClick={() => handlePanelSelect('debug')}
-                aria-controls="editor-inspector"
-                aria-expanded={isPanelOpen && rightPanel === 'debug'}
-              >
-                <BugOutlined />
-                <span>调试</span>
-              </button>
-              <button
-                type="button"
-                className={`editor-mobile-toolbar-btn ${isPanelOpen && rightPanel === 'share' ? 'editor-mobile-toolbar-btn--active' : ''}`}
-                onClick={() => handlePanelSelect('share')}
-                aria-controls="editor-inspector"
-                aria-expanded={isPanelOpen && rightPanel === 'share'}
-              >
-                <ShareAltOutlined />
-                <span>分享</span>
-              </button>
+              {RIGHT_PANELS.map(({ key, label, icon: Icon }) => {
+                const isActive = isPanelOpen && rightPanel === key
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`editor-mobile-toolbar-btn ${isActive ? 'editor-mobile-toolbar-btn--active' : ''}`}
+                    onClick={() => handlePanelSelect(key)}
+                    aria-controls="editor-inspector"
+                    aria-expanded={isActive}
+                  >
+                    <Icon />
+                    <span>{label}</span>
+                  </button>
+                )
+              })}
             </div>
           </nav>
         </div>

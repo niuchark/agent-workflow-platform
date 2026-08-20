@@ -25,19 +25,18 @@ const NODE_TYPE_META: Record<string, { label: string; description: string }> = {
 const ModelSelect: React.FC<{
   value?: string;
   onChange?: (value: string) => void;
-  provider: UserModelProvider;
   models: ProviderModel[];
   style?: React.CSSProperties;
   size?: 'small' | 'middle' | 'large';
-}> = ({ value, onChange, provider, models, style, size }) => (
+}> = ({ value, onChange, models, style, size }) => (
   <AutoComplete
     value={value}
     onChange={onChange}
     style={style}
     size={size}
-    placeholder={provider === 'openai' ? '选择或输入模型 ID' : '选择模型'}
+    placeholder="选择或输入模型 ID"
     options={[
-      ...(value && !models.some((model) => model.id === value) ? [{ value, label: `${value}（当前不可用）` }] : []),
+      ...(value && !models.some((model) => model.id === value) ? [{ value, label: `${value}（自定义模型 ID）` }] : []),
       ...models.map((model) => ({ value: model.id, label: model.displayName })),
     ]}
     filterOption={(input, option) => String(option?.value || '').toLowerCase().includes(input.toLowerCase())}
@@ -241,7 +240,7 @@ const ConfigPanel: React.FC = () => {
           <Select loading={modelCatalogLoading} options={providerOptions(selectedProvider)} />
         </Form.Item>
         <Form.Item name="model" label="模型" initialValue="qwen-turbo">
-          <ModelSelect provider={selectedProvider} models={modelsByProvider[selectedProvider]} style={{ width: '100%' }} />
+          <ModelSelect models={modelsByProvider[selectedProvider]} style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item name="systemPrompt" label="系统提示词">
           <Input.TextArea rows={4} placeholder="定义 Agent 的角色、能力和行为规范" />
@@ -299,7 +298,7 @@ const ConfigPanel: React.FC = () => {
               <Select loading={modelCatalogLoading} options={providerOptions(supervisorProvider)} />
             </Form.Item>
             <Form.Item name="supervisorModel" label="Supervisor 模型" initialValue="qwen-plus">
-              <ModelSelect provider={supervisorProvider} models={modelsByProvider[supervisorProvider]} style={{ width: '100%' }} />
+              <ModelSelect models={modelsByProvider[supervisorProvider]} style={{ width: '100%' }} />
             </Form.Item>
             <Divider orientation="left" style={{ margin: '12px 0 12px' }}>🤖 Workers ({workers.length})</Divider>
             {workers.map((worker, index) => (
@@ -329,7 +328,7 @@ const ConfigPanel: React.FC = () => {
                       size="small"
                       style={{ width: 120 }}
                     />
-                    <ModelSelect provider={worker.provider || 'qwen'} models={modelsByProvider[worker.provider || 'qwen']} value={worker.model} onChange={(v) => updateWorker(index, 'model', v)} size="small" style={{ width: 180 }} />
+                    <ModelSelect models={modelsByProvider[worker.provider || 'qwen']} value={worker.model} onChange={(v) => updateWorker(index, 'model', v)} size="small" style={{ width: 180 }} />
                     <Text type="secondary" style={{ fontSize: 11 }}>温度:</Text>
                     <InputNumber value={worker.temperature} onChange={(v) => updateWorker(index, 'temperature', v)} min={0} max={1} step={0.1} size="small" style={{ width: 60 }} />
                   </Space>
@@ -365,7 +364,7 @@ const ConfigPanel: React.FC = () => {
               <Select loading={modelCatalogLoading} options={providerOptions(selectedProvider)} />
             </Form.Item>
             <Form.Item name="model" label="模型" initialValue="qwen-turbo">
-              <ModelSelect provider={selectedProvider} models={modelsByProvider[selectedProvider]} style={{ width: '100%' }} />
+              <ModelSelect models={modelsByProvider[selectedProvider]} style={{ width: '100%' }} />
             </Form.Item>
             <Form.Item name="systemPrompt" label="系统提示词"><Input.TextArea rows={4} placeholder="定义模型的角色和行为" /></Form.Item>
             <Form.Item className="variable-template-form-item" name="userPrompt" label={<UserPromptLabel />} rules={[{ required: true }]}>

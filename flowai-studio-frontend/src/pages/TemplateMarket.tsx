@@ -6,7 +6,6 @@ import {
 import {
   SearchOutlined,
   DownloadOutlined,
-  StarOutlined,
   PlusOutlined,
   MoreOutlined,
   AppstoreOutlined,
@@ -20,7 +19,22 @@ import {
   CodeOutlined,
 } from '@ant-design/icons'
 import { useStore } from '../store'
-import { TemplateCategory, TemplateSort, TEMPLATE_CATEGORY_OPTIONS } from '../types'
+import {
+  TemplateCategory,
+  TemplateSort,
+  TEMPLATE_CATEGORY_OPTIONS,
+  Workflow,
+  WorkflowTemplate,
+} from '../types'
+
+interface CreateTemplateValues {
+  applicationId: string
+  sourceWorkflowId: string
+  name: string
+  description?: string
+  category: TemplateCategory
+  tags?: string[]
+}
 
 const categoryMap = Object.fromEntries(TEMPLATE_CATEGORY_OPTIONS.map(c => [c.value, c]))
 const categoryIconMap = {
@@ -41,17 +55,20 @@ const TemplateMarket: React.FC = () => {
   const {
     templates,
     templateTotal,
-    templatePage,
     templateTotalPages,
     templateCategories,
     templateLoading,
     fetchTemplates,
     fetchTemplateCategories,
     fetchTemplateById,
+    createTemplate,
     createFromTemplate,
     publishTemplate,
     archiveTemplate,
     deleteTemplate,
+    apps,
+    fetchApps,
+    fetchWorkflows,
   } = useStore()
 
   const [keyword, setKeyword] = useState('')
@@ -61,19 +78,24 @@ const TemplateMarket: React.FC = () => {
 
   // 导入模态
   const [importModalVisible, setImportModalVisible] = useState(false)
-  const [selectedTemplate, setSelectedTemplate] = useState<any>(null)
+  const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate | null>(null)
   const [importAppId, setImportAppId] = useState('')
 
   // 详情模态
   const [detailModalVisible, setDetailModalVisible] = useState(false)
-  const [detailTemplate, setDetailTemplate] = useState<any>(null)
+  const [detailTemplate, setDetailTemplate] = useState<WorkflowTemplate | null>(null)
 
-  // 我的应用列表（用于导入时选择目标应用）
-  const { apps, fetchApps } = useStore()
+  // 从现有工作流创建模板
+  const [createModalVisible, setCreateModalVisible] = useState(false)
+  const [createSubmitting, setCreateSubmitting] = useState(false)
+  const [sourceWorkflowsLoading, setSourceWorkflowsLoading] = useState(false)
+  const [sourceWorkflows, setSourceWorkflows] = useState<Workflow[]>([])
+  const [createForm] = Form.useForm<CreateTemplateValues>()
+  const sourceApplicationId = Form.useWatch('applicationId', createForm)
 
   useEffect(() => {
     fetchApps()
-  }, [])
+  }, [fetchApps])
 
   const loadTemplates = useCallback(() => {
     fetchTemplates({ keyword: keyword || undefined, category, sort, page, pageSize: 12 })
@@ -102,7 +124,7 @@ const TemplateMarket: React.FC = () => {
     setPage(1)
   }
 
-  const handleViewDetail = async (template: any) => {
+  const handleViewDetail = async (template: WorkflowTemplate) => {
     try {
       const detail = await fetchTemplateById(template.id)
       setDetailTemplate(detail)
@@ -112,7 +134,7 @@ const TemplateMarket: React.FC = () => {
     }
   }
 
-  const handleImportClick = (template: any) => {
+  const handleImportClick = (template: WorkflowTemplate) => {
     setSelectedTemplate(template)
     setImportAppId('')
     setImportModalVisible(true)
@@ -175,7 +197,57 @@ const TemplateMarket: React.FC = () => {
     })
   }
 
-  const getCardMenu = (template: any) => ({
+  const openCreateModal = () => {
+    createForm.resetFields()
+    setSourceWorkflows([])
+    setCreateModalVisible(true)
+  }
+
+  const handleSourceAppChange = async (applicationId: string) => {
+    createForm.setFieldValue('sourceWorkflowId', undefined)
+    setSourceWorkflows([])
+    setSourceWorkflowsLoading(true)
+    try {
+      setSourceWorkflows(await fetchWorkflows(applicationId))
+    } catch {
+      message.error('获取工作流失败，请重试')
+    } finally {
+      setSourceWorkflowsLoading(false)
+    }
+  }
+
+  const handleSourceWorkflowChange = (sourceWorkflowId: string) => {
+    const workflow = sourceWorkflows.find((item) => item.id === sourceWorkflowId)
+    if (!createForm.getFieldValue('name') && workflow) {
+      createForm.setFieldValue('name', workflow.name)
+    }
+  }
+
+  const handleCreateTemplate = async (values: CreateTemplateValues) => {
+    setCreateSubmitting(true)
+    try {
+      const template = await createTemplate({
+        sourceWorkflowId: values.sourceWorkflowId,
+        name: values.name.trim(),
+        description: values.description?.trim() || undefined,
+        category: values.category,
+        tags: values.tags,
+      })
+      await publishTemplate(template.id)
+      message.success('模板已创建并发布')
+      setCreateModalVisible(false)
+      createForm.resetFields()
+      setSourceWorkflows([])
+      loadTemplates()
+      void fetchTemplateCategories()
+    } catch {
+      message.error('创建模板失败，请重试')
+    } finally {
+      setCreateSubmitting(false)
+    }
+  }
+
+  const getCardMenu = (template: WorkflowTemplate) => ({
     items: [
       { key: 'detail', label: '查看详情', icon: <AppstoreOutlined /> },
       { key: 'import', label: '导入', icon: <DownloadOutlined /> },
@@ -205,13 +277,18 @@ const TemplateMarket: React.FC = () => {
     <div className="template-market-page">
       {/* Header */}
       <div className="template-market-header">
-        <div className="template-market-header-title">
-          <h2>模板市场</h2>
-          <span className="template-count-badge">{templateTotal}</span>
+        <div className="template-market-heading-copy">
+          <div className="template-market-header-title">
+            <h2>模板市场</h2>
+            <span className="template-count-badge">{templateTotal}</span>
+          </div>
+          <p className="template-market-subtitle">
+            从精选模板快速创建工作流，一键导入即可使用
+          </p>
         </div>
-        <p className="template-market-subtitle">
-          从精选模板快速创建工作流，一键导入即可使用
-        </p>
+        <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
+          创建模板
+        </Button>
       </div>
 
       {/* Filter bar */}
@@ -381,11 +458,103 @@ const TemplateMarket: React.FC = () => {
       ) : (
         <div className="template-empty-wrapper">
           <Empty
-            description="暂无模板"
-            style={{ padding: '56px 0' }}
+            description={keyword || category ? (
+              <div className="template-empty-content">
+                <strong>没有匹配的模板</strong>
+                <span>换个关键词或清除筛选条件后再试</span>
+                <Button onClick={() => {
+                  setKeyword('')
+                  setCategory(undefined)
+                  setPage(1)
+                }}>
+                  清除筛选
+                </Button>
+              </div>
+            ) : (
+              <div className="template-empty-content">
+                <strong>还没有已发布的模板</strong>
+                <span>从已有工作流创建第一个模板，团队即可一键复用</span>
+                <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
+                  创建模板
+                </Button>
+              </div>
+            )}
           />
         </div>
       )}
+
+      {/* Create modal */}
+      <Modal
+        title="从工作流创建模板"
+        open={createModalVisible}
+        onCancel={() => setCreateModalVisible(false)}
+        onOk={() => createForm.submit()}
+        okText="创建并发布"
+        cancelText="取消"
+        confirmLoading={createSubmitting}
+        destroyOnClose
+      >
+        <Form<CreateTemplateValues>
+          form={createForm}
+          layout="vertical"
+          requiredMark={false}
+          onFinish={handleCreateTemplate}
+          className="template-create-form"
+        >
+          <Form.Item
+            name="applicationId"
+            label="来源应用"
+            rules={[{ required: true, message: '请选择来源应用' }]}
+          >
+            <Select
+              placeholder="选择包含目标工作流的应用"
+              options={apps.map((app) => ({ value: app.id, label: app.name }))}
+              onChange={handleSourceAppChange}
+            />
+          </Form.Item>
+          <Form.Item
+            name="sourceWorkflowId"
+            label="来源工作流"
+            rules={[{ required: true, message: '请选择来源工作流' }]}
+          >
+            <Select
+              placeholder={sourceApplicationId ? '选择要发布的工作流' : '请先选择应用'}
+              disabled={!sourceApplicationId}
+              loading={sourceWorkflowsLoading}
+              options={sourceWorkflows.map((workflow) => ({ value: workflow.id, label: workflow.name }))}
+              onChange={handleSourceWorkflowChange}
+              notFoundContent={sourceWorkflowsLoading ? <Spin size="small" /> : '该应用暂无工作流'}
+            />
+          </Form.Item>
+          <Form.Item
+            name="name"
+            label="模板名称"
+            rules={[
+              { required: true, message: '请输入模板名称' },
+              { max: 100, message: '模板名称不能超过 100 个字符' },
+            ]}
+          >
+            <Input placeholder="例如：智能客服问答流程" />
+          </Form.Item>
+          <Form.Item
+            name="description"
+            label="模板说明"
+            rules={[{ max: 500, message: '模板说明不能超过 500 个字符' }]}
+          >
+            <Input.TextArea rows={3} placeholder="说明模板适合解决什么问题" />
+          </Form.Item>
+          <Form.Item
+            name="category"
+            label="分类"
+            rules={[{ required: true, message: '请选择模板分类' }]}
+          >
+            <Select placeholder="选择分类" options={TEMPLATE_CATEGORY_OPTIONS} />
+          </Form.Item>
+          <Form.Item name="tags" label="标签">
+            <Select mode="tags" placeholder="输入标签后按回车，可添加多个" tokenSeparators={[',', '，']} />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       {/* Import modal */}
       <Modal
@@ -403,7 +572,7 @@ const TemplateMarket: React.FC = () => {
               value={importAppId || undefined}
               onChange={setImportAppId}
             >
-              {(Array.isArray(apps) ? apps : []).map((app: any) => (
+              {apps.map((app) => (
                 <Select.Option key={app.id} value={app.id}>
                   {app.icon || <AppstoreOutlined />} {app.name}
                 </Select.Option>

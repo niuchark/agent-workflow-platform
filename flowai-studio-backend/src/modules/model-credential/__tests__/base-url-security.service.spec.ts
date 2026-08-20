@@ -9,6 +9,10 @@ describe('BaseUrlSecurityService', () => {
     get: jest.fn((_key: string, fallback: string) => allowlist || fallback),
   } as unknown as ConfigService);
 
+  beforeEach(() => {
+    jest.resetAllMocks();
+  });
+
   it('allows public HTTPS and normalizes trailing slashes', async () => {
     await expect(create().assertAllowed('https://8.8.8.8/v1///')).resolves.toBe('https://8.8.8.8/v1');
   });
@@ -45,6 +49,20 @@ describe('BaseUrlSecurityService', () => {
   it('does not allow a broader host or port than the exact origin', async () => {
     const service = create('http://127.0.0.1:11434');
     await expect(service.assertAllowed('http://127.0.0.1:11435')).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('allows a trusted DashScope hostname resolved through a proxy fake IP', async () => {
+    (lookup as jest.Mock).mockResolvedValue([{ address: '198.18.0.167', family: 4 }]);
+
+    await expect(create().assertAllowed('https://dashscope.aliyuncs.com/compatible-mode/v1'))
+      .resolves.toBe('https://dashscope.aliyuncs.com/compatible-mode/v1');
+  });
+
+  it('still blocks an arbitrary hostname resolved to a proxy fake IP', async () => {
+    (lookup as jest.Mock).mockResolvedValue([{ address: '198.18.0.168', family: 4 }]);
+
+    await expect(create().assertAllowed('https://attacker.example/v1'))
+      .rejects.toMatchObject({ status: 422 });
   });
 
   it('re-resolves DNS and blocks a rebinding to a private address', async () => {

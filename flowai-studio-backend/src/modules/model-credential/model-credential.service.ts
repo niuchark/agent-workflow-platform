@@ -1,6 +1,7 @@
 import {
   BadGatewayException,
   Injectable,
+  Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -17,10 +18,28 @@ import {
 } from './model-credential.types';
 import { UpsertModelCredentialDto } from './dto/model-credential.dto';
 
-const QWEN_MODELS = ['qwen-turbo', 'qwen-plus', 'qwen-max', 'qwen-long'];
+const QWEN_FALLBACK_MODELS = [
+  'qwen3.8-max',
+  'qwen3.7-plus',
+  'qwen3.7-flash',
+  'qwen3-coder-plus',
+  'qwen-turbo',
+  'qwen-plus',
+  'qwen-max',
+  'qwen-long',
+];
+
+interface QwenCatalogResponse {
+  output?: {
+    total?: number;
+    models?: Array<{ model?: unknown; name?: unknown }>;
+  };
+}
 
 @Injectable()
 export class ModelCredentialService {
+  private readonly logger = new Logger(ModelCredentialService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly crypto: CredentialCryptoService,
@@ -174,7 +193,13 @@ export class ModelCredentialService {
     const provider = this.parseProvider(rawProvider);
     const credential = await this.resolveStored(userId, provider, true);
     if (provider === 'qwen') {
-      return QWEN_MODELS.map((id) => ({ id, displayName: id, provider }));
+      try {
+        return await this.listQwenModels(credential.baseUrl, credential.apiKey || '', provider);
+      } catch (error) {
+        const safe = this.safeUpstreamError(error);
+        this.logger.warn(`Qwen model catalog unavailable (${safe.code}); using fallback catalog`);
+        return QWEN_FALLBACK_MODELS.map((id) => ({ id, displayName: id, provider }));
+      }
     }
     try {
       if (provider === 'openai') {
@@ -203,6 +228,51 @@ export class ModelCredentialService {
       const safe = this.safeUpstreamError(error);
       throw new BadGatewayException({ code: safe.code, message: safe.message });
     }
+  }
+
+  private async listQwenModels(
+    baseUrl: string,
+    apiKey: string,
+    provider: UserModelProvider,
+  ) {
+    const catalogUrl = new URL('/api/v1/models', baseUrl).toString();
+    const pageSize = 100;
+    const models = new Map<string, string>();
+
+    for (let page = 1; page <= 10; page += 1) {
+      const params = new URLSearchParams({
+        providers: 'qwen',
+        capabilities: 'TG',
+        page_no: String(page),
+        page_size: String(pageSize),
+        language: 'zh-CN',
+      });
+      const response = await axios.get<QwenCatalogResponse>(catalogUrl, {
+        params,
+        headers: { Authorization: `Bearer ${apiKey}` },
+        timeout: 15000,
+        maxRedirects: 0,
+      });
+      const pageModels = Array.isArray(response.data?.output?.models)
+        ? response.data.output.models
+        : [];
+
+      for (const item of pageModels) {
+        const id = typeof item.model === 'string' ? item.model.trim() : '';
+        if (!id) continue;
+        const name = typeof item.name === 'string' ? item.name.trim() : '';
+        models.set(id, name && name !== id ? `${name}（${id}）` : id);
+      }
+
+      const total = Number(response.data?.output?.total || 0);
+      if (pageModels.length < pageSize || models.size >= total) break;
+    }
+
+    if (models.size === 0) throw new Error('Qwen model catalog returned no models');
+    for (const id of QWEN_FALLBACK_MODELS) {
+      if (!models.has(id)) models.set(id, id);
+    }
+    return Array.from(models, ([id, displayName]) => ({ id, displayName, provider }));
   }
 
   async resolveStored(

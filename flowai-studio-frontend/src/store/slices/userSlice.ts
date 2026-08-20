@@ -1,19 +1,15 @@
 import { StateCreator } from 'zustand'
+import axios from 'axios'
 import { User, LoginForm, RegisterForm } from '../../types'
-import request from '../../utils/axios'
+import request, { getResponseData } from '../../utils/axios'
 
 // 错误类型定义
-interface LoginError {
+interface AuthError {
   type: 'VALIDATION' | 'AUTHENTICATION' | 'NETWORK' | 'SERVER' | 'LOCKED';
   message: string;
-  details?: any;
 }
 
-export interface UserError {
-  type: LoginError['type']
-  message: string
-  details?: any
-}
+export type UserError = AuthError
 
 export interface UserSlice {
   user: User | null
@@ -37,41 +33,48 @@ export interface UserSlice {
 /**
  * 解析错误信息
  */
-const parseLoginError = (error: any): LoginError => {
-  if (!error.response) {
-    // 网络错误
+const parseAuthError = (error: unknown): AuthError => {
+  if (error instanceof Error && !axios.isAxiosError(error)) {
+    return { type: 'VALIDATION', message: error.message }
+  }
+
+  if (!axios.isAxiosError(error) || !error.response) {
     return {
       type: 'NETWORK',
       message: '网络连接失败，请检查网络设置'
     };
   }
 
-  const { status, data } = error.response;
+  const { status } = error.response;
+  const responseData = error.response.data as { message?: string | string[] }
+  const message = Array.isArray(responseData?.message)
+    ? responseData.message.join('；')
+    : responseData?.message
   
   switch (status) {
     case 400:
       return {
         type: 'VALIDATION',
-        message: data.message || '请求参数错误'
+        message: message || '请求参数错误'
       };
     
     case 401:
       // 检查是否为账户锁定
-      if (data.message?.includes('锁定')) {
+      if (message?.includes('锁定')) {
         return {
           type: 'LOCKED',
-          message: data.message
+          message
         };
       }
       return {
         type: 'AUTHENTICATION',
-        message: data.message || '用户名或密码错误'
+        message: message || '用户名或密码错误'
       };
     
     case 409:
       return {
         type: 'VALIDATION',
-        message: data.message || '用户名已存在'
+        message: message || '用户名已存在'
       };
     
     case 500:
@@ -83,7 +86,7 @@ const parseLoginError = (error: any): LoginError => {
     default:
       return {
         type: 'SERVER',
-        message: data.message || '未知错误，请稍后重试'
+        message: message || '未知错误，请稍后重试'
       };
   }
 };
@@ -116,17 +119,9 @@ export const createUserSlice: StateCreator<UserSlice> = (set, get) => ({
     set({ isLoading: true, authError: null })
     
     try {
-      // 前端验证
-      if (!data.username?.trim()) {
-        throw new Error('请输入用户名')
-      }
-      
-      if (!data.password?.trim()) {
-        throw new Error('请输入密码')
-      }
-
-      const response = await request.post('/users/login', data)
-      const { user, token } = response.data as { user: User; token: string }
+      const { user, token } = getResponseData<{ user: User; token: string }>(
+        await request.post('/users/login', data),
+      )
       
       // 保存到本地存储
       localStorage.setItem('token', token)
@@ -139,8 +134,8 @@ export const createUserSlice: StateCreator<UserSlice> = (set, get) => ({
         isLoading: false, 
         authError: null 
       })
-    } catch (error: any) {
-      const loginError = parseLoginError(error)
+    } catch (error: unknown) {
+      const loginError = parseAuthError(error)
       
       set({ 
         isLoading: false, 
@@ -155,27 +150,10 @@ export const createUserSlice: StateCreator<UserSlice> = (set, get) => ({
     set({ isLoading: true, authError: null })
     
     try {
-      // 前端验证
-      if (!data.username?.trim()) {
-        throw new Error('请输入用户名')
-      }
-      
-      if (data.username.length < 3 || data.username.length > 20) {
-        throw new Error('用户名长度必须在3-20个字符之间')
-      }
-      
-      if (!data.password?.trim()) {
-        throw new Error('请输入密码')
-      }
-      
-      if (data.password.length < 6) {
-        throw new Error('密码长度至少为6个字符')
-      }
-
       await request.post('/users/register', data)
       set({ isLoading: false, authError: null })
-    } catch (error: any) {
-      const loginError = parseLoginError(error)
+    } catch (error: unknown) {
+      const loginError = parseAuthError(error)
       
       set({ 
         isLoading: false, 
@@ -199,8 +177,7 @@ export const createUserSlice: StateCreator<UserSlice> = (set, get) => ({
 
   fetchProfile: async () => {
     try {
-      const response = await request.get('/users/profile') as any
-      const user = response.data as User
+      const user = getResponseData<User>(await request.get('/users/profile'))
       localStorage.setItem('user', JSON.stringify(user))
       set({ user })
     } catch (error) {

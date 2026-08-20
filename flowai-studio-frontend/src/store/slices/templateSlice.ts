@@ -1,6 +1,8 @@
 import { StateCreator } from 'zustand'
 import { WorkflowTemplate, TemplateCategoryCount, TemplateSort, TemplateCategory } from '../../types'
-import request from '../../utils/axios'
+import request, { getResponseData } from '../../utils/axios'
+
+const TEMPLATE_API = '/templates'
 
 export interface TemplateSlice {
   templates: WorkflowTemplate[]
@@ -58,7 +60,7 @@ export interface TemplateSlice {
   deleteTemplate: (id: string) => Promise<void>
 }
 
-export const createTemplateSlice: StateCreator<TemplateSlice> = (set, get) => ({
+export const createTemplateSlice: StateCreator<TemplateSlice> = (set) => ({
   templates: [],
   templateTotal: 0,
   templatePage: 1,
@@ -71,8 +73,13 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set, get) => ({
   fetchTemplates: async (params = {}) => {
     set({ templateLoading: true, templateError: null })
     try {
-      const response = await request.get('/workflow/templates', { params }) as any
-      const data = response.data
+      const data = getResponseData<{
+        items: WorkflowTemplate[]
+        total: number
+        page: number
+        pageSize: number
+        totalPages: number
+      }>(await request.get(TEMPLATE_API, { params }))
       set({
         templates: data.items || [],
         templateTotal: data.total || 0,
@@ -89,8 +96,10 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set, get) => ({
 
   fetchTemplateCategories: async () => {
     try {
-      const response = await request.get('/workflow/templates/categories') as any
-      set({ templateCategories: response.data || [] })
+      const categories = getResponseData<TemplateCategoryCount[]>(
+        await request.get(`${TEMPLATE_API}/categories`),
+      )
+      set({ templateCategories: categories || [] })
     } catch (error) {
       console.error('Failed to fetch template categories', error)
     }
@@ -98,8 +107,7 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set, get) => ({
 
   fetchTemplateById: async (id) => {
     try {
-      const response = await request.get(`/workflow/templates/${id}`) as any
-      return response.data
+      return getResponseData<WorkflowTemplate>(await request.get(`${TEMPLATE_API}/${id}`))
     } catch (error) {
       throw error
     }
@@ -108,8 +116,7 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set, get) => ({
   createTemplate: async (data) => {
     set({ templateLoading: true, templateError: null })
     try {
-      const response = await request.post('/workflow/templates', data) as any
-      const template = response.data
+      const template = getResponseData<WorkflowTemplate>(await request.post(TEMPLATE_API, data))
       set({ templateLoading: false })
       return template
     } catch (error) {
@@ -120,8 +127,7 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set, get) => ({
 
   updateTemplate: async (id, data) => {
     try {
-      const response = await request.patch(`/workflow/templates/${id}`, data) as any
-      return response.data
+      return getResponseData<WorkflowTemplate>(await request.patch(`${TEMPLATE_API}/${id}`, data))
     } catch (error) {
       throw error
     }
@@ -129,8 +135,7 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set, get) => ({
 
   publishTemplate: async (id) => {
     try {
-      const response = await request.post(`/workflow/templates/${id}/publish`) as any
-      return response.data
+      return getResponseData<WorkflowTemplate>(await request.post(`${TEMPLATE_API}/${id}/publish`))
     } catch (error) {
       throw error
     }
@@ -138,8 +143,7 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set, get) => ({
 
   archiveTemplate: async (id) => {
     try {
-      const response = await request.post(`/workflow/templates/${id}/archive`) as any
-      return response.data
+      return getResponseData<WorkflowTemplate>(await request.post(`${TEMPLATE_API}/${id}/archive`))
     } catch (error) {
       throw error
     }
@@ -147,8 +151,12 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set, get) => ({
 
   createFromTemplate: async (id, data) => {
     try {
-      const response = await request.post(`/workflow/templates/${id}/import`, data) as any
-      return response.data
+      return getResponseData<{
+        workflowId: string
+        name: string
+        templateName: string
+        templateId: string
+      }>(await request.post(`${TEMPLATE_API}/${id}/import`, data))
     } catch (error) {
       throw error
     }
@@ -156,8 +164,11 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set, get) => ({
 
   rateTemplate: async (id, rating) => {
     try {
-      const response = await request.post(`/workflow/templates/${id}/rate`, { rating }) as any
-      return response.data
+      return getResponseData<{
+        rating: number
+        ratingCount: number
+        yourRating: number
+      }>(await request.post(`${TEMPLATE_API}/${id}/rate`, { rating }))
     } catch (error) {
       throw error
     }
@@ -165,7 +176,7 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set, get) => ({
 
   deleteTemplate: async (id) => {
     try {
-      await request.delete(`/workflow/templates/${id}`)
+      await request.delete(`${TEMPLATE_API}/${id}`)
     } catch (error) {
       throw error
     }

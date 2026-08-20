@@ -42,6 +42,9 @@ export class BaseUrlSecurityService {
         this.reject('MODEL_BASE_URL_FORBIDDEN', '禁止访问云元数据或链路本地地址');
       }
       if (this.isPrivate(address) && !allowlisted) {
+        if (this.isProxyFakeIp(address) && this.isTrustedPublicProviderHost(url!.hostname)) {
+          continue;
+        }
         this.reject('MODEL_BASE_URL_FORBIDDEN', '私网模型地址未加入管理员白名单');
       }
     }
@@ -95,6 +98,18 @@ export class BaseUrlSecurityService {
       address.toLowerCase().startsWith('fe9') ||
       address.toLowerCase().startsWith('fea') ||
       address.toLowerCase().startsWith('feb');
+  }
+
+  private isProxyFakeIp(address: string): boolean {
+    if (isIP(address) !== 4) return false;
+    const [a, b] = address.split('.').map(Number);
+    return a === 198 && (b === 18 || b === 19);
+  }
+
+  private isTrustedPublicProviderHost(hostname: string): boolean {
+    const normalized = hostname.toLowerCase().replace(/\.$/, '');
+    return normalized === 'dashscope.aliyuncs.com' ||
+      normalized.endsWith('.maas.aliyuncs.com');
   }
 
   private reject(code: string, message: string): never {

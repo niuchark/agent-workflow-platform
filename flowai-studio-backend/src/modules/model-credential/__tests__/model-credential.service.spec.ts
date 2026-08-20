@@ -1,6 +1,9 @@
 import { ModelCredentialService } from '../model-credential.service';
+import axios from 'axios';
 
 describe('ModelCredentialService', () => {
+  afterEach(() => jest.restoreAllMocks());
+
   const existing = {
     id: 'credential-1',
     userId: 'user-a',
@@ -74,5 +77,41 @@ describe('ModelCredentialService', () => {
     expect(JSON.stringify(summary)).not.toContain('secret');
     expect(summary).not.toHaveProperty('encryptedApiKey');
   });
-});
 
+  it('loads the Qwen model catalog from the provider API', async () => {
+    const { service } = setup();
+    jest.spyOn(axios, 'get').mockResolvedValue({
+      data: {
+        output: {
+          total: 2,
+          models: [
+            { model: 'qwen3.7-flash', name: '通义千问3.7-Flash' },
+            { model: 'qwen3.7-plus', name: '通义千问3.7-Plus' },
+          ],
+        },
+      },
+    });
+
+    const models = await service.listModels('user-a', 'qwen');
+    expect(models).toEqual(expect.arrayContaining([
+      { id: 'qwen3.7-flash', displayName: '通义千问3.7-Flash（qwen3.7-flash）', provider: 'qwen' },
+      { id: 'qwen3.7-plus', displayName: '通义千问3.7-Plus（qwen3.7-plus）', provider: 'qwen' },
+      { id: 'qwen-turbo', displayName: 'qwen-turbo', provider: 'qwen' },
+    ]));
+    expect(axios.get).toHaveBeenCalledWith(
+      'https://example.com/api/v1/models',
+      expect.objectContaining({ headers: { Authorization: 'Bearer secret' } }),
+    );
+  });
+
+  it('falls back to common Qwen models when the catalog is unavailable', async () => {
+    const { service } = setup();
+    jest.spyOn(axios, 'get').mockRejectedValue(new Error('network unavailable'));
+
+    const models = await service.listModels('user-a', 'qwen');
+    expect(models).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'qwen3.7-flash', provider: 'qwen' }),
+      expect.objectContaining({ id: 'qwen-plus', provider: 'qwen' }),
+    ]));
+  });
+});

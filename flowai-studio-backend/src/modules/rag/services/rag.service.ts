@@ -525,7 +525,7 @@ export class RAGService {
     let results: any[];
     switch (retrievalMode) {
       case 'keyword':
-        results = await this.retrieveKeyword(query, knowledgeBaseId, effectiveTopK, kb);
+        results = await this.retrieveKeyword(query, knowledgeBaseId, effectiveTopK);
         break;
       case 'hybrid':
         results = await this.retrieveHybrid(userId, query, knowledgeBaseId, effectiveTopK, kb, vectorWeight, rrfK);
@@ -632,49 +632,16 @@ export class RAGService {
    * 纯向量检索
    */
   private async retrieveVector(userId: string, query: string, knowledgeBaseId: string, topK: number, kb: any): Promise<any[]> {
-    const embeddingProvider = await this.getEmbeddingProviderForKB(userId, kb);
-    const vectorStore = this.getVectorStoreForKB(kb);
-
-    // 生成查询向量
-    const embedResult = await embeddingProvider.embed(query);
-    if (!embedResult.embedding || embedResult.embedding.length === 0) {
-      this.logger.warn('Query embedding is empty, returning empty results');
-      return [];
-    }
-
-    // 向量搜索
-    const searchResults = await vectorStore.search(knowledgeBaseId, {
-      queryVector: embedResult.embedding,
-      topK,
-      similarityThreshold: kb.similarityThreshold,
-      filter: {
-        match: { key: 'knowledgeBaseId', value: knowledgeBaseId },
-      },
-    });
-
-    // 补充文档名称信息
-    return this.enrichResultsWithDocNames(searchResults);
+    const results = await this.searchVector(userId, query, knowledgeBaseId, topK, kb);
+    return this.enrichRetrievalResults(results);
   }
 
   /**
    * 纯关键词检索（BM25）
    */
-  private async retrieveKeyword(query: string, knowledgeBaseId: string, topK: number, kb: any): Promise<any[]> {
-    const results = await this.bm25Service.search({
-      query,
-      knowledgeBaseId,
-      topK,
-    });
-
-    // 补充文档名称信息
-    return this.enrichResultsWithDocNames(
-      results.map((r) => ({
-        id: r.id,
-        content: r.content,
-        similarity: r.score,
-        metadata: r.metadata,
-      }))
-    );
+  private async retrieveKeyword(query: string, knowledgeBaseId: string, topK: number): Promise<any[]> {
+    const results = await this.searchKeyword(query, knowledgeBaseId, topK);
+    return this.enrichRetrievalResults(results);
   }
 
   /**
@@ -703,9 +670,9 @@ export class RAGService {
     // 并行执行双路检索
     const [vectorResults, keywordResults] = await Promise.allSettled([
       // 向量检索
-      this.retrieveVectorForHybrid(userId, query, knowledgeBaseId, topK, kb),
+      this.searchVector(userId, query, knowledgeBaseId, topK, kb),
       // 关键词检索（多取一些，因为融合后可能部分重叠）
-      this.retrieveKeywordForHybrid(query, knowledgeBaseId, topK * 2),
+      this.searchKeyword(query, knowledgeBaseId, topK * 2),
     ]);
 
     // 处理检索结果（自适应降级）
@@ -733,14 +700,10 @@ export class RAGService {
       return [];
     }
     if (vResults.length === 0) {
-      return this.enrichResultsWithDocNames(
-        kResults.map((r) => ({ id: r.id, content: r.content, similarity: r.score, metadata: r.metadata }))
-      );
+      return this.enrichRetrievalResults(kResults);
     }
     if (kResults.length === 0) {
-      return this.enrichResultsWithDocNames(
-        vResults.map((r) => ({ id: r.id, content: r.content, similarity: r.score, metadata: r.metadata }))
-      );
+      return this.enrichRetrievalResults(vResults);
     }
 
     // RRF 融合
@@ -781,9 +744,9 @@ export class RAGService {
   }
 
   /**
-   * 为混合检索执行向量检索（返回 RetrievalResult 格式）
+   * 执行底层向量检索（返回 RetrievalResult 格式）
    */
-  private async retrieveVectorForHybrid(
+  private async searchVector(
     userId: string,
     query: string,
     knowledgeBaseId: string,
@@ -795,6 +758,7 @@ export class RAGService {
 
     const embedResult = await embeddingProvider.embed(query);
     if (!embedResult.embedding || embedResult.embedding.length === 0) {
+      this.logger.warn('Query embedding is empty, returning empty results');
       return [];
     }
 
@@ -817,9 +781,9 @@ export class RAGService {
   }
 
   /**
-   * 为混合检索执行关键词检索（返回 RetrievalResult 格式）
+   * 执行底层关键词检索（返回 RetrievalResult 格式）
    */
-  private async retrieveKeywordForHybrid(
+  private async searchKeyword(
     query: string,
     knowledgeBaseId: string,
     topK: number,
@@ -842,6 +806,17 @@ export class RAGService {
   // ============================================================
   // 结果增强
   // ============================================================
+
+  private enrichRetrievalResults(results: RetrievalResult[]): Promise<any[]> {
+    return this.enrichResultsWithDocNames(
+      results.map(({ id, content, score, metadata }) => ({
+        id,
+        content,
+        similarity: score,
+        metadata,
+      })),
+    );
+  }
 
   /**
    * 补充文档名称信息
