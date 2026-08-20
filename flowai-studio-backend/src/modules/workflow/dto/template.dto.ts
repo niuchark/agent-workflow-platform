@@ -14,6 +14,7 @@ import {
   Max,
   MaxLength,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 /** 模板分类枚举 */
 export enum TemplateCategory {
@@ -117,11 +118,13 @@ export class QueryTemplateDto {
   sort?: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   page?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(1)
   @Max(100)
