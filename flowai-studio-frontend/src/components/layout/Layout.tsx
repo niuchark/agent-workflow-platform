@@ -37,7 +37,7 @@ const routeMeta: Record<string, { title: string }> = {
   '/debug': { title: '调试中心' },
   '/teams': { title: '团队管理' },
   '/api-keys': { title: 'API 密钥' },
-  '/model-settings': { title: '模型服务' },
+  '/model-settings': { title: '模型配置' },
   '/cost-statistics': { title: '成本统计' },
   '/rate-limit': { title: '限流监控' },
   '/trace-list': { title: '全链路追踪' },
