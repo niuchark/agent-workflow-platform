@@ -33,6 +33,23 @@ const Login: React.FC = () => {
     }
   }
 
+  const getAlertDescription = () => {
+    if (!authError) return undefined
+
+    switch (authError.type) {
+      case 'AUTHENTICATION':
+        return '为保护账号安全，系统不会指出具体哪一项不匹配。请检查用户名拼写和密码后重试。'
+      case 'VALIDATION':
+        return '请根据对应输入框下方的提示修改后再提交。'
+      case 'NETWORK':
+        return '请确认设备已联网，或稍后重新尝试。'
+      case 'SERVER':
+        return '这不是你的填写问题，请稍后重新尝试。'
+      default:
+        return undefined
+    }
+  }
+
   const onSubmit = async (values: { username: string; password: string; remember?: boolean }) => {
     handleClearError()
     try {
@@ -71,6 +88,7 @@ const Login: React.FC = () => {
           {showError && authError && (
             <Alert
               message={authError.message}
+              description={getAlertDescription()}
               type={getAlertType()}
               showIcon
               closable
@@ -86,23 +104,29 @@ const Login: React.FC = () => {
             className="auth-form"
             onValuesChange={handleClearError}
             requiredMark={false}
+            scrollToFirstError
           >
             <Form.Item
               name="username"
               label="用户名"
               rules={[
                 { required: true, message: '请输入用户名' },
-                { min: 3, message: '用户名至少 3 个字符' },
-                { max: 20, message: '用户名不超过 20 个字符' },
-                { pattern: /^[a-zA-Z0-9_]+$/, message: '仅支持字母、数字和下划线' },
+                { min: 3, message: '用户名长度不足：至少需要 3 位' },
+                { max: 20, message: '用户名过长：最多允许 20 位' },
+                {
+                  pattern: /^[a-zA-Z0-9_]+$/,
+                  message: '用户名包含不支持的字符：不能使用中文、空格或特殊符号',
+                },
               ]}
+              validateFirst
               validateTrigger="onBlur"
             >
               <Input
                 prefix={<UserOutlined />}
-                placeholder="请输入用户名"
+                placeholder="3–20 位英文、数字或下划线"
                 disabled={isLoading}
                 size="large"
+                autoComplete="username"
               />
             </Form.Item>
 
@@ -111,8 +135,9 @@ const Login: React.FC = () => {
               label="密码"
               rules={[
                 { required: true, message: '请输入密码' },
-                { min: 6, message: '密码至少 6 个字符' },
+                { min: 6, message: '密码长度不足：至少需要 6 位字符' },
               ]}
+              validateFirst
               validateTrigger="onBlur"
             >
               <Input.Password
@@ -120,6 +145,7 @@ const Login: React.FC = () => {
                 placeholder="请输入密码"
                 disabled={isLoading}
                 size="large"
+                autoComplete="current-password"
               />
             </Form.Item>
 

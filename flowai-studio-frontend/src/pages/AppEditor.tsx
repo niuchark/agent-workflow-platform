@@ -13,6 +13,7 @@ import {
   FileMarkdownOutlined,
   CloseOutlined,
   DeleteOutlined,
+  PlusSquareOutlined,
 } from '@ant-design/icons'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
@@ -58,7 +59,13 @@ const AppEditor: React.FC = () => {
   } = useStore()
 
   const [rightPanel, setRightPanel] = useState<RightPanel>('config')
-  const [isPanelOpen, setIsPanelOpen] = useState(true)
+  const [isNarrowViewport, setIsNarrowViewport] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+  )
+  const [isPanelOpen, setIsPanelOpen] = useState(() =>
+    typeof window === 'undefined' || !window.matchMedia('(max-width: 767px)').matches
+  )
+  const [isNodePanelOpen, setIsNodePanelOpen] = useState(false)
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
   const [nodePanelWidth, setNodePanelWidth] = useState(DEFAULT_NODE_PANEL_WIDTH)
 
@@ -92,6 +99,18 @@ const AppEditor: React.FC = () => {
     initEditor()
   }, [appId])
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 767px)')
+    const handleViewportChange = (event: MediaQueryListEvent) => {
+      setIsNarrowViewport(event.matches)
+      setIsNodePanelOpen(false)
+      setIsPanelOpen(!event.matches)
+    }
+
+    mediaQuery.addEventListener('change', handleViewportChange)
+    return () => mediaQuery.removeEventListener('change', handleViewportChange)
+  }, [])
+
   const handleSave = async () => {
     const workflowId = currentWorkflow?.id
     if (!workflowId) {
@@ -115,6 +134,18 @@ const AppEditor: React.FC = () => {
   const handlePanelSelect = (panel: RightPanel) => {
     setRightPanel(panel)
     setIsPanelOpen(true)
+    setIsNodePanelOpen(false)
+  }
+
+  const handleNodePanelToggle = () => {
+    const nextIsOpen = !isNodePanelOpen
+    setIsNodePanelOpen(nextIsOpen)
+    if (nextIsOpen) setIsPanelOpen(false)
+  }
+
+  const handleMobilePanelDismiss = () => {
+    setIsNodePanelOpen(false)
+    if (isNarrowViewport) setIsPanelOpen(false)
   }
 
   const handleCanvasNodeSelect = () => {
@@ -319,8 +350,9 @@ const AppEditor: React.FC = () => {
               size="small"
               icon={<ExportOutlined />}
               className="editor-action-btn"
+              aria-label="导出工作流"
             >
-              导出
+              <span className="editor-action-label">导出</span>
             </Button>
           </Dropdown>
           <Button
@@ -329,8 +361,9 @@ const AppEditor: React.FC = () => {
             onClick={handleSave}
             loading={isLoading}
             className="editor-action-btn"
+            aria-label="保存工作流"
           >
-            保存
+            <span className="editor-action-label">保存</span>
           </Button>
           <Button
             size="small"
@@ -338,8 +371,9 @@ const AppEditor: React.FC = () => {
             icon={<PlayCircleOutlined />}
             onClick={handleRun}
             className="editor-action-btn"
+            aria-label="运行工作流"
           >
-            运行
+            <span className="editor-action-label">运行</span>
           </Button>
         </div>
       </header>
@@ -347,12 +381,31 @@ const AppEditor: React.FC = () => {
       {/* ---- Editor body ---- */}
       <ReactFlowProvider>
         <div className="editor-body">
+          {(isNodePanelOpen || (isNarrowViewport && isPanelOpen)) && (
+            <button
+              type="button"
+              className="editor-panel-scrim"
+              onClick={handleMobilePanelDismiss}
+              aria-label="关闭编辑器面板"
+            />
+          )}
           <aside
-            className="editor-node-panel-shell"
+            id="editor-node-library"
+            className={`editor-node-panel-shell ${isNodePanelOpen ? 'editor-node-panel-shell--mobile-open' : ''}`}
             style={{ width: nodePanelWidth }}
             aria-label="节点库"
           >
             <NodePanel />
+            <Tooltip title="关闭节点库">
+              <button
+                type="button"
+                className="editor-node-panel-close"
+                onClick={() => setIsNodePanelOpen(false)}
+                aria-label="关闭节点库"
+              >
+                <CloseOutlined />
+              </button>
+            </Tooltip>
             <div
               className="editor-node-panel-resizer"
               role="separator"
@@ -411,6 +464,50 @@ const AppEditor: React.FC = () => {
               </div>
             </aside>
           )}
+          <nav className="editor-mobile-toolbar" aria-label="编辑器面板">
+            <button
+              type="button"
+              className={`editor-mobile-toolbar-btn ${isNodePanelOpen ? 'editor-mobile-toolbar-btn--active' : ''}`}
+              onClick={handleNodePanelToggle}
+              aria-controls="editor-node-library"
+              aria-expanded={isNodePanelOpen}
+            >
+              <PlusSquareOutlined />
+              <span>节点</span>
+            </button>
+            <div className="editor-mobile-panel-actions">
+              <button
+                type="button"
+                className={`editor-mobile-toolbar-btn ${isPanelOpen && rightPanel === 'config' ? 'editor-mobile-toolbar-btn--active' : ''}`}
+                onClick={() => handlePanelSelect('config')}
+                aria-controls="editor-inspector"
+                aria-expanded={isPanelOpen && rightPanel === 'config'}
+              >
+                <SettingOutlined />
+                <span>配置</span>
+              </button>
+              <button
+                type="button"
+                className={`editor-mobile-toolbar-btn ${isPanelOpen && rightPanel === 'debug' ? 'editor-mobile-toolbar-btn--active' : ''}`}
+                onClick={() => handlePanelSelect('debug')}
+                aria-controls="editor-inspector"
+                aria-expanded={isPanelOpen && rightPanel === 'debug'}
+              >
+                <BugOutlined />
+                <span>调试</span>
+              </button>
+              <button
+                type="button"
+                className={`editor-mobile-toolbar-btn ${isPanelOpen && rightPanel === 'share' ? 'editor-mobile-toolbar-btn--active' : ''}`}
+                onClick={() => handlePanelSelect('share')}
+                aria-controls="editor-inspector"
+                aria-expanded={isPanelOpen && rightPanel === 'share'}
+              >
+                <ShareAltOutlined />
+                <span>分享</span>
+              </button>
+            </div>
+          </nav>
         </div>
       </ReactFlowProvider>
       </div>

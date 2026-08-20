@@ -5,6 +5,13 @@ import { useNavigate, Link } from 'react-router-dom'
 import { useStore } from '../store'
 import BrandLogo from '../components/BrandLogo'
 
+const getRegistrationErrorMessage = (error: unknown) => {
+  if (typeof error === 'object' && error && 'message' in error && typeof error.message === 'string') {
+    return error.message
+  }
+  return '注册失败，请稍后重试'
+}
+
 const Register: React.FC = () => {
   const navigate = useNavigate()
   const { register, isLoading } = useStore()
@@ -18,8 +25,8 @@ const Register: React.FC = () => {
       await register({ username, password })
       message.success('注册成功，请登录')
       navigate('/login')
-    } catch {
-      setError('注册失败，请检查输入信息')
+    } catch (submitError) {
+      setError(getRegistrationErrorMessage(submitError))
     }
   }
 
@@ -63,18 +70,32 @@ const Register: React.FC = () => {
             onFinish={onSubmit}
             layout="vertical"
             className="auth-form"
+            onValuesChange={() => setError(null)}
             requiredMark={false}
+            scrollToFirstError
           >
             <Form.Item
               name="username"
               label="用户名"
               rules={[
                 { required: true, message: '请输入用户名' },
-                { min: 3, message: '用户名至少 3 个字符' },
-                { max: 20, message: '用户名不超过 20 个字符' },
+                { min: 3, message: '用户名长度不足：至少需要 3 位' },
+                { max: 20, message: '用户名过长：最多允许 20 位' },
+                {
+                  pattern: /^[a-zA-Z0-9_]+$/,
+                  message: '用户名包含不支持的字符：不能使用中文、空格或特殊符号',
+                },
               ]}
+              validateFirst
+              validateTrigger="onBlur"
             >
-              <Input prefix={<UserOutlined />} placeholder="请输入用户名" size="large" />
+              <Input
+                prefix={<UserOutlined />}
+                placeholder="3–20 位英文、数字或下划线"
+                size="large"
+                disabled={isLoading}
+                autoComplete="username"
+              />
             </Form.Item>
 
             <Form.Item
@@ -82,10 +103,18 @@ const Register: React.FC = () => {
               label="密码"
               rules={[
                 { required: true, message: '请输入密码' },
-                { min: 6, message: '密码至少 6 个字符' },
+                { min: 6, message: '密码长度不足：至少需要 6 位字符' },
               ]}
+              validateFirst
+              validateTrigger="onBlur"
             >
-              <Input.Password prefix={<LockOutlined />} placeholder="请输入密码" size="large" />
+              <Input.Password
+                prefix={<LockOutlined />}
+                placeholder="请输入密码"
+                size="large"
+                disabled={isLoading}
+                autoComplete="new-password"
+              />
             </Form.Item>
 
             <Form.Item
@@ -103,8 +132,16 @@ const Register: React.FC = () => {
                   },
                 }),
               ]}
+              validateFirst
+              validateTrigger="onBlur"
             >
-              <Input.Password prefix={<LockOutlined />} placeholder="请再次输入密码" size="large" />
+              <Input.Password
+                prefix={<LockOutlined />}
+                placeholder="请再次输入密码"
+                size="large"
+                disabled={isLoading}
+                autoComplete="new-password"
+              />
             </Form.Item>
 
             <Form.Item style={{ marginTop: 24 }}>
@@ -113,6 +150,7 @@ const Register: React.FC = () => {
                 htmlType="submit"
                 className="auth-submit-btn"
                 loading={isLoading}
+                disabled={isLoading}
                 block
                 size="large"
               >
