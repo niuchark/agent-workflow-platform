@@ -24,8 +24,9 @@ RUN npm ci
 # 复制源代码
 COPY . .
 
-# 构建生产版本
-RUN npm run build
+# 构建生产版本。大型 Ant Design/图表依赖在 Vite 打包阶段可能超过
+# Node.js 根据宿主机内存自动计算出的默认堆上限。
+RUN NODE_OPTIONS=--max-old-space-size=2048 npm run build
 
 # Stage 2: Nginx
 FROM nginx:alpine AS runner

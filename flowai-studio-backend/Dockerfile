@@ -15,6 +15,10 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Prisma schema engine 需要 OpenSSL；显式安装可避免 Alpine 环境下
+# 错误回退到 openssl-1.1.x 后无法加载 engine。
+RUN apk add --no-cache openssl
+
 # 先复制依赖文件（利用 Docker 缓存层）
 COPY package*.json ./
 COPY prisma ./prisma/
@@ -37,8 +41,8 @@ RUN npm prune --production
 # Stage 2: Runner
 FROM node:20-alpine AS runner
 
-# 安装 dumb-init 用于正确处理信号
-RUN apk add --no-cache dumb-init
+# 安装 dumb-init 用于正确处理信号；Prisma migrate/runtime engine 需要 OpenSSL。
+RUN apk add --no-cache dumb-init openssl
 
 WORKDIR /app
 

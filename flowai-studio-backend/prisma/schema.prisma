@@ -13,28 +13,27 @@ datasource db {
 
 // 用户表
 model User {
-  id        String   @id @default(uuid())
-  username  String   @unique
-  password  String
-  avatar    String?
+  id         String   @id @default(uuid())
+  username   String   @unique
+  password   String
+  avatar     String?
   // 全局角色: admin / member
-  globalRole String  @default("member")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  globalRole String   @default("member")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   // 关联
-  applications    Application[]
-  knowledgeBases  KnowledgeBase[]
-  skills          Skill[]
-  chatHistories   ChatHistory[]
-  mcpServers      McpServer[]
-  templates       WorkflowTemplate[]
-  ownedTeams      Team[]              @relation("TeamOwner")
-  teamMemberships TeamMember[]
-  apiKeys         ApiKey[]
-  modelCredentials ModelCredential[]
+  applications      Application[]
+  knowledgeBases    KnowledgeBase[]
+  skills            Skill[]
+  chatHistories     ChatHistory[]
+  mcpServers        McpServer[]
+  templates         WorkflowTemplate[]
+  ownedTeams        Team[]             @relation("TeamOwner")
+  teamMemberships   TeamMember[]
+  apiKeys           ApiKey[]
+  modelCredentials  ModelCredential[]
   tokenUsageRecords TokenUsageRecord[]
-
 
   @@map("users")
 }
@@ -44,20 +43,20 @@ model User {
 // ============================================================
 
 model ModelCredential {
-  id                String   @id @default(uuid())
-  provider          String
-  baseUrl           String
-  encryptedApiKey   String?
-  encryptionIv      String?
-  encryptionTag     String?
-  keyPrefix         String?
-  keySuffix         String?
-  status            String   @default("untested") // untested, valid, invalid, disabled
-  isEnabled         Boolean  @default(false)
-  lastTestedAt      DateTime?
-  lastTestMessage   String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id              String    @id @default(uuid())
+  provider        String
+  baseUrl         String
+  encryptedApiKey String?
+  encryptionIv    String?
+  encryptionTag   String?
+  keyPrefix       String?
+  keySuffix       String?
+  status          String    @default("untested") // untested, valid, invalid, disabled
+  isEnabled       Boolean   @default(false)
+  lastTestedAt    DateTime?
+  lastTestMessage String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -87,12 +86,11 @@ model Application {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // 关联
-  workflows       Workflow[]
-  teamApplications TeamApplication[]
-  appShares       AppShare[]
-  apiKeys         ApiKey[]
+  workflows         Workflow[]
+  teamApplications  TeamApplication[]
+  appShares         AppShare[]
+  apiKeys           ApiKey[]
   tokenUsageRecords TokenUsageRecord[]
-
 
   @@map("applications")
 }
@@ -103,17 +101,17 @@ model Application {
 
 // 工作流配置表
 model Workflow {
-  id          String @id @default(uuid())
+  id          String  @id @default(uuid())
   name        String
   description String?
-  
+
   // 节点和边配置 (JSON存储)
   nodes String
   edges String
-  
+
   // 变量定义
   variables String?
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -125,11 +123,10 @@ model Workflow {
   currentVersion Int @default(1)
 
   // 关联
-  executions WorkflowExecution[]
-  versions   WorkflowVersion[]
+  executions        WorkflowExecution[]
+  versions          WorkflowVersion[]
   tokenUsageRecords TokenUsageRecord[]
-  traces           WorkflowTrace[]
-
+  traces            WorkflowTrace[]
 
   @@map("workflows")
 }
@@ -178,12 +175,12 @@ model WorkflowTemplate {
   // 模板基本信息
   name        String
   description String?
-  icon        String?           // 模板图标/封面 URL
-  screenshot  String?           // 工作流截图 URL
+  icon        String? // 模板图标/封面 URL
+  screenshot  String? // 工作流截图 URL
 
   // 分类与标签
-  category String              // 分类: productivity, customer-service, content-creation, data-analysis, education, development, other
-  tags     String              // 标签列表 JSON 数组, 如 '["AI","客服","自动化"]'
+  category String // 分类: productivity, customer-service, content-creation, data-analysis, education, development, other
+  tags     String // 标签列表 JSON 数组, 如 '["AI","客服","自动化"]'
 
   // 快照内容（来自工作流的完整定义）
   nodes     String
@@ -191,9 +188,9 @@ model WorkflowTemplate {
   variables String?
 
   // 统计数据
-  downloadCount Int    @default(0)
-  rating        Float  @default(0)   // 平均评分 0-5
-  ratingCount   Int    @default(0)   // 评分人数
+  downloadCount Int   @default(0)
+  rating        Float @default(0) // 平均评分 0-5
+  ratingCount   Int   @default(0) // 评分人数
 
   // 状态: draft(草稿), published(已发布), archived(已下架)
   status String @default("draft")
@@ -219,22 +216,22 @@ model WorkflowTemplate {
 model WorkflowExecution {
   id     String @id @default(uuid())
   status String @default("pending") // pending, running, success, failed, cancelled
-  
+
   // 输入参数
   inputs String?
-  
+
   // 执行上下文 (节点输出结果)
   context String?
-  
+
   // 执行日志
   logs String?
-  
+
   // 错误信息
   error String?
-  
+
   // 执行耗时(ms)
   duration Int?
-  
+
   startedAt   DateTime  @default(now())
   completedAt DateTime?
   createdAt   DateTime  @default(now())
@@ -245,7 +242,6 @@ model WorkflowExecution {
 
   // 关联
   tokenUsageRecords TokenUsageRecord[]
-
 
   @@map("workflow_executions")
 }
@@ -259,45 +255,45 @@ model KnowledgeBase {
   id          String  @id @default(uuid())
   name        String
   description String?
-  
+
   // 嵌入模型配置
   // Provider 类型: qwen / openai / ollama
   embeddingProvider String @default("qwen")
   embeddingModel    String @default("text-embedding-v3")
-  
+
   // 向量维度 (根据模型不同而不同: text-embedding-v3=1024, text-embedding-v2=1536)
   embeddingDimension Int @default(1024)
 
   // 向量存储后端: pgvector / qdrant / milvus
   vectorStore String @default("pgvector")
-  
+
   // 分块配置
-  chunkSize     Int     @default(500)
-  chunkOverlap  Int     @default(50)
-  
+  chunkSize    Int @default(500)
+  chunkOverlap Int @default(50)
+
   // 检索配置
-  topK              Int     @default(5)
+  topK                Int   @default(5)
   similarityThreshold Float @default(0.7)
-  
+
   // 检索模式: vector(纯向量), keyword(纯关键词), hybrid(混合)
   retrievalMode String @default("vector")
-  
+
   // 混合检索配置 (Phase 2.2)
   // 向量检索权重 (0-1, 关键词权重 = 1 - vectorWeight)
   vectorWeight Float @default(0.7)
   // RRF 融合常数 K (学术推荐值 60)
-  rrfK Int @default(60)
-  
+  rrfK         Int   @default(60)
+
   // 重排序配置 (Phase 2.3)
   // 是否启用重排序
-  rerankerEnabled Boolean @default(false)
+  rerankerEnabled  Boolean @default(false)
   // Reranker 类型: cohere / ollama / none
-  rerankerProvider String @default("none")
+  rerankerProvider String  @default("none")
   // Reranker 模型名称
-  rerankerModel String @default("")
+  rerankerModel    String  @default("")
   // 重排序返回的文档数量 (null 表示不截断, 保持与 topK 一致)
-  rerankerTopN Int?
-  
+  rerankerTopN     Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -314,18 +310,18 @@ model KnowledgeBase {
 
 // 文档表
 model Document {
-  id              String  @id @default(uuid())
+  id              String          @id @default(uuid())
   name            String
   content         String
-  mimeType        String  @default("text/markdown")
+  mimeType        String          @default("text/markdown")
   size            Int
-  status          String  @default("completed")
+  status          String          @default("completed")
   error           String?
   metadata        String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
   knowledgeBaseId String
-  knowledgeBase   KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  knowledgeBase   KnowledgeBase   @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
   chunks          DocumentChunk[]
 
   @@unique([name, knowledgeBaseId])
@@ -336,19 +332,19 @@ model Document {
 model DocumentChunk {
   id      String @id @default(uuid())
   content String
-  
+
   // 向量数据 — 使用 pgvector 的 vector 类型存储
   // 通过 Prisma Unsupported 类型映射，SQL 层面使用 vector(1024)
   embedding Unsupported("vector(1024)")?
-  
+
   // 分块位置
   chunkIndex Int
   startIndex Int
   endIndex   Int
-  
+
   // 元数据
-  metadata String?
-  
+  metadata Json? @db.JsonB
+
   createdAt DateTime @default(now())
 
   // 外键
@@ -368,25 +364,25 @@ model Skill {
   id          String  @id @default(uuid())
   name        String
   description String?
-  
+
   // 工具类型: builtin(内置), custom(自定义)
   type String @default("custom")
-  
+
   // 内置工具类型标识
   builtinType String?
-  
+
   // 自定义工具配置
   config String?
-  
+
   // 输入参数定义
   inputSchema String?
-  
+
   // 输出格式定义
   outputSchema String?
-  
+
   // 是否启用
   isActive Boolean @default(true)
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -404,25 +400,25 @@ model Skill {
 // 对话历史表
 model ChatHistory {
   id String @id @default(uuid())
-  
+
   // 会话ID
   sessionId String
-  
+
   // 消息角色
   role String // user, assistant, system
-  
+
   // 消息内容
   content String
-  
+
   // 引用的知识库文档
   references String?
-  
+
   // 使用的工具
   toolCalls String?
-  
+
   // 元数据
   metadata String?
-  
+
   createdAt DateTime @default(now())
 
   // 外键
@@ -448,22 +444,22 @@ model McpServer {
   transportType String @default("stdio")
 
   // stdio 模式: 启动命令 (如 "npx -y @modelcontextprotocol/server-filesystem /tmp")
-  command     String?
-  args        String?   // JSON 数组字符串, 如 '["--port","3001"]'
-  env         String?   // JSON 对象字符串, 额外环境变量
+  command String?
+  args    String? // JSON 数组字符串, 如 '["--port","3001"]'
+  env     String? // JSON 对象字符串, 额外环境变量
 
   // SSE 模式: 服务器 URL
-  url         String?
+  url String?
 
   // 状态
-  isActive    Boolean @default(true)
+  isActive Boolean @default(true)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // 外键
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([name, userId])
   @@map("mcp_servers")
@@ -487,7 +483,7 @@ model Team {
   owner   User   @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 
   // 关联
-  members         TeamMember[]
+  members          TeamMember[]
   teamApplications TeamApplication[]
 
   @@map("teams")
@@ -495,9 +491,9 @@ model Team {
 
 // 团队成员表
 model TeamMember {
-  id        String   @id @default(uuid())
-  role      String   @default("viewer") // owner, admin, editor, viewer
-  joinedAt  DateTime @default(now())
+  id       String   @id @default(uuid())
+  role     String   @default("viewer") // owner, admin, editor, viewer
+  joinedAt DateTime @default(now())
 
   // 外键
   teamId String
@@ -527,15 +523,15 @@ model TeamApplication {
 
 // API 密钥表
 model ApiKey {
-  id        String   @id @default(uuid())
-  name      String
-  keyHash   String   @unique
-  keyPrefix String   // sk-xxxx 前缀用于识别
-  scopes    String   // JSON 数组, 如 '["app:read","app:execute"]'
-  isActive  Boolean  @default(true)
+  id         String    @id @default(uuid())
+  name       String
+  keyHash    String    @unique
+  keyPrefix  String // sk-xxxx 前缀用于识别
+  scopes     String // JSON 数组, 如 '["app:read","app:execute"]'
+  isActive   Boolean   @default(true)
   lastUsedAt DateTime?
   expiresAt  DateTime?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   // 外键
   userId String
@@ -550,16 +546,16 @@ model ApiKey {
 
 // 应用分享表
 model AppShare {
-  id            String   @id @default(uuid())
-  shareLink     String   @unique
-  isPublic      Boolean  @default(false)
-  accessCount   Int      @default(0)
-  embedConfig   String?  // JSON 配置
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id          String   @id @default(uuid())
+  shareLink   String   @unique
+  isPublic    Boolean  @default(false)
+  accessCount Int      @default(0)
+  embedConfig String? // JSON 配置
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // 外键
-  applicationId String  @unique
+  applicationId String      @unique
   application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
   @@map("app_shares")
@@ -577,11 +573,11 @@ model TokenUsageRecord {
   userId        String
   applicationId String?
   workflowId    String?
-  executionId   String?  // 关联工作流执行记录
+  executionId   String? // 关联工作流执行记录
 
   // 模型信息
-  provider String  // openai, claude, qwen, gemini, ollama
-  model    String  // gpt-4o, qwen-max, etc.
+  provider String // openai, claude, qwen, gemini, ollama
+  model    String // gpt-4o, qwen-max, etc.
 
   // Token 使用量
   promptTokens     Int
@@ -597,9 +593,9 @@ model TokenUsageRecord {
   createdAt DateTime @default(now())
 
   // 外键
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  application Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
-  workflow    Workflow?    @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application Application?       @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  workflow    Workflow?          @relation(fields: [workflowId], references: [id], onDelete: SetNull)
   execution   WorkflowExecution? @relation(fields: [executionId], references: [id], onDelete: SetNull)
 
   @@index([userId])
@@ -630,9 +626,9 @@ model WorkflowTrace {
   executionId   String?
 
   // 执行信息
-  status    String  @default("running") // running, success, failed, cancelled
-  totalMs   Int?    // 总耗时
-  spanCount Int     @default(0)
+  status    String @default("running") // running, success, failed, cancelled
+  totalMs   Int? // 总耗时
+  spanCount Int    @default(0)
 
   // 元数据
   inputs  String? // JSON
@@ -662,20 +658,20 @@ model SpanRecord {
   id String @id @default(uuid())
 
   // Span 标识
-  spanId String @unique
+  spanId  String @unique
   traceId String
 
   // 父 Span
   parentSpanId String?
 
   // Span 信息
-  name     String // 节点名称/操作名称
-  kind     String @default("internal") // internal, client, server, producer, consumer
-  status   String @default("ok") // ok, error, timeout
+  name   String // 节点名称/操作名称
+  kind   String @default("internal") // internal, client, server, producer, consumer
+  status String @default("ok") // ok, error, timeout
 
   // 时间
-  startTime DateTime
-  endTime   DateTime?
+  startTime  DateTime
+  endTime    DateTime?
   durationMs Int?
 
   // 属性 (JSON)
