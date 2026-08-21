@@ -4,7 +4,7 @@
  * 使用共享的校验规则与 AuthShell 布局；登录成功后跳转工作台，
  * 失败时根据 AuthError 类型展示不同级别的提示与说明文案。
  */
-import { Form, Input, Button, Alert, Checkbox } from 'antd'
+import { Form, Input, Button, Alert } from 'antd'
 import { LockOutlined, UserOutlined } from '@ant-design/icons'
 import { useNavigate, Link } from 'react-router-dom'
 import { useStore } from '../store'
@@ -49,7 +49,7 @@ const Login: React.FC = () => {
   }
 
   /** 提交登录：成功后跳转应用列表页 */
-  const onSubmit = async (values: { username: string; password: string; remember?: boolean }) => {
+  const onSubmit = async (values: { username: string; password: string }) => {
     clearError()
     try {
       const { username, password } = values
@@ -114,12 +114,6 @@ const Login: React.FC = () => {
             autoComplete="current-password"
           />
         </Form.Item>
-
-        <div className="auth-form-extra">
-          <Form.Item name="remember" valuePropName="checked" noStyle>
-            <Checkbox disabled={isLoading}>记住我</Checkbox>
-          </Form.Item>
-        </div>
 
         <Form.Item style={{ marginTop: 24 }}>
           <Button

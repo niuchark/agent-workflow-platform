@@ -6,6 +6,7 @@
  * - 响应拦截器直接返回 data，并把各种 HTTP 错误统一改写为可读的中文提示。
  */
 import axios from 'axios'
+import { clearStoredAuth, getStoredToken } from './authStorage'
 
 /** 从 Axios 响应中取出 data 字段（兼容响应拦截器已解包的情况） */
 export const getResponseData = <T>(response: unknown): T =>
@@ -30,8 +31,8 @@ const request = axios.create({
 // 请求拦截器
 request.interceptors.request.use(
   (config) => {
-    // 从localStorage获取token
-    const token = localStorage.getItem('token')
+    // 从 authStorage 获取 token（登录后始终持久化在 localStorage）
+    const token = getStoredToken()
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -70,13 +71,11 @@ request.interceptors.response.use(
           break
         
         case 401:
-          // 未授权，清除token并跳转到登录页
-          localStorage.removeItem('token')
-          localStorage.removeItem('user')
-          
-          // 如果不是登录页面，跳转到登录页
-          if (!window.location.pathname.includes('/login')) {
-            window.location.href = '/login'
+          // 未授权：清除登录态，并派发事件由应用内登出（路由守卫会自动跳回登录页）
+          clearStoredAuth()
+          // 登录接口自身的 401（密码错误/账号锁定）由登录页展示错误，不触发全局登出
+          if (!error.config?.url?.includes('/users/login')) {
+            window.dispatchEvent(new Event('auth:unauthorized'))
           }
           error.message = data.message || '登录已过期，请重新登录'
           break

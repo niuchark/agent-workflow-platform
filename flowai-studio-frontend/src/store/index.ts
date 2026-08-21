@@ -44,14 +44,23 @@ export const useStore = create<StoreState>()(
       ...createApiKeySlice(...args),
     }),
     {
-      // 持久化配置：只把用户、令牌和全局配置写入 localStorage
+      // 持久化配置：登录态由 authStorage 单独管理，
+      // 这里只持久化非敏感的全局配置，避免 token 重复落盘
       name: 'flowai-storage',
       partialize: (state) => ({
-        user: state.user,
-        token: state.token,
-        isAuthenticated: state.isAuthenticated,
         globalConfig: state.globalConfig,
       }),
+      // 兼容旧版本：忽略 persisted 中遗留的登录态字段，登录态一律以 authStorage 为准
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<StoreState>
+        return {
+          ...currentState,
+          ...persisted,
+          user: currentState.user,
+          token: currentState.token,
+          isAuthenticated: currentState.isAuthenticated,
+        }
+      },
     }
   )
 )

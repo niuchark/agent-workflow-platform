@@ -25,6 +25,7 @@ import {
 import ReactMarkdown from 'react-markdown'
 import { useStore } from '../store'
 import request from '../utils/axios'
+import { getStoredToken } from '../utils/authStorage'
 import { createParser } from 'eventsource-parser'
 import { useNavigate } from 'react-router-dom'
 import { useModelCatalog } from '../utils/useModelCatalog'
@@ -186,7 +187,7 @@ const Debug: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${getStoredToken()}`,
         },
         body: JSON.stringify({
           message: currentInput,
@@ -302,7 +303,7 @@ const Debug: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${getStoredToken()}`,
         },
         body: JSON.stringify({ inputs }),
       })

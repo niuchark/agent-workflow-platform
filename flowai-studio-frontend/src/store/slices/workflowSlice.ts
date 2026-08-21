@@ -8,6 +8,7 @@
 import { StateCreator } from 'zustand'
 import { Workflow, WorkflowNode, WorkflowEdge, NodeExecution } from '../../types'
 import request from '../../utils/axios'
+import { getStoredToken } from '../../utils/authStorage'
 import { 
   Connection,
   OnNodesChange, 
@@ -208,7 +209,7 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${getStoredToken()}`
         },
         body: JSON.stringify({ inputs })
       })
