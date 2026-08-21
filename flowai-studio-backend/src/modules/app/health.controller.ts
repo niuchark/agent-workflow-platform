@@ -1,3 +1,6 @@
+/**
+ * 健康检查控制器：Docker HEALTHCHECK / K8s 探针 / 监控面板使用。
+ */
 import { Controller, Get } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { RedisService } from '../../common/services/redis.service';
@@ -24,6 +27,7 @@ export class HealthController {
     private cacheService: CacheService,
   ) {}
 
+  /** 综合健康检查：数据库 / Redis / pgvector / 多级缓存 */
   @Get()
   async check() {
     const checks: Record<string, any> = {};
@@ -58,7 +62,7 @@ export class HealthController {
       checks.pgvector = { status: 'unhealthy', error: error instanceof Error ? error.message : 'Unknown error' };
     }
 
-    // 4. 多级缓存健康检查 (Phase 2.4)
+    // 4. 多级缓存健康检查
     try {
       const cacheHealth = await this.cacheService.healthCheck();
       checks.cache = cacheHealth;
@@ -81,6 +85,7 @@ export class HealthController {
    * - L1/L2 命中率、缓存大小、回源次数
    * - 互斥锁竞争统计
    */
+  /** 缓存统计端点：L1/L2 命中率与缓存大小 */
   @Get('cache-stats')
   getCacheStats() {
     return this.cacheService.getStats();

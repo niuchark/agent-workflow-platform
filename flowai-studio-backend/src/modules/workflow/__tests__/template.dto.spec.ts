@@ -1,3 +1,4 @@
+/** 模板 DTO 单元测试 */
 import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';

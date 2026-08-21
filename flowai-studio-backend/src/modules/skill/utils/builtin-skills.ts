@@ -1,6 +1,10 @@
+/**
+ * 内置技能实现：时间、HTTP、JSON、正则、计算器与沙箱代码执行。
+ */
 import axios from 'axios';
 import { VM } from 'vm2';
 
+/** 按类型分发到对应的内置技能执行器 */
 export async function executeBuiltinSkill(type: string, params: Record<string, any>): Promise<any> {
   switch (type) {
     case 'time':
@@ -20,6 +24,7 @@ export async function executeBuiltinSkill(type: string, params: Record<string, a
   }
 }
 
+/** 时间技能：返回当前时间 */
 function executeTimeSkill(): any {
   const now = new Date();
   return {

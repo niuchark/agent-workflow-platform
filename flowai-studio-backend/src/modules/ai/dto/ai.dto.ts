@@ -1,5 +1,9 @@
+/**
+ * AI 相关 DTO：对话、运行与流式运行的请求体。
+ */
 import { IsString, IsOptional, IsObject, IsUUID, IsArray, IsIn } from 'class-validator';
 
+/** 运行应用/工作流的请求体 */
 export class RunDto {
   @IsUUID('4', { message: 'Invalid application ID' })
   appId: string;
@@ -16,8 +20,10 @@ export class RunDto {
   sessionId?: string;
 }
 
+/** 流式运行请求体（继承 RunDto） */
 export class StreamRunDto extends RunDto {}
 
+/** 对话请求体 */
 export class ChatDto {
   @IsString({ message: 'Message must be a string' })
   message: string;

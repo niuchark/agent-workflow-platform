@@ -1,3 +1,9 @@
+/**
+ * AI 服务：工作流运行（普通/SSE）与知识库增强对话。
+ *
+ * 对话通过 SSE 流式输出，可选关联知识库做 RAG 增强；
+ * 所有模型调用都按当前用户的凭证动态创建 Provider。
+ */
 import { BadGatewayException, HttpException, Injectable, Inject, forwardRef, UnprocessableEntityException } from '@nestjs/common';
 import { Response } from 'express';
 import { PrismaService } from '../../common/services/prisma.service';
@@ -9,6 +15,7 @@ import { LLMProviderFactory } from '../agent/providers/llm-provider.factory';
 import { ModelCredentialService } from '../model-credential/model-credential.service';
 import { UserModelProvider } from '../model-credential/model-credential.types';
 
+/** AI 服务 */
 @Injectable()
 export class AiService {
   constructor(
@@ -26,6 +33,7 @@ export class AiService {
    * 2. Execute the workflow
    * 3. Return the final context
    */
+  /** 非流式运行工作流：返回最终上下文与输出节点结果 */
   async run(userId: string, runDto: RunDto) {
     const workflowId = await this.resolveWorkflowId(userId, runDto.appId, runDto.workflowId);
 
@@ -52,6 +60,7 @@ export class AiService {
    * Streaming workflow run via SSE:
    * Pushes real-time node execution status events to the client.
    */
+  /** 流式运行工作流：通过 SSE 推送节点级执行状态 */
   async streamRun(userId: string, streamRunDto: StreamRunDto, res: Response) {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -92,6 +101,7 @@ export class AiService {
    * Resolve workflowId: use explicit workflowId if provided,
    * otherwise find the latest workflow for the given appId.
    */
+  /** 解析工作流 ID：未显式指定时取该应用最新工作流 */
   private async resolveWorkflowId(userId: string, appId: string, workflowId?: string): Promise<string> {
     if (workflowId) {
       return workflowId;
@@ -128,6 +138,7 @@ export class AiService {
    * Extract the output from the execution context.
    * Looks for output node results, or returns the last node's result.
    */
+  /** 从执行上下文中提取输出节点结果（无则返回整个上下文） */
   private extractOutputFromContext(context: Record<string, any>): any {
     // Try to find an output node result (key pattern: node with result property)
     for (const [, value] of Object.entries(context)) {
@@ -141,6 +152,7 @@ export class AiService {
     return context;
   }
 
+  /** 对话：保存消息 → RAG 检索 → 流式调用模型 → 落库 */
   async chat(userId: string, chatDto: ChatDto, res: Response) {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -215,6 +227,7 @@ export class AiService {
     }
   }
 
+  /** 非流式调用 LLM（供工作流节点等内部复用） */
   async chatWithLLM(
     userId: string,
     userPrompt: string,
@@ -250,6 +263,7 @@ export class AiService {
   /**
    * chatWithLLM 的增强版，同时返回 Token 使用量
    */
+  /** 非流式调用 LLM 并返回 Token 用量（供 LLM 节点记录成本） */
   async chatWithLLMAndUsage(
     userId: string,
     userPrompt: string,
@@ -291,6 +305,7 @@ export class AiService {
     }
   }
 
+  /** 解析对话使用的供应商与模型：显式指定优先，否则用唯一可用凭证 */
   private async resolveChatSelection(
     userId: string,
     requestedProvider?: UserModelProvider,
@@ -316,6 +331,7 @@ export class AiService {
     return { provider, model: requestedModel || defaults[provider] };
   }
 
+  /** 获取某会话的完整聊天历史 */
   async getChatHistory(userId: string, sessionId: string) {
     return this.prisma.chatHistory.findMany({
       where: {
@@ -334,6 +350,7 @@ export class AiService {
     });
   }
 
+  /** 获取用户的会话列表（按最近消息时间倒序） */
   async getAllChatHistories(userId: string, appId?: string) {
     const where: { userId: string; metadata?: { path: string[]; equals: string } } = { userId };
     

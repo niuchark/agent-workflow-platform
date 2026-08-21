@@ -1,3 +1,9 @@
+/**
+ * RAG 控制器：知识库管理、文档上传/删除/分块查询与统一检索接口。
+ *
+ * 检索支持三种模式（vector/keyword/hybrid），可在请求中覆盖
+ * topK、retrievalMode、vectorWeight、rrfK 等参数。
+ */
 import {
   Controller,
   Get,
@@ -23,7 +29,8 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 export class RAGController {
   constructor(private readonly ragService: RAGService) {}
 
-  // 知识库管理
+  // ===== 知识库管理 =====
+  /** 创建知识库 */
   @Post('knowledge-bases')
   createKnowledgeBase(
     @CurrentUser('userId') userId: string,
@@ -32,11 +39,13 @@ export class RAGController {
     return this.ragService.createKnowledgeBase(userId, createKnowledgeBaseDto);
   }
 
+  /** 获取知识库列表 */
   @Get('knowledge-bases')
   findKnowledgeBases(@CurrentUser('userId') userId: string) {
     return this.ragService.findKnowledgeBases(userId);
   }
 
+  /** 获取知识库详情 */
   @Get('knowledge-bases/:id')
   findKnowledgeBaseById(
     @CurrentUser('userId') userId: string,
@@ -45,6 +54,7 @@ export class RAGController {
     return this.ragService.findKnowledgeBaseById(userId, id);
   }
 
+  /** 更新知识库配置 */
   @Patch('knowledge-bases/:id')
   updateKnowledgeBase(
     @CurrentUser('userId') userId: string,
@@ -54,6 +64,7 @@ export class RAGController {
     return this.ragService.updateKnowledgeBase(userId, id, updateKnowledgeBaseDto);
   }
 
+  /** 删除知识库 */
   @Delete('knowledge-bases/:id')
   deleteKnowledgeBase(
     @CurrentUser('userId') userId: string,
@@ -62,7 +73,8 @@ export class RAGController {
     return this.ragService.deleteKnowledgeBase(userId, id);
   }
 
-  // 文档管理
+  // ===== 文档管理 =====
+  /** 上传文档（multipart，后台异步向量化） */
   @Post('documents/upload')
   @UseInterceptors(FileInterceptor('file'))
   uploadDocument(
@@ -73,6 +85,7 @@ export class RAGController {
     return this.ragService.uploadDocument(userId, knowledgeBaseId, file);
   }
 
+  /** 获取文档分块 */
   @Get('documents/:documentId/chunks')
   getDocumentChunks(
     @CurrentUser('userId') userId: string,
@@ -81,6 +94,7 @@ export class RAGController {
     return this.ragService.getDocumentChunks(userId, documentId);
   }
 
+  /** 删除文档 */
   @Delete('documents/:documentId')
   deleteDocument(
     @CurrentUser('userId') userId: string,
@@ -102,6 +116,7 @@ export class RAGController {
    * - FastGPT: POST /api/core/dataset/searchTest
    * - 本设计: 支持运行时覆盖检索参数（更灵活）
    */
+  /** 统一检索接口：按知识库配置的检索模式执行 */
   @Post('retrieve')
   retrieve(
     @CurrentUser('userId') userId: string,

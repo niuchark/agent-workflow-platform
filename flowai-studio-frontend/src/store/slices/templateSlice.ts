@@ -1,9 +1,17 @@
+/**
+ * 工作流模板状态切片：管理模板市场的列表、分类、评分与导入。
+ *
+ * 列表查询支持关键词、分类、标签、官方筛选、排序与分页，
+ * 分页信息（总数/页码/总页数）一并保存在 store 中供页面展示。
+ */
 import { StateCreator } from 'zustand'
 import { WorkflowTemplate, TemplateCategoryCount, TemplateSort, TemplateCategory } from '../../types'
 import request, { getResponseData } from '../../utils/axios'
 
+/** 模板接口的基础路径 */
 const TEMPLATE_API = '/templates'
 
+/** 模板切片对外暴露的状态与 Actions 类型 */
 export interface TemplateSlice {
   templates: WorkflowTemplate[]
   templateTotal: number
@@ -60,6 +68,7 @@ export interface TemplateSlice {
   deleteTemplate: (id: string) => Promise<void>
 }
 
+/** 创建模板切片：提供模板列表、分类、详情、CRUD、发布/归档、导入与评分操作 */
 export const createTemplateSlice: StateCreator<TemplateSlice> = (set) => ({
   templates: [],
   templateTotal: 0,
@@ -70,6 +79,7 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set) => ({
   templateLoading: false,
   templateError: null,
 
+  /** 分页查询模板列表，并保存分页元信息 */
   fetchTemplates: async (params = {}) => {
     set({ templateLoading: true, templateError: null })
     try {
@@ -94,6 +104,7 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set) => ({
     }
   },
 
+  /** 拉取模板分类及各类数量统计 */
   fetchTemplateCategories: async () => {
     try {
       const categories = getResponseData<TemplateCategoryCount[]>(
@@ -105,6 +116,7 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set) => ({
     }
   },
 
+  /** 按 ID 拉取模板详情 */
   fetchTemplateById: async (id) => {
     try {
       return getResponseData<WorkflowTemplate>(await request.get(`${TEMPLATE_API}/${id}`))
@@ -113,6 +125,7 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set) => ({
     }
   },
 
+  /** 创建模板（支持从现有工作流复制） */
   createTemplate: async (data) => {
     set({ templateLoading: true, templateError: null })
     try {
@@ -125,6 +138,7 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set) => ({
     }
   },
 
+  /** 更新模板基础信息 */
   updateTemplate: async (id, data) => {
     try {
       return getResponseData<WorkflowTemplate>(await request.patch(`${TEMPLATE_API}/${id}`, data))
@@ -133,6 +147,7 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set) => ({
     }
   },
 
+  /** 发布模板（进入模板市场展示） */
   publishTemplate: async (id) => {
     try {
       return getResponseData<WorkflowTemplate>(await request.post(`${TEMPLATE_API}/${id}/publish`))
@@ -141,6 +156,7 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set) => ({
     }
   },
 
+  /** 归档模板（从市场下架） */
   archiveTemplate: async (id) => {
     try {
       return getResponseData<WorkflowTemplate>(await request.post(`${TEMPLATE_API}/${id}/archive`))
@@ -149,6 +165,7 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set) => ({
     }
   },
 
+  /** 从模板导入创建新工作流 */
   createFromTemplate: async (id, data) => {
     try {
       return getResponseData<{
@@ -162,6 +179,7 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set) => ({
     }
   },
 
+  /** 给模板评分，返回最新均分与评分人数 */
   rateTemplate: async (id, rating) => {
     try {
       return getResponseData<{
@@ -174,6 +192,7 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set) => ({
     }
   },
 
+  /** 删除模板 */
   deleteTemplate: async (id) => {
     try {
       await request.delete(`${TEMPLATE_API}/${id}`)

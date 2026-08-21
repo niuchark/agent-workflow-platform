@@ -1,15 +1,25 @@
+/**
+ * Prisma 数据库服务：封装 PrismaClient 生命周期与向量检索能力。
+ *
+ * - 启动时连接数据库并自动启用 pgvector 扩展；
+ * - 提供基于 pgvector 的余弦相似度检索与向量分块插入方法
+ *   （Prisma 原生不支持 vector 类型，故使用 raw SQL）。
+ */
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 
+/** Prisma 服务：连接管理 + pgvector 向量操作 */
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
 
+  /** 模块初始化：连接数据库并启用 pgvector 扩展 */
   async onModuleInit() {
     await this.$connect();
     await this.enablePgvectorExtension();
   }
 
+  /** 模块销毁：断开数据库连接 */
   async onModuleDestroy() {
     await this.$disconnect();
   }
@@ -19,6 +29,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
    * pgvector 是 PostgreSQL 的向量相似度搜索扩展
    * 竞品对标: Dify 支持 pgvector 作为默认向量存储后端
    */
+  /** 启用 pgvector 扩展（失败仅告警，不影响主流程） */
   private async enablePgvectorExtension() {
     try {
       await this.$executeRawUnsafe(`CREATE EXTENSION IF NOT EXISTS vector;`);
@@ -42,6 +53,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
    * @param selectFields - 额外需要 SELECT 的字段
    * @returns 相似度排序后的结果
    */
+  /** 余弦相似度检索：用 pgvector 的 <=> 距离算子排序返回最相似记录 */
   async vectorSearch(params: {
     table: string;
     queryVector: number[];

@@ -1,8 +1,21 @@
+/**
+ * 全局样式：Tailwind 入口 + 设计令牌 + 组件层样式。
+ *
+ * 结构说明：
+ * - @layer base：CSS 变量（色彩/阴影/圆角）与全局基础样式；
+ * - @layer components：跨页面复用的组件类（卡片、面板、节点、按钮等），
+ *   优先用 @apply 组合 Tailwind 工具类，减少页面级重复样式；
+ * - 末尾保留少量原生 CSS，用于 React Flow 动态几何与伪元素等场景。
+ *
+ * 注意：tailwind.config.js 关闭了 preflight，以兼容 Ant Design，
+ * 因此全局 reset 只做了 box-sizing 与基础字体等最小化处理。
+ */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  /** 设计令牌：全站色彩、阴影与圆角的 CSS 变量定义 */
   :root {
     color-scheme: light;
     --c-bg: #f8fafc;

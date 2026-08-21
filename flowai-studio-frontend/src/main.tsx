@@ -1,3 +1,10 @@
+/**
+ * 应用入口：挂载 React 根组件，并配置 Ant Design 全局主题与中文语言包。
+ *
+ * 这里是整个前端应用的启动点：将 <App /> 渲染到 #root 节点，
+ * 同时通过 ConfigProvider 统一注入品牌色、字体、圆角等设计令牌，
+ * 使全站组件保持一致的视觉风格。
+ */
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { ConfigProvider } from 'antd'
@@ -10,6 +17,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ConfigProvider
       locale={zhCN}
       theme={{
+        // 全局设计令牌：品牌色、语义色、圆角、字体与阴影
         token: {
           colorPrimary: '#0284c7',
           colorLink: '#0284c7',
@@ -34,6 +42,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           boxShadowSecondary:
             '0 12px 30px -12px rgba(15,23,42,0.22)',
         },
+        // 常用组件的局部样式微调（按钮高度、表格表头、菜单选中态等）
         components: {
           Button: {
             borderRadius: 10,

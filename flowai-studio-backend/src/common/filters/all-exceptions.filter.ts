@@ -1,3 +1,9 @@
+/**
+ * 全局异常过滤器：把所有异常统一转换为 JSON 错误响应。
+ *
+ * HttpException 保留其状态码与 message，未知异常按 500 处理；
+ * 同时记录请求方法、路径与堆栈日志。
+ */
 import {
   ExceptionFilter,
   Catch,
@@ -8,10 +14,12 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 
+/** 全局异常过滤器：统一错误响应格式 */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
 
+  /** 捕获异常：提取状态码与消息，输出统一错误结构 */
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -21,6 +29,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let message = 'Internal server error';
     let code = 'INTERNAL_ERROR';
 
+    // 业务异常：从响应体中提取 message/code
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
@@ -52,6 +61,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     });
   }
 
+  /** 按 HTTP 状态码映射内部错误码 */
   private getErrorCode(status: number): string {
     const codeMap: Record<number, string> = {
       [HttpStatus.BAD_REQUEST]: 'BAD_REQUEST',

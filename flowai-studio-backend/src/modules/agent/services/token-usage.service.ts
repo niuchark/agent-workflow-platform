@@ -1,8 +1,15 @@
+/**
+ * Token 用量统计服务：记录、批量落库与成本报表。
+ *
+ * 采用"内存缓冲 + 定时/阈值批量写入"降低写库压力；
+ * 成本报表用原生 SQL 按天/周/月/模型/供应商分组聚合。
+ */
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../common/services/prisma.service';
 import { LLMProviderFactory } from '../providers/llm-provider.factory';
 import { RecordTokenUsageDto, GetTokenUsageDto, GetCostReportDto } from '../dto/token-usage.dto';
 
+/** Token 用量统计服务 */
 @Injectable()
 export class TokenUsageService {
   private readonly logger = new Logger(TokenUsageService.name);
@@ -14,6 +21,7 @@ export class TokenUsageService {
   /** 缓冲区最大条目 */
   private readonly BUFFER_MAX = 100;
 
+  /** 构造时启动定时刷新缓冲区的定时器 */
   constructor(
     private prisma: PrismaService,
     private llmFactory: LLMProviderFactory,
@@ -30,6 +38,7 @@ export class TokenUsageService {
    * 记录一次 LLM 调用的 Token 使用量
    * 写入内存缓冲区，定时或达到阈值后批量刷入数据库
    */
+  /** 记录一次 LLM 调用的 Token 使用量（进缓冲区） */
   recordUsage(dto: RecordTokenUsageDto): void {
     // 自动计算成本（如果未提供）
     if (dto.cost === undefined || dto.cost === 0) {
@@ -57,6 +66,7 @@ export class TokenUsageService {
   /**
    * 便捷方法：从 LLMResponse 中提取并记录使用量
    */
+  /** 便捷方法：从 LLMResponse 中提取并记录使用量 */
   recordFromResponse(params: {
     userId: string;
     applicationId?: string;
@@ -84,6 +94,7 @@ export class TokenUsageService {
   /**
    * 将缓冲区中的记录批量写入数据库
    */
+  /** 将缓冲区中的记录批量写入数据库（失败则放回缓冲区） */
   async flush(): Promise<void> {
     if (this.buffer.length === 0) return;
 
@@ -121,6 +132,7 @@ export class TokenUsageService {
   /**
    * 查询 Token 使用量列表
    */
+  /** 查询 Token 使用量：明细 + 总数 + 汇总统计 */
   async getUsage(userId: string, dto: GetTokenUsageDto) {
     const where: any = { userId };
 
@@ -176,6 +188,7 @@ export class TokenUsageService {
    * 获取成本报表
    * 支持按 day/week/month/model/provider 分组
    */
+  /** 获取成本报表：按 day/week/month/model/provider 分组 */
   async getCostReport(userId: string, dto: GetCostReportDto) {
     const where: any = { userId };
 
@@ -256,6 +269,7 @@ export class TokenUsageService {
   /**
    * 获取模型使用排行
    */
+  /** 获取模型使用排行（按费用降序，取前 20） */
   async getModelRanking(userId: string, startDate?: string, endDate?: string) {
     const where: any = { userId };
     if (startDate || endDate) {
@@ -296,6 +310,7 @@ export class TokenUsageService {
   /**
    * 构建 SQL WHERE 子句
    */
+  /** 构建 SQL WHERE 子句 */
   private buildWhereClause(where: any): string {
     const conditions: string[] = [];
 

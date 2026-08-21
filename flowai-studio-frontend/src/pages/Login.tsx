@@ -1,3 +1,9 @@
+/**
+ * 登录页面：用户名 + 密码登录。
+ *
+ * 使用共享的校验规则与 AuthShell 布局；登录成功后跳转工作台，
+ * 失败时根据 AuthError 类型展示不同级别的提示与说明文案。
+ */
 import { Form, Input, Button, Alert, Checkbox } from 'antd'
 import { LockOutlined, UserOutlined } from '@ant-design/icons'
 import { useNavigate, Link } from 'react-router-dom'
@@ -10,6 +16,7 @@ const Login: React.FC = () => {
   const { login, isLoading, authError, clearError } = useStore()
   const [form] = Form.useForm()
 
+  /** 按错误类型映射 Alert 级别 */
   const getAlertType = () => {
     if (!authError) return 'error' as const
     switch (authError.type) {
@@ -23,6 +30,7 @@ const Login: React.FC = () => {
     }
   }
 
+  /** 按错误类型给出更具体的解决建议 */
   const getAlertDescription = () => {
     if (!authError) return undefined
 
@@ -40,6 +48,7 @@ const Login: React.FC = () => {
     }
   }
 
+  /** 提交登录：成功后跳转应用列表页 */
   const onSubmit = async (values: { username: string; password: string; remember?: boolean }) => {
     clearError()
     try {

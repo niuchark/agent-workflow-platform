@@ -1,3 +1,6 @@
+/**
+ * MCP 控制器：服务器 CRUD、连接管理与工具调用接口。
+ */
 import {
   Controller,
   Get,
@@ -12,12 +15,13 @@ import { McpService } from './mcp.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
+/** MCP REST 控制器 */
 @Controller('mcp')
 @UseGuards(JwtAuthGuard)
 export class McpController {
   constructor(private readonly mcpService: McpService) {}
 
-  // ========== 服务器 CRUD ==========
+  // ===== 服务器 CRUD =====
 
   /** 创建 MCP 服务器配置 */
   @Post('servers')

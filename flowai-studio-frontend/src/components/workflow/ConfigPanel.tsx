@@ -1,3 +1,13 @@
+/**
+ * 节点配置面板：编辑画布中选中节点的详细参数。
+ *
+ * 按节点类型（start/llm/agent/rag/skill/condition/output）渲染
+ * 不同的表单；所有修改通过 updateNodeData 实时同步回 store，
+ * 因此画布与配置面板始终一致。
+ *
+ * 还包含 Agent 的 Supervisor/Worker 编辑、条件分支的可视化构建器、
+ * 以及上游变量插入（VariableTextArea）等能力。
+ */
 import React, { useEffect, useMemo, useState } from 'react'
 import { Form, Input, Select, Slider, InputNumber, Switch, Divider, Card, Button, Space, Tag, Empty, Typography, AutoComplete, Alert, Tooltip } from 'antd'
 import { PlusOutlined, DeleteOutlined, RobotOutlined, SettingOutlined, QuestionCircleOutlined, BranchesOutlined } from '@ant-design/icons'
@@ -11,6 +21,7 @@ import { getAvailableVariables } from './variableUtils'
 const { Option } = Select
 const { Text } = Typography
 
+/** 各节点类型的展示名称与说明（面板头部与空态提示使用） */
 const NODE_TYPE_META: Record<string, { label: string; description: string }> = {
   start: { label: '开始节点', description: '定义工作流的起点和初始输入。' },
   userInput: { label: '用户输入', description: '收集用户问题或变量，作为后续节点输入。' },
@@ -22,6 +33,7 @@ const NODE_TYPE_META: Record<string, { label: string; description: string }> = {
   output: { label: '输出节点', description: '组织最终返回给用户的结果。' },
 }
 
+/** 模型选择输入：支持从已加载模型中选择，也允许输入自定义模型 ID */
 const ModelSelect: React.FC<{
   value?: string;
   onChange?: (value: string) => void;
@@ -43,12 +55,14 @@ const ModelSelect: React.FC<{
   />
 )
 
+/** 模型供应商的中文/展示名 */
 const PROVIDER_LABELS: Record<UserModelProvider, string> = {
   qwen: 'Qwen',
   openai: 'OpenAI-compatible',
   ollama: 'Ollama',
 }
 
+/** 条件分支支持的比较运算符选项 */
 const CONDITION_OPERATOR_OPTIONS = [
   { value: 'contains', label: '包含' },
   { value: '===', label: '等于' },
@@ -59,6 +73,7 @@ const CONDITION_OPERATOR_OPTIONS = [
   { value: '<=', label: '小于等于' },
 ]
 
+/** 把条件数据归一化为数组（兼容历史版本存 JSON 字符串的情况） */
 const normalizeConditions = (conditions: unknown) => {
   if (Array.isArray(conditions)) return conditions
   if (typeof conditions !== 'string' || !conditions.trim()) return []
@@ -71,6 +86,7 @@ const normalizeConditions = (conditions: unknown) => {
   }
 }
 
+/** 用户提示词字段的标签：带"什么是用户提示词"的说明气泡 */
 const UserPromptLabel = () => (
   <span className="field-label-with-help">
     <span>用户提示词</span>
@@ -90,21 +106,26 @@ const UserPromptLabel = () => (
   </span>
 )
 
+/** 节点配置面板组件 */
 const ConfigPanel: React.FC = () => {
   const navigate = useNavigate()
   const { availableProviders, modelsByProvider, loading: modelCatalogLoading } = useModelCatalog()
   const { selectedNode, nodes, edges, updateNodeData, knowledgeBases, fetchKnowledgeBases, skills, fetchSkills } = useStore()
   const [form] = Form.useForm()
+  // Agent 的 Worker 列表单独用 state 管理（不属于 Form 字段）
   const [workers, setWorkers] = useState<any[]>([])
+  // 监听表单中的 agentMode/provider，驱动条件渲染与模型列表
   const agentMode = Form.useWatch('agentMode', form) || 'single'
   const selectedProvider = (Form.useWatch('provider', form) || 'qwen') as UserModelProvider
   const supervisorProvider = (Form.useWatch('supervisorProvider', form) || selectedProvider) as UserModelProvider
 
+  // 打开面板时加载知识库与技能列表（供 Agent/RAG/工具节点选择）
   useEffect(() => {
     fetchKnowledgeBases()
     fetchSkills()
   }, [fetchKnowledgeBases, fetchSkills])
 
+  // 选中节点变化时，把节点数据回填到表单
   useEffect(() => {
     if (selectedNode) {
       const data = selectedNode.data as any
@@ -132,20 +153,24 @@ const ConfigPanel: React.FC = () => {
     }
   }, [selectedNode, form, updateNodeData])
 
+  /** 表单值变化：实时写回选中节点的数据 */
   const handleValuesChange = (_changedValues: any, allValues: any) => {
     if (selectedNode) {
       updateNodeData(selectedNode.id, allValues)
     }
   }
 
+  // 当前选中节点的元信息与显示名
   const selectedNodeMeta = selectedNode ? NODE_TYPE_META[selectedNode.type] : null
   const selectedNodeName = selectedNode
     ? ((selectedNode.data as any)?.label || selectedNodeMeta?.label || '未命名节点')
     : ''
+  // 当前节点可引用的上游变量
   const availableVariables = useMemo(
     () => selectedNode ? getAvailableVariables(nodes, edges, selectedNode.id) : [],
     [edges, nodes, selectedNode],
   )
+  // 条件变量按节点分组（供条件构建器选择）
   const conditionVariableGroups = useMemo(() => {
     const groups = new Map<string, Array<{ label: string; value: string }>>()
 
@@ -161,6 +186,7 @@ const ConfigPanel: React.FC = () => {
     return [...groups.entries()].map(([label, options]) => ({ label, options }))
   }, [availableVariables])
 
+  /** 添加一个 Worker：默认配置并同步到节点数据 */
   const addWorker = () => {
     const newWorker = {
       id: `worker_${Date.now()}`,
@@ -182,6 +208,7 @@ const ConfigPanel: React.FC = () => {
     }
   }
 
+  /** 删除指定位置的 Worker */
   const removeWorker = (index: number) => {
     const updatedWorkers = workers.filter((_, i) => i !== index)
     setWorkers(updatedWorkers)
@@ -190,6 +217,7 @@ const ConfigPanel: React.FC = () => {
     }
   }
 
+  /** 更新指定 Worker 的多个字段 */
   const updateWorkerFields = (index: number, patch: Record<string, any>) => {
     const updatedWorkers = workers.map((w, i) =>
       i === index ? { ...w, ...patch } : w
@@ -200,10 +228,12 @@ const ConfigPanel: React.FC = () => {
     }
   }
 
+  /** 更新指定 Worker 的单个字段 */
   const updateWorker = (index: number, field: string, value: any) => {
     updateWorkerFields(index, { [field]: value })
   }
 
+  /** 生成供应商下拉选项：不可用的供应商标记"不可用"并禁用 */
   const providerOptions = (current?: UserModelProvider) => (
     (['qwen', 'openai', 'ollama'] as UserModelProvider[]).map((provider) => ({
       value: provider,
@@ -212,6 +242,7 @@ const ConfigPanel: React.FC = () => {
     }))
   )
 
+  /** 渲染 Agent 节点配置：基础字段 + 工具/知识库/记忆 + Supervisor/Worker */
   const renderAgentConfig = (commonFields: React.ReactNode) => {
     return (
       <>
@@ -342,6 +373,7 @@ const ConfigPanel: React.FC = () => {
     )
   }
 
+  /** 按节点类型渲染对应的配置表单 */
   const renderConfigForm = () => {
       const commonFields = (
         <Form.Item name="label" label="节点名称">

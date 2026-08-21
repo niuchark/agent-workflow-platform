@@ -223,7 +223,7 @@ export class CacheService implements OnModuleDestroy {
   private readonly l1: LRUMemoryCache;
   private readonly config: Required<MultiLevelCacheConfig>;
 
-  // 互斥锁: 防止缓存击穿（并发回源）
+  // 互斥锁：同一时刻只允许一个请求回源，防止缓存击穿
   private readonly locks = new Map<string, Promise<any>>();
 
   // 缓存统计
@@ -238,6 +238,7 @@ export class CacheService implements OnModuleDestroy {
     totalLoads: 0,
   };
 
+  /** 构造时初始化 L1 缓存与配置（未提供的项使用默认值） */
   constructor(
     private readonly redisService: RedisService,
     @Optional()
@@ -263,6 +264,7 @@ export class CacheService implements OnModuleDestroy {
     );
   }
 
+  /** 模块销毁：清空 L1 内存缓存并停止清理定时器 */
   onModuleDestroy() {
     this.l1.destroy();
   }
@@ -565,6 +567,7 @@ export class CacheService implements OnModuleDestroy {
   // 缓存统计
   // ============================================================
 
+  /** 获取缓存统计：含各级命中率 */
   getStats(): CacheStats & {
     l1Size: number;
     l1MaxEntries: number;
@@ -590,6 +593,7 @@ export class CacheService implements OnModuleDestroy {
   /**
    * 重置统计信息
    */
+  /** 重置缓存统计 */
   resetStats(): void {
     this.stats.l1Hits = 0;
     this.stats.l1Misses = 0;
@@ -605,6 +609,7 @@ export class CacheService implements OnModuleDestroy {
   // 健康检查
   // ============================================================
 
+  /** 健康检查：L1/L2 状态汇总 */
   async healthCheck(): Promise<{
     status: 'healthy' | 'degraded' | 'unhealthy';
     l1: { enabled: boolean; size: number; maxEntries: number };
@@ -650,6 +655,7 @@ export class CacheService implements OnModuleDestroy {
   // 内部方法
   // ============================================================
 
+  /** 回源加载：写 L2 + L1（空值用短 TTL 防穿透），回源失败不缓存 */
   private async loadFromSource<T>(
     fullKey: string,
     factory: () => Promise<T>,
@@ -699,6 +705,7 @@ export class CacheService implements OnModuleDestroy {
    * 构建完整缓存键
    * 格式: {keyPrefix}:{key}
    */
+  /** 构建完整缓存键：{keyPrefix}:{key} */
   private buildKey(key: string): string {
     return `${this.config.keyPrefix}:${key}`;
   }
@@ -709,6 +716,7 @@ export class CacheService implements OnModuleDestroy {
    * @param ttlMs 原始 TTL（毫秒）
    * @returns 抖动后的 TTL（毫秒）
    */
+  /** TTL 抖动：给过期时间加随机偏移，防止缓存雪崩 */
   private applyJitter(ttlMs: number): number {
     const jitterRange = ttlMs * this.config.ttlJitter;
     const jitter = (Math.random() - 0.5) * 2 * jitterRange; // ±jitter%
@@ -718,6 +726,7 @@ export class CacheService implements OnModuleDestroy {
   /**
    * TTL 抖动（秒为单位）
    */
+  /** TTL 抖动（秒为单位） */
   private applyJitterSeconds(ttlSeconds: number): number {
     return Math.round(this.applyJitter(ttlSeconds * 1000) / 1000);
   }

@@ -1,3 +1,11 @@
+/**
+ * 模板市场页面：浏览、筛选、导入与管理工作流模板。
+ *
+ * 主要能力：
+ * - 关键词/分类筛选 + 分类标签页（含各分类数量）；
+ * - 查看模板详情、一键导入到指定应用（生成副本工作流）；
+ * - 从已有工作流创建模板并发布，或下架/删除自己创建的模板。
+ */
 import { useState, useEffect, useCallback } from 'react'
 import {
   Input, Select, Tag, Card, Button, Modal, Form, Empty, Spin, Row, Col,
@@ -27,6 +35,7 @@ import {
   WorkflowTemplate,
 } from '../types'
 
+/** 创建模板弹窗的表单值 */
 interface CreateTemplateValues {
   applicationId: string
   sourceWorkflowId: string
@@ -36,7 +45,9 @@ interface CreateTemplateValues {
   tags?: string[]
 }
 
+/** 分类值 → 分类元信息（用于展示名称） */
 const categoryMap = Object.fromEntries(TEMPLATE_CATEGORY_OPTIONS.map(c => [c.value, c]))
+/** 分类 → 图标 */
 const categoryIconMap = {
   productivity: <RocketOutlined aria-hidden="true" />,
   'customer-service': <MessageOutlined aria-hidden="true" />,
@@ -47,10 +58,12 @@ const categoryIconMap = {
   other: <AppstoreOutlined aria-hidden="true" />,
 }
 
+/** 取某分类的图标（缺省用通用图标） */
 const getCategoryIcon = (category?: TemplateCategory) => (
   category ? categoryIconMap[category] : <AppstoreOutlined aria-hidden="true" />
 )
 
+/** 模板市场页面组件 */
 const TemplateMarket: React.FC = () => {
   const {
     templates,
@@ -75,17 +88,17 @@ const TemplateMarket: React.FC = () => {
   const [category, setCategory] = useState<TemplateCategory | undefined>(undefined)
   const [page, setPage] = useState(1)
 
-  // 导入模态
+  // ===== 导入模态状态 =====
   const [importModalVisible, setImportModalVisible] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate | null>(null)
   const [importAppId, setImportAppId] = useState('')
   const [importLoadingTemplateId, setImportLoadingTemplateId] = useState<string | null>(null)
 
-  // 详情模态
+  // ===== 详情模态状态 =====
   const [detailModalVisible, setDetailModalVisible] = useState(false)
   const [detailTemplate, setDetailTemplate] = useState<WorkflowTemplate | null>(null)
 
-  // 从现有工作流创建模板
+  // ===== 从现有工作流创建模板的状态 =====
   const [createModalVisible, setCreateModalVisible] = useState(false)
   const [createSubmitting, setCreateSubmitting] = useState(false)
   const [sourceWorkflowsLoading, setSourceWorkflowsLoading] = useState(false)
@@ -93,32 +106,39 @@ const TemplateMarket: React.FC = () => {
   const [createForm] = Form.useForm<CreateTemplateValues>()
   const sourceApplicationId = Form.useWatch('applicationId', createForm)
 
+  // 进入页面加载应用列表（用于导入/创建弹窗）
   useEffect(() => {
     fetchApps()
   }, [fetchApps])
 
+  /** 按当前筛选条件加载模板列表 */
   const loadTemplates = useCallback(() => {
     fetchTemplates({ keyword: keyword || undefined, category, page, pageSize: 12 })
   }, [keyword, category, page, fetchTemplates])
 
+  // 筛选条件变化时重新加载
   useEffect(() => {
     loadTemplates()
   }, [loadTemplates])
 
+  // 加载分类统计
   useEffect(() => {
     fetchTemplateCategories()
   }, [fetchTemplateCategories])
 
+  /** 搜索：重置页码并搜索 */
   const handleSearch = (value: string) => {
     setKeyword(value)
     setPage(1)
   }
 
+  /** 切换分类：重置页码 */
   const handleCategoryChange = (value: TemplateCategory | undefined) => {
     setCategory(value)
     setPage(1)
   }
 
+  /** 查看模板详情 */
   const handleViewDetail = async (template: WorkflowTemplate) => {
     try {
       const detail = await fetchTemplateById(template.id)
@@ -129,6 +149,7 @@ const TemplateMarket: React.FC = () => {
     }
   }
 
+  /** 点击导入：优先用列表自带结构，缺失时拉取详情 */
   const handleImportClick = async (template: WorkflowTemplate) => {
     if (importLoadingTemplateId) return
 
@@ -156,6 +177,7 @@ const TemplateMarket: React.FC = () => {
     }
   }
 
+  /** 确认导入：在目标应用中创建副本工作流 */
   const handleImportConfirm = async () => {
     if (!selectedTemplate || !importAppId) {
       message.error('请选择目标应用')
@@ -174,6 +196,7 @@ const TemplateMarket: React.FC = () => {
     }
   }
 
+  /** 发布模板 */
   const handlePublish = async (id: string) => {
     try {
       await publishTemplate(id)
@@ -184,6 +207,7 @@ const TemplateMarket: React.FC = () => {
     }
   }
 
+  /** 下架模板 */
   const handleArchive = async (id: string) => {
     try {
       await archiveTemplate(id)
@@ -194,6 +218,7 @@ const TemplateMarket: React.FC = () => {
     }
   }
 
+  /** 删除模板：弹窗二次确认 */
   const handleDelete = async (id: string) => {
     Modal.confirm({
       title: '确认删除',
@@ -213,12 +238,14 @@ const TemplateMarket: React.FC = () => {
     })
   }
 
+  /** 打开创建模板弹窗 */
   const openCreateModal = () => {
     createForm.resetFields()
     setSourceWorkflows([])
     setCreateModalVisible(true)
   }
 
+  /** 切换来源应用：拉取该应用下的工作流列表 */
   const handleSourceAppChange = async (applicationId: string) => {
     createForm.setFieldValue('sourceWorkflowId', undefined)
     setSourceWorkflows([])
@@ -232,6 +259,7 @@ const TemplateMarket: React.FC = () => {
     }
   }
 
+  /** 选择来源工作流：若用户未填名称则自动带出工作流名 */
   const handleSourceWorkflowChange = (sourceWorkflowId: string) => {
     const workflow = sourceWorkflows.find((item) => item.id === sourceWorkflowId)
     if (!createForm.getFieldValue('name') && workflow) {
@@ -239,6 +267,7 @@ const TemplateMarket: React.FC = () => {
     }
   }
 
+  /** 创建模板并发布 */
   const handleCreateTemplate = async (values: CreateTemplateValues) => {
     setCreateSubmitting(true)
     try {
@@ -263,6 +292,7 @@ const TemplateMarket: React.FC = () => {
     }
   }
 
+  /** 模板卡片的下拉菜单：按状态显示发布/下架/删除 */
   const getCardMenu = (template: WorkflowTemplate) => ({
     items: [
       ...(template.status === 'draft'

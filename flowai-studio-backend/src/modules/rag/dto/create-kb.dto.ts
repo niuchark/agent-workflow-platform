@@ -1,3 +1,6 @@
+/**
+ * 创建知识库 DTO：定义知识库配置的请求体字段与校验规则。
+ */
 import { IsString, IsOptional, IsNumber, IsIn, IsBoolean, Min, Max } from 'class-validator';
 
 /**

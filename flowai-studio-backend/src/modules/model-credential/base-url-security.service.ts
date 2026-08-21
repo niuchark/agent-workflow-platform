@@ -1,8 +1,17 @@
+/**
+ * Base URL 安全校验服务：防止 SSRF 与私网访问。
+ *
+ * 校验规则：
+ * - 仅允许 HTTP/HTTPS，且 URL 不能带认证信息/查询参数/片段；
+ * - 公网必须 HTTPS，除非该 origin 已加入管理员私网白名单；
+ * - 解析 DNS 后拒绝云元数据、链路本地与私网地址（白名单除外）。
+ */
 import { Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { lookup } from 'dns/promises';
 import { isIP } from 'net';
 
+/** Base URL 安全校验服务 */
 @Injectable()
 export class BaseUrlSecurityService {
   private readonly privateAllowlist: Set<string>;
@@ -16,6 +25,7 @@ export class BaseUrlSecurityService {
     );
   }
 
+  /** 校验并规范化 Base URL：非法地址直接拒绝 */
   async assertAllowed(rawUrl: string): Promise<string> {
     let url: URL;
     try {
@@ -53,6 +63,7 @@ export class BaseUrlSecurityService {
     return `${url!.origin}${pathname === '/' ? '' : pathname}`;
   }
 
+  /** 解析主机名到 IP 列表（直接传 IP 时原样返回） */
   private async resolve(hostname: string): Promise<string[]> {
     const normalizedHostname = hostname.startsWith('[') && hostname.endsWith(']')
       ? hostname.slice(1, -1)
@@ -67,6 +78,7 @@ export class BaseUrlSecurityService {
     }
   }
 
+  /** 判断是否为私网/环回/保留地址 */
   private isPrivate(address: string): boolean {
     if (isIP(address) === 4) {
       const [a, b, c] = address.split('.').map(Number);

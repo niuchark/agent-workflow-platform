@@ -1,3 +1,11 @@
+/**
+ * 调试中心页面：验证 AI 对话、工作流执行与知识库检索效果。
+ *
+ * 两个标签页：
+ * - AI 对话：通过 SSE 流式调用 /api/ai/chat，可关联知识库并展示引用文档；
+ * - 工作流执行：选择应用/工作流，填入 JSON 输入后流式运行，
+ *   实时展示每个节点的状态、耗时、输出与整体进度。
+ */
 import { useState, useRef, useEffect } from 'react'
 import { Typography, Input, Button, Select, Divider, message, Empty, Progress, AutoComplete, Alert } from 'antd'
 import {
@@ -25,6 +33,7 @@ import { UserModelProvider } from '../utils/modelCredentialApi'
 const { Text, Paragraph } = Typography
 const { Option } = Select
 
+/** 一条聊天消息（含可选的检索引用文档） */
 interface ChatMessage {
   id: string
   role: 'user' | 'assistant' | 'system'
@@ -38,6 +47,7 @@ interface ChatMessage {
   }[]
 }
 
+/** 工作流中单个节点的执行状态（用于卡片展示） */
 interface NodeExecState {
   nodeId: string
   status: 'running' | 'success' | 'failed' | 'skipped' | 'timeout' | 'retrying'
@@ -47,12 +57,14 @@ interface NodeExecState {
   attempt?: number
 }
 
+/** 调试中心页面组件 */
 const Debug: React.FC = () => {
   const navigate = useNavigate()
   const { availableProviders, modelsByProvider, loading: modelCatalogLoading } = useModelCatalog()
   const { isLoading, setIsLoading, apps, fetchApps, knowledgeBases, fetchKnowledgeBases } = useStore()
   const [input, setInput] = useState('')
-  const isComposingRef = useRef(false) // 标记是否在输入法组合状态
+  // 标记是否处于输入法组合状态（回车选字时不触发发送）
+  const isComposingRef = useRef(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [activeTab, setActiveTab] = useState<'chat' | 'workflow'>('chat')
   const [selectedAppId, setSelectedAppId] = useState<string>('')
@@ -72,11 +84,13 @@ const Debug: React.FC = () => {
   const [streamingContent, setStreamingContent] = useState('')
   const chatEndRef = useRef<HTMLDivElement>(null)
 
+  // 进入页面加载应用与知识库列表
   useEffect(() => {
     fetchApps()
     fetchKnowledgeBases()
   }, [fetchApps, fetchKnowledgeBases])
 
+  // 只有一个可用供应商时自动选中
   useEffect(() => {
     if (!selectedProvider && availableProviders.length === 1) {
       const provider = availableProviders[0]
@@ -85,12 +99,14 @@ const Debug: React.FC = () => {
     }
   }, [availableProviders, modelsByProvider, selectedProvider])
 
+  // 新消息/流式内容变化时滚动到底部
   useEffect(() => {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' })
     }
   }, [messages, streamingContent])
 
+  /** 切换应用：拉取其工作流列表并清空上次的输入 */
   const handleAppChange = async (appId: string) => {
     setSelectedAppId(appId)
     setSelectedWorkflowId('')
@@ -107,7 +123,7 @@ const Debug: React.FC = () => {
     }
   }
 
-  // 选择工作流时，获取详情并自动预填充 UserInput 节点所需的输入参数
+  /** 选择工作流：获取详情并自动预填充 UserInput 节点所需的输入参数 */
   const handleWorkflowChange = async (workflowId: string) => {
     setSelectedWorkflowId(workflowId)
     if (!workflowId) {
@@ -119,7 +135,7 @@ const Debug: React.FC = () => {
       const response = await request.get(`/workflows/${workflowId}`) as any
       const wfData = response.data || response
       const nodes: any[] = Array.isArray(wfData.nodes) ? wfData.nodes : []
-      // 找出所有 UserInput 节点，提取 inputField 作为预填充的 key
+      // 找出所有 UserInput 节点，提取 inputField 作为必填字段
       const fields: string[] = []
       const inputTemplate: Record<string, string> = {}
       for (const node of nodes) {
@@ -143,6 +159,7 @@ const Debug: React.FC = () => {
     }
   }
 
+  /** 发送对话消息：通过 SSE 流式接收回复 */
   const handleSendMessage = async () => {
     const trimmed = input.trim()
     if (!trimmed || isStreaming) return
@@ -188,6 +205,7 @@ const Debug: React.FC = () => {
       let accumulatedContent = ''
       let references: any[] = []
 
+      // 解析 SSE：text 累积内容、done 落库、error 提示
       const parser = createParser((event) => {
         if (event.type === 'event') {
           try {
@@ -248,6 +266,7 @@ const Debug: React.FC = () => {
     }
   }
 
+  /** 运行工作流：流式接收节点状态与最终结果 */
   const handleRunWorkflow = async () => {
     if (!selectedWorkflowId) {
       message.error('请选择工作流')
@@ -293,6 +312,7 @@ const Debug: React.FC = () => {
       const reader = response.body?.getReader()
       if (!reader) throw new Error('No response body')
 
+      // 解析 SSE：节点状态/进度/心跳/完成/错误
       const parser = createParser((event) => {
         if (event.type === 'event') {
           try {
@@ -340,7 +360,7 @@ const Debug: React.FC = () => {
         parser.feed(decoder.decode(value))
       }
 
-      // If status wasn't set by events, mark as success
+      // 流正常结束但未收到 done 事件时，兜底标记为成功
       setWfStatus(prev => prev === 'running' ? 'success' : prev)
     } catch {
       message.error('工作流执行失败')
@@ -350,12 +370,14 @@ const Debug: React.FC = () => {
     }
   }
 
+  /** 清空工作流执行结果 */
   const handleClearWorkflow = () => {
     setWorkflowResult(null)
     setNodeStates({})
     setWfStatus('idle')
   }
 
+  /** 节点状态 → 图标 */
   const nodeStatusIcon = (status: string) => {
     switch (status) {
       case 'running':
@@ -375,6 +397,7 @@ const Debug: React.FC = () => {
     }
   }
 
+  /** 节点状态 → 中文标签 */
   const nodeStatusLabel = (status: string) => {
     switch (status) {
       case 'running': return '执行中'

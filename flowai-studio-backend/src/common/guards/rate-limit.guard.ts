@@ -83,6 +83,7 @@ export class RateLimiterService {
    * 并发执行控制
    * 使用 Redis INCR/DECR 保证分布式一致性
    */
+  /** 并发执行控制：用 Redis INCR/DECR 保证分布式计数一致 */
   async acquireConcurrent(key: string, maxConcurrent: number): Promise<{ allowed: boolean; current: number }> {
     if (maxConcurrent <= 0) return { allowed: true, current: 0 };
 
@@ -111,6 +112,7 @@ export class RateLimiterService {
   /**
    * 释放并发配额
    */
+  /** 释放并发配额 */
   async releaseConcurrent(key: string): Promise<void> {
     try {
       const client = this.redisService.getClient();
@@ -159,6 +161,7 @@ export class CircuitBreakerService {
    * 获取熔断器状态
    * Redis Key: circuit:{name}:state / circuit:{name}:failures / circuit:{name}:openedAt
    */
+  /** 获取熔断器状态：open 超时后自动转为 half_open */
   async getState(name: string): Promise<CircuitState> {
     const client = this.redisService.getClient();
     const stateKey = `circuit:${name}:state`;
@@ -187,6 +190,7 @@ export class CircuitBreakerService {
   /**
    * 检查请求是否被允许通过
    */
+  /** 检查请求是否被允许通过（closed 放行 / open 拒绝 / half_open 限量放行） */
   async isAllowed(name: string): Promise<boolean> {
     const state = await this.getState(name);
 
@@ -218,6 +222,7 @@ export class CircuitBreakerService {
   /**
    * 记录成功
    */
+  /** 记录成功：半开状态成功则关闭熔断器 */
   async recordSuccess(name: string): Promise<void> {
     const client = this.redisService.getClient();
     const state = await this.getState(name);
@@ -235,6 +240,7 @@ export class CircuitBreakerService {
   /**
    * 记录失败
    */
+  /** 记录失败：达到阈值打开熔断器；半开状态失败立即重新打开 */
   async recordFailure(name: string): Promise<void> {
     const client = this.redisService.getClient();
     const config = await this.getConfig(name);
@@ -267,6 +273,7 @@ export class CircuitBreakerService {
   /**
    * 获取熔断器统计信息
    */
+  /** 获取熔断器统计信息 */
   async getStats(name: string): Promise<{
     state: CircuitState;
     failures: number;
@@ -287,6 +294,7 @@ export class CircuitBreakerService {
   /**
    * 重置熔断器
    */
+  /** 重置熔断器：清空全部状态键 */
   async reset(name: string): Promise<void> {
     const client = this.redisService.getClient();
     await client.del(`circuit:${name}:state`);
@@ -296,6 +304,7 @@ export class CircuitBreakerService {
     this.logger.log(`Circuit [${name}] manually reset`);
   }
 
+  /** 打开熔断器：写入 open 状态与开启时间（带 TTL 自动恢复） */
   private async openCircuit(name: string): Promise<void> {
     const client = this.redisService.getClient();
     const config = await this.getConfig(name);
@@ -303,6 +312,7 @@ export class CircuitBreakerService {
     await client.set(`circuit:${name}:openedAt`, Date.now().toString(), 'EX', config.openDuration);
   }
 
+  /** 读取熔断器配置（当前使用默认配置，可扩展为配置中心） */
   private async getConfig(name: string): Promise<CircuitBreakerConfig> {
     // 可扩展: 从数据库/配置中心读取每个熔断器的配置
     return DEFAULT_CIRCUIT_CONFIG;
@@ -322,8 +332,9 @@ export class RateLimitMiddleware implements NestMiddleware {
     private readonly circuitBreakerService: CircuitBreakerService,
   ) {}
 
+  /** 限流中间件：按全局限流 → 用户限流 → 分场景限流逐级检查 */
   async use(req: Request, res: Response, next: NextFunction) {
-    // 从 JWT 中获取用户 ID（如果有）
+    // 从 JWT 中获取用户 ID（未登录按匿名处理）
     const userId = (req as any).user?.userId || 'anonymous';
     const path = req.path;
 

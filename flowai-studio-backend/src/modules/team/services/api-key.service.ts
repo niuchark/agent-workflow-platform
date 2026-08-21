@@ -1,3 +1,6 @@
+/**
+ * API Key 服务：生成、校验与管理外部访问密钥。
+ */
 import {
   Injectable,
   NotFoundException,

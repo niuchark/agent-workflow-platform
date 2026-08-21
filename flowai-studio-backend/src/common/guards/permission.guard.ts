@@ -1,3 +1,6 @@
+/**
+ * RBAC 权限守卫：按全局角色 / 资源所有者 / 团队成员权限逐级校验。
+ */
 import {
   Injectable,
   CanActivate,
@@ -26,6 +29,7 @@ export class PermissionGuard implements CanActivate {
     private prisma: PrismaService,
   ) {}
 
+  /** 权限校验：管理员/所有者/团队角色/团队应用权限，逐级放行 */
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const requiredPermissions = this.reflector.get<Permission[]>(
       PERMISSIONS_KEY,
@@ -44,7 +48,7 @@ export class PermissionGuard implements CanActivate {
       throw new ForbiddenException('无法识别用户身份');
     }
 
-    // 1. 检查全局角色
+    // 1. 检查全局角色（管理员直接放行）
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { globalRole: true },
@@ -126,6 +130,7 @@ export class PermissionGuard implements CanActivate {
   /**
    * 检查团队应用权限级别是否覆盖指定操作
    */
+  /** 检查团队应用权限级别是否覆盖指定操作 */
   private checkTeamAppPermission(
     teamAppPerm: string,
     permission: Permission,

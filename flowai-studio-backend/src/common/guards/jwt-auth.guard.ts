@@ -1,3 +1,9 @@
+/**
+ * JWT 认证守卫：校验 Authorization 头中的 Bearer token。
+ *
+ * 验证通过后把用户负载写入 request.user，
+ * 供 @CurrentUser 装饰器与 PermissionGuard 使用。
+ */
 import {
   Injectable,
   CanActivate,
@@ -12,10 +18,12 @@ interface JwtPayload {
   email: string;
 }
 
+/** JWT 认证守卫：负责登录态校验 */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(private jwtService: JwtService) {}
 
+  /** 校验 token：无效或过期直接抛 401 */
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
     const token = this.extractTokenFromHeader(request);
@@ -34,6 +42,7 @@ export class JwtAuthGuard implements CanActivate {
     return true;
   }
 
+  /** 从 Authorization 头提取 Bearer token */
   private extractTokenFromHeader(request: Request): string | undefined {
     const [type, token] = request.headers.authorization?.split(' ') ?? [];
     return type === 'Bearer' ? token : undefined;

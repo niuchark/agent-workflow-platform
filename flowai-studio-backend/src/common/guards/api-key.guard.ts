@@ -1,3 +1,6 @@
+/**
+ * API Key 认证守卫：校验 Authorization 头中的 sk- 格式密钥。
+ */
 import {
   Injectable,
   CanActivate,

@@ -1,3 +1,6 @@
+/**
+ * 团队服务：团队、成员与团队应用授权的业务逻辑。
+ */
 import {
   Injectable,
   NotFoundException,
@@ -8,14 +11,14 @@ import {
 import { PrismaService } from '../../../common/services/prisma.service';
 import { CreateTeamDto, UpdateTeamDto, AddMemberDto, UpdateMemberRoleDto, AddTeamAppDto, UpdateTeamAppPermissionDto } from '../dto/team.dto';
 
+/** 团队服务 */
 @Injectable()
 export class TeamService {
   constructor(private prisma: PrismaService) {}
 
-  // ============================================================
-  // 团队 CRUD
-  // ============================================================
+  // ============ 团队 CRUD ============
 
+  /** 创建团队：创建者自动成为 owner 成员 */
   async create(userId: string, dto: CreateTeamDto) {
     const team = await this.prisma.team.create({
       data: {
@@ -38,6 +41,7 @@ export class TeamService {
     return this.serializeTeam(team);
   }
 
+  /** 获取当前用户加入的团队列表（含我的角色与成员/应用数量） */
   async listMyTeams(userId: string) {
     const teams = await this.prisma.team.findMany({
       where: {
@@ -66,6 +70,7 @@ export class TeamService {
     }));
   }
 
+  /** 获取团队详情（仅成员可见） */
   async getTeam(userId: string, teamId: string) {
     const team = await this.prisma.team.findUnique({
       where: { id: teamId },
@@ -117,6 +122,7 @@ export class TeamService {
     };
   }
 
+  /** 更新团队信息 */
   async update(userId: string, teamId: string, dto: UpdateTeamDto) {
     const team = await this.assertTeamAdmin(userId, teamId);
 

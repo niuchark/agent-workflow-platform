@@ -1,3 +1,9 @@
+/**
+ * 追踪详情页：展示一次工作流运行的完整调用链。
+ *
+ * 包含基本信息（状态/耗时/输入输出）、按 span 绘制的时间线瀑布图、
+ * 以及 Span 明细表（可展开查看事件、属性与父子关系）。
+ */
 import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Spin, Tag, Card, Descriptions, Table, Button, message, Empty } from 'antd'
@@ -8,6 +14,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { getTraceDetail, TraceDetail as TraceDetailType, SpanRecord } from '../utils/traceApi'
 
+/** 状态 → 标签颜色、图标与文案（覆盖 trace 与 span 两级） */
 const STATUS_MAP: Record<string, { color: string; icon: React.ReactNode; label: string }> = {
   running: { color: 'processing', icon: <ClockCircleOutlined />, label: '运行中' },
   success: { color: 'success', icon: <CheckCircleOutlined />, label: '成功' },
@@ -18,6 +25,7 @@ const STATUS_MAP: Record<string, { color: string; icon: React.ReactNode; label: 
   timeout: { color: 'warning', icon: <ClockCircleOutlined />, label: 'Timeout' },
 }
 
+/** 耗时格式化：ms/s/min 自适应 */
 const formatDuration = (ms: number | null | undefined): string => {
   if (ms == null) return '-'
   if (ms < 1000) return `${ms}ms`
@@ -25,6 +33,7 @@ const formatDuration = (ms: number | null | undefined): string => {
   return `${(ms / 60000).toFixed(1)}min`
 }
 
+/** 时间格式化：ISO → 本地时间字符串 */
 const formatTime = (iso: string | null | undefined): string => {
   if (!iso) return '-'
   return new Date(iso).toLocaleString('zh-CN')
@@ -39,6 +48,7 @@ interface WaterfallRow {
   barLeftPercent: number
 }
 
+/** 追踪详情页组件 */
 const TraceDetailPage: React.FC = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -47,6 +57,7 @@ const TraceDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [trace, setTrace] = useState<TraceDetailType | null>(null)
 
+  /** 按 URL 中的 traceId 加载追踪详情 */
   const loadData = async () => {
     if (!traceId) return
     setLoading(true)
@@ -61,6 +72,7 @@ const TraceDetailPage: React.FC = () => {
     }
   }
 
+  // traceId 变化时重新加载
   useEffect(() => {
     loadData()
   }, [traceId])
@@ -73,7 +85,7 @@ const TraceDetailPage: React.FC = () => {
     const traceEnd = trace.completedAt
       ? new Date(trace.completedAt).getTime()
       : Math.max(...trace.spans.map((s) => new Date(s.endTime || s.startTime).getTime()))
-    const totalDuration = traceEnd - traceStart || 1 // avoid division by zero
+    const totalDuration = traceEnd - traceStart || 1 // 防止除零
 
     return trace.spans.map((span) => {
       const spanStart = new Date(span.startTime).getTime()
@@ -86,7 +98,7 @@ const TraceDetailPage: React.FC = () => {
         offsetMs,
         durationMs,
         barLeftPercent: Math.max(0, (offsetMs / totalDuration) * 100),
-        barWidthPercent: Math.max(0.5, (durationMs / totalDuration) * 100), // min 0.5% for visibility
+        barWidthPercent: Math.max(0.5, (durationMs / totalDuration) * 100), // 最小 0.5% 保证可见
       }
     })
   }, [trace])

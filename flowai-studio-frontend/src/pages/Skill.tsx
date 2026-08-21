@@ -1,3 +1,11 @@
+/**
+ * 工具管理页面：维护内置/自定义工具（Skill）并支持试运行。
+ *
+ * - 工具 CRUD：内置工具选类型即可，自定义工具需配置 API 地址、
+ *   HTTP 方法与请求头；
+ * - 卡片展示启用/禁用状态，点击卡片或菜单可打开执行弹窗，
+ *   输入 JSON 参数后调用后端执行并查看结果。
+ */
 import { useState, useEffect } from 'react'
 import { Button, Input, message, Modal, Select, Switch, Form, Empty, Dropdown, Spin } from 'antd'
 import {
@@ -16,6 +24,7 @@ import { useStore } from '../store'
 
 const { TextArea } = Input
 
+/** 工具管理页面组件 */
 const Skill: React.FC = () => {
   const {
     skills,
@@ -46,6 +55,7 @@ const Skill: React.FC = () => {
   const [builtinSkills, setBuiltinSkills] = useState<any[]>([])
   const [executionResult, setExecutionResult] = useState<any>(null)
 
+  // 进入页面加载工具列表与内置工具类型
   useEffect(() => {
     fetchSkills()
     fetchBuiltinSkills()
@@ -53,6 +63,7 @@ const Skill: React.FC = () => {
 
   const safeSkills = Array.isArray(skills) ? skills : []
 
+  /** 拉取内置工具类型列表 */
   const fetchBuiltinSkills = async () => {
     try {
       const data = await getBuiltinSkills()
@@ -62,12 +73,14 @@ const Skill: React.FC = () => {
     }
   }
 
+  /** 打开新建弹窗：重置表单 */
   const handleAddSkill = () => {
     setEditingSkill(null)
     setFormData({ name: '', description: '', type: 'builtin', builtinType: '', isActive: true, config: { url: '', method: 'POST', headers: '' } })
     setModalVisible(true)
   }
 
+  /** 打开编辑弹窗：回填工具配置（config 兼容字符串/对象） */
   const handleEditSkill = (skill: any) => {
     setEditingSkill(skill)
     let config = { url: '', method: 'POST', headers: '' }
@@ -92,6 +105,7 @@ const Skill: React.FC = () => {
     setModalVisible(true)
   }
 
+  /** 保存工具：按类型组装 payload（自定义工具需解析请求头 JSON） */
   const handleSaveSkill = async () => {
     if (!formData.name) {
       message.error('请输入工具名称')
@@ -106,7 +120,7 @@ const Skill: React.FC = () => {
       return
     }
     try {
-      // Build the payload
+      // 组装请求参数：内置/自定义工具的配置字段不同
       const payload: any = {
         name: formData.name,
         description: formData.description,
@@ -138,6 +152,7 @@ const Skill: React.FC = () => {
     }
   }
 
+  /** 删除工具 */
   const handleDeleteSkill = async (id: string) => {
     try {
       await deleteSkill(id)
@@ -147,6 +162,7 @@ const Skill: React.FC = () => {
     }
   }
 
+  /** 打开执行弹窗：重置参数与结果 */
   const handleExecuteSkill = (skill: any) => {
     setSelectedSkill(skill)
     setExecutionParams({})
@@ -156,9 +172,10 @@ const Skill: React.FC = () => {
     setExecutionModalVisible(true)
   }
 
+  /** 执行工具：重新解析 JSON 参数，成功后展示结果 */
   const handleRunExecution = async () => {
     if (!selectedSkill) return
-    // Re-parse from text to catch any errors
+    // 从文本框重新解析参数，捕获输入错误
     let parsedParams = executionParams
     try {
       parsedParams = JSON.parse(executionParamsText)
@@ -176,6 +193,7 @@ const Skill: React.FC = () => {
     }
   }
 
+  /** 工具卡片下拉菜单：编辑/执行/删除 */
   const getCardMenu = (skill: any) => ({
     items: [
       { key: 'edit', label: '编辑', icon: <EditOutlined />, onClick: (e: any) => { e.domEvent?.stopPropagation(); handleEditSkill(skill) } },

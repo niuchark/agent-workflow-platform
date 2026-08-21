@@ -1,3 +1,6 @@
+/**
+ * Commitlint 配置：限定提交信息的类型与格式。
+ */
 const allowedTypes = [
   'feat',
   'fix',

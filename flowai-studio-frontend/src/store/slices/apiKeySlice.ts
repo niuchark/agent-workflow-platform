@@ -1,7 +1,14 @@
+/**
+ * API Key 状态切片：管理应用 API Key 的列表、创建、删除与启停。
+ *
+ * 注意：创建成功时服务端只返回一次完整 key，因此 createdKey
+ * 只保存本次创建结果，列表页需在创建后提示用户立即保存。
+ */
 import { StateCreator } from 'zustand'
 import { ApiKey, CreateApiKeyForm, ApiKeyCreatedResponse } from '../../types'
 import * as teamApi from '../../utils/teamApi'
 
+/** API Key 切片对外暴露的状态与 Actions 类型 */
 export interface ApiKeySlice {
   apiKeys: ApiKey[]
   createdKey: ApiKeyCreatedResponse | null
@@ -15,6 +22,7 @@ export interface ApiKeySlice {
   toggleApiKey: (keyId: string, isActive: boolean) => Promise<ApiKey>
 }
 
+/** 创建 API Key 切片：封装列表加载、创建、删除与启停操作 */
 export const createApiKeySlice: StateCreator<ApiKeySlice> = (set, get) => ({
   apiKeys: [],
   createdKey: null,
@@ -23,6 +31,7 @@ export const createApiKeySlice: StateCreator<ApiKeySlice> = (set, get) => ({
   setApiKeys: (apiKeys) => set({ apiKeys }),
   setCreatedKey: (createdKey) => set({ createdKey }),
 
+  /** 拉取 API Key 列表（可按应用过滤） */
   fetchApiKeys: async (applicationId) => {
     set({ isLoading: true })
     try {
@@ -36,6 +45,7 @@ export const createApiKeySlice: StateCreator<ApiKeySlice> = (set, get) => ({
     }
   },
 
+  /** 创建 API Key：保存本次返回的完整 key（仅此一次），供页面提示用户 */
   createApiKey: async (data) => {
     set({ isLoading: true })
     try {
@@ -51,6 +61,7 @@ export const createApiKeySlice: StateCreator<ApiKeySlice> = (set, get) => ({
     }
   },
 
+  /** 删除 API Key：成功后从本地列表中移除 */
   deleteApiKey: async (keyId) => {
     try {
       await teamApi.deleteApiKey(keyId)
@@ -60,6 +71,7 @@ export const createApiKeySlice: StateCreator<ApiKeySlice> = (set, get) => ({
     }
   },
 
+  /** 启用/停用 API Key：用服务端返回的最新状态更新列表 */
   toggleApiKey: async (keyId, isActive) => {
     try {
       const response = await teamApi.toggleApiKey(keyId, isActive) as any

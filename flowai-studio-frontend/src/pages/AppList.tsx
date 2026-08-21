@@ -1,3 +1,11 @@
+/**
+ * 应用列表页（工作台）：展示、创建、编辑、发布/归档/删除应用。
+ *
+ * 主要能力：
+ * - 应用卡片网格 + 搜索过滤，点击卡片进入编辑器；
+ * - 首次进入且没有任何应用时，自动创建示例应用与示例工作流；
+ * - 支持从 DSL（YAML/JSON）导入工作流：上传/粘贴 → 校验 → 导入到指定应用。
+ */
 import { useState, useEffect, useRef } from 'react'
 import { Button, Modal, Form, Input, Select, Upload, message, Empty, Dropdown, Spin, Alert } from 'antd'
 import {
@@ -24,6 +32,7 @@ import { importWorkflowDsl, validateWorkflowDsl } from '../utils/workflowDslApi'
 
 const { Search } = Input
 
+/** 应用列表页组件 */
 const AppList: React.FC = () => {
   const navigate = useNavigate()
   const {
@@ -39,7 +48,7 @@ const AppList: React.FC = () => {
   const [searchText, setSearchText] = useState('')
   const initDone = useRef(false)
 
-  // DSL 导入相关 state
+  // ===== DSL 导入相关 state =====
   const [importModalOpen, setImportModalOpen] = useState(false)
   const [importDslContent, setImportDslContent] = useState('')
   const [importFormat, setImportFormat] = useState<'yaml' | 'json'>('yaml')
@@ -53,6 +62,7 @@ const AppList: React.FC = () => {
   const [importValidating, setImportValidating] = useState(false)
   const [importing, setImporting] = useState(false)
 
+  // 初始化：加载应用列表；首次使用时创建示例应用
   useEffect(() => {
     if (initDone.current) return
     initDone.current = true
@@ -82,6 +92,7 @@ const AppList: React.FC = () => {
     initAppList()
   }, [])
 
+  // 按名称/描述过滤应用
   const filteredApps = Array.isArray(apps)
     ? apps.filter(
         (app) =>
@@ -97,6 +108,7 @@ const AppList: React.FC = () => {
     setIsModalOpen(true)
   }
 
+  /** 打开编辑弹窗：回填应用信息 */
   const handleEdit = (app: Application) => {
     form.setFieldsValue({ name: app.name, description: app.description, icon: app.icon })
     setIsEditing(true)
@@ -104,6 +116,7 @@ const AppList: React.FC = () => {
     setIsModalOpen(true)
   }
 
+  /** 提交新建/编辑表单 */
   const handleSubmit = async (values: { name: string; description?: string; icon?: string }) => {
     try {
       if (isEditing && currentApp) {
@@ -119,6 +132,7 @@ const AppList: React.FC = () => {
     }
   }
 
+  /** 删除应用：阻止事件冒泡（避免误触进入编辑器） */
   const handleDelete = async (id: string, e?: any) => {
     e?.domEvent?.stopPropagation?.()
     try {
@@ -129,12 +143,14 @@ const AppList: React.FC = () => {
     }
   }
 
+  /** 进入应用编辑器 */
   const handleEnterEditor = (appId: string) => {
     navigate(`/apps/${appId}/editor`)
   }
 
   // ===== DSL 导入处理 =====
 
+  /** 打开导入弹窗：重置所有导入状态 */
   const handleOpenImport = () => {
     setImportDslContent('')
     setImportFormat('yaml')
@@ -144,6 +160,7 @@ const AppList: React.FC = () => {
     setImportModalOpen(true)
   }
 
+  /** 读取上传的 DSL 文件：按扩展名推断格式 */
   const handleFileUpload = (file: File) => {
     const reader = new FileReader()
     reader.onload = (e) => {
@@ -160,6 +177,7 @@ const AppList: React.FC = () => {
     return false
   }
 
+  /** 校验 DSL 内容：调用后端校验接口 */
   const handleValidate = async () => {
     if (!importDslContent.trim()) {
       message.warning('请先上传或粘贴 DSL 内容')
@@ -176,6 +194,7 @@ const AppList: React.FC = () => {
     }
   }
 
+  /** 确认导入：把 DSL 导入到指定应用 */
   const handleImportConfirm = async () => {
     if (!importDslContent.trim()) {
       message.warning('请先上传或粘贴 DSL 内容')
@@ -205,6 +224,7 @@ const AppList: React.FC = () => {
 
   // ===== 原有功能 =====
 
+  /** 按应用状态生成可用的操作菜单项（发布/下线/归档/取消归档） */
   const getStatusAction = (app: Application) => {
     switch (app.status) {
       case 'draft':
@@ -289,6 +309,7 @@ const AppList: React.FC = () => {
     }
   }
 
+  /** 生成应用卡片的下拉菜单（编辑 + 状态操作 + 删除） */
   const getCardMenu = (app: Application) => ({
     items: [
       {
@@ -312,6 +333,7 @@ const AppList: React.FC = () => {
     ].filter(Boolean),
   })
 
+  /** 应用状态 → 徽标文案与样式类 */
   const statusMap: Record<string, { label: string; cls: string }> = {
     draft: { label: '草稿', cls: 'status-badge--draft' },
     published: { label: '已发布', cls: 'status-badge--published' },

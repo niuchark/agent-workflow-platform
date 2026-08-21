@@ -1,3 +1,6 @@
+/**
+ * 技能节点执行器：解析参数后调用技能服务执行。
+ */
 import { Injectable } from '@nestjs/common';
 import { INodeExecutor } from '../../types';
 import { SkillService } from '../../../skill/services/skill.service';
@@ -6,6 +9,7 @@ import { SkillService } from '../../../skill/services/skill.service';
 export class SkillNodeExecutor implements INodeExecutor {
   constructor(private readonly skillService: SkillService) {}
 
+  /** 解析参数模板 → 执行技能 → 返回 result */
   async execute(node: any, context: Record<string, any>): Promise<Record<string, any>> {
     const nodeData = node.data as any;
     const { skillId, parameters } = nodeData;
@@ -17,6 +21,7 @@ export class SkillNodeExecutor implements INodeExecutor {
     return { result };
   }
 
+  /** 逐字段解析参数：字符串值中的变量引用替换为实际值 */
   private resolveParameters(params: Record<string, any>, context: Record<string, any>): Record<string, any> {
     const resolvedParams: Record<string, any> = {};
     if (!params) return resolvedParams;
@@ -32,6 +37,7 @@ export class SkillNodeExecutor implements INodeExecutor {
     return resolvedParams;
   }
 
+  /** 把参数模板中的变量引用替换为上下文实际值 */
   private resolveVariables(template: string, context: Record<string, any>): string {
     return template.replace(/\{\{(.+?)\}\}/g, (match, p1) => {
       const keys = p1.trim().split('.');

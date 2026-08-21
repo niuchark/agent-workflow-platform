@@ -1,3 +1,6 @@
+/**
+ * 应用分享服务：分享链接、公开访问与嵌入代码。
+ */
 import {
   Injectable,
   NotFoundException,

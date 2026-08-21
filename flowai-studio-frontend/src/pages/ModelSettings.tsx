@@ -1,3 +1,9 @@
+/**
+ * 模型服务配置页面：管理各模型厂商（Qwen/OpenAI-compatible/Ollama）凭证。
+ *
+ * 支持保存并测试连通性、重新测试、启用/停用与删除配置；
+ * 测试通过后凭证自动启用，失败时后端保留配置并标记为不可用。
+ */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
@@ -32,6 +38,7 @@ import {
 
 const { Text, Paragraph } = Typography
 
+/** 支持的模型供应商元信息（展示名、默认 Base URL、是否需要 Key） */
 const PROVIDERS: Array<{
   provider: UserModelProvider
   title: string
@@ -70,12 +77,15 @@ const PROVIDERS: Array<{
   },
 ]
 
+/** 每个供应商表单的字段结构 */
 type FormState = Record<UserModelProvider, { baseUrl: string; apiKey: string }>
 
+/** 生成初始表单：Base URL 用各供应商默认值 */
 const initialForms = (): FormState => Object.fromEntries(
   PROVIDERS.map((item) => [item.provider, { baseUrl: item.defaultBaseUrl, apiKey: '' }]),
 ) as FormState
 
+/** 按凭证状态计算展示标签（未配置/已启用/测试失败/已停用/待测试） */
 const statusPresentation = (summary?: ModelCredentialSummary) => {
   if (!summary?.configured) return { color: 'default', text: '未配置' }
   if (summary.status === 'valid' && summary.isEnabled) return { color: 'success', text: '已启用' }
@@ -84,10 +94,12 @@ const statusPresentation = (summary?: ModelCredentialSummary) => {
   return { color: 'processing', text: '待测试' }
 }
 
+/** 提取错误消息：没有具体 message 时用兜底文案 */
 const getErrorMessage = (error: unknown, fallback: string) => (
   error instanceof Error && error.message ? error.message : fallback
 )
 
+/** 模型服务配置页面组件 */
 const ModelSettings: React.FC = () => {
   const [credentials, setCredentials] = useState<ModelCredentialSummary[]>([])
   const [forms, setForms] = useState<FormState>(initialForms)
@@ -95,11 +107,13 @@ const ModelSettings: React.FC = () => {
   const [busyProvider, setBusyProvider] = useState<UserModelProvider | null>(null)
   const initialized = useRef(false)
 
+  // provider → 凭证摘要 的映射，供卡片快速查询
   const credentialMap = useMemo(
     () => new Map(credentials.map((item) => [item.provider, item])),
     [credentials],
   )
 
+  /** 加载凭证列表：回填各供应商的 Base URL */
   const load = async () => {
     try {
       const list = await getModelCredentials()
@@ -118,16 +132,19 @@ const ModelSettings: React.FC = () => {
     }
   }
 
+  // 初始化：只加载一次
   useEffect(() => {
     if (initialized.current) return
     initialized.current = true
     void load()
   }, [])
 
+  /** 更新某个供应商表单的字段 */
   const patchForm = (provider: UserModelProvider, patch: Partial<FormState[UserModelProvider]>) => {
     setForms((current) => ({ ...current, [provider]: { ...current[provider], ...patch } }))
   }
 
+  /** 保存并测试：先保存凭证，再测试连通性；测试失败也保留配置 */
   const saveAndTest = async (provider: UserModelProvider) => {
     const value = forms[provider]
     setBusyProvider(provider)
@@ -141,7 +158,7 @@ const ModelSettings: React.FC = () => {
       message.success('保存并测试成功，模型服务已启用')
       await load()
     } catch (error: unknown) {
-      // 保存成功、测试失败时后端会保留配置并标记为不可用。
+      // 保存成功、测试失败时后端会保留配置并标记为不可用
       message.error(getErrorMessage(error, '连接测试失败'))
       await load()
     } finally {
@@ -149,6 +166,7 @@ const ModelSettings: React.FC = () => {
     }
   }
 
+  /** 重新测试已有凭证的连通性 */
   const retest = async (provider: UserModelProvider) => {
     setBusyProvider(provider)
     try {
@@ -163,6 +181,7 @@ const ModelSettings: React.FC = () => {
     }
   }
 
+  /** 停用模型服务 */
   const disable = async (provider: UserModelProvider) => {
     setBusyProvider(provider)
     try {
@@ -176,6 +195,7 @@ const ModelSettings: React.FC = () => {
     }
   }
 
+  /** 删除模型服务配置：重置表单并重新加载 */
   const remove = async (provider: UserModelProvider) => {
     setBusyProvider(provider)
     try {

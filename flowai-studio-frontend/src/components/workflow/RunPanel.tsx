@@ -1,3 +1,9 @@
+/**
+ * 调试运行面板：输入 JSON 参数并流式运行当前工作流。
+ *
+ * 运行过程通过 SSE 逐节点更新 executionStates，面板展示
+ * 每个节点的状态、输出与错误；支持停止（仅本地置状态）与清空结果。
+ */
 import { useState } from 'react'
 import { Button, Input, Empty } from 'antd'
 import {
@@ -14,6 +20,7 @@ import { useStore } from '../../store'
 
 const { TextArea } = Input
 
+/** 调试运行面板组件 */
 const RunPanel: React.FC = () => {
   const {
     currentWorkflow,
@@ -25,14 +32,17 @@ const RunPanel: React.FC = () => {
     clearExecutionStates,
   } = useStore()
 
+  // 默认示例输入，方便用户直接点击运行
   const [inputsText, setInputsText] = useState('{"question": "你好，请介绍一下自己"}')
   const [isRunning, setIsRunning] = useState(false)
 
+  /** 运行工作流：解析 JSON 输入后调用流式运行 */
   const handleRun = async () => {
     const workflowId = currentWorkflow?.id
     if (!workflowId) return
 
     let inputs: Record<string, any> = {}
+    // 输入解析失败时按空对象继续运行
     try {
       inputs = JSON.parse(inputsText)
     } catch {
@@ -49,16 +59,19 @@ const RunPanel: React.FC = () => {
     }
   }
 
+  /** 停止运行：仅把本地状态置为已停止 */
   const handleStop = () => {
     setIsRunning(false)
     setExecutionStatus('stopped')
   }
 
+  /** 清空所有节点执行结果与整体状态 */
   const handleClear = () => {
     clearExecutionStates()
     setExecutionStatus(null)
   }
 
+  /** 按状态映射对应的图标与颜色 */
   const statusIcon = (status: string) => {
     switch (status) {
       case 'running':

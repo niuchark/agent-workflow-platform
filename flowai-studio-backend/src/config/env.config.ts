@@ -1,5 +1,13 @@
+/**
+ * 环境变量配置：用 Zod 定义并校验所有必需的 env 变量。
+ *
+ * 应用启动时通过 ConfigModule.forRoot 调用本 schema 校验，
+ * 缺少必填项（如 JWT_SECRET、DATABASE_URL）会直接启动失败；
+ * 生产环境额外强制要求模型凭证加密密钥。
+ */
 import { z } from 'zod';
 
+/** 环境变量 schema：全部配置项及其默认值、校验规则 */
 export const envSchema = z.object({
   // 服务器配置
   PORT: z.string().default('3001'),
@@ -66,6 +74,7 @@ export const envSchema = z.object({
   MODEL_CREDENTIAL_ENCRYPTION_KEY: z.string().optional(),
   MODEL_PRIVATE_BASE_URL_ALLOWLIST: z.string().default(''),
 }).superRefine((config, ctx) => {
+  // 生产环境必须配置模型凭证加密密钥，否则拒绝启动
   if (config.NODE_ENV === 'production' && !config.MODEL_CREDENTIAL_ENCRYPTION_KEY) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -75,4 +84,5 @@ export const envSchema = z.object({
   }
 });
 
+/** 校验后的环境变量类型（与 envSchema 推断一致） */
 export type EnvConfig = z.infer<typeof envSchema>;

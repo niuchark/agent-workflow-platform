@@ -1,3 +1,9 @@
+/**
+ * 团队与 API Key API：封装团队、成员、应用授权、API 密钥与分享相关请求。
+ *
+ * 这些接口被 teamSlice、apiKeySlice 与分享设置组件复用，
+ * 统一返回 { data } 结构，由调用方解包。
+ */
 import request from './axios'
 import type {
   Team,

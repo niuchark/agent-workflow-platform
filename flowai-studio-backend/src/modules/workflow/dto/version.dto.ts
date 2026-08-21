@@ -1,3 +1,6 @@
+/**
+ * 工作流版本 DTO：创建版本快照的请求体。
+ */
 import { IsOptional, IsString, IsBoolean, MaxLength } from 'class-validator';
 
 /**
@@ -5,6 +8,7 @@ import { IsOptional, IsString, IsBoolean, MaxLength } from 'class-validator';
  *
  * Phase 4.2: 版本管理
  */
+/** 创建工作流版本的请求体 */
 export class CreateVersionDto {
   /** 版本标签（如 "v1.0 正式发布"） */
   @IsOptional()

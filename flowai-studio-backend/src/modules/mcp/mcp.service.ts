@@ -1,3 +1,9 @@
+/**
+ * MCP 服务：管理 MCP 服务器配置与活跃连接。
+ *
+ * 维护一个 serverId → McpClient 的连接池；
+ * 连接/断开、工具列表查询与工具调用都先校验归属权。
+ */
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { McpClient, McpTool, McpToolResult } from './mcp-client';
@@ -5,6 +11,7 @@ import { McpClient, McpTool, McpToolResult } from './mcp-client';
 /**
  * MCP 服务器配置 DTO
  */
+/** 创建 MCP 服务器的请求体 */
 export interface CreateMcpServerDto {
   name: string;
   description?: string;
@@ -15,6 +22,7 @@ export interface CreateMcpServerDto {
   url?: string;
 }
 
+/** 更新 MCP 服务器的请求体 */
 export interface UpdateMcpServerDto {
   name?: string;
   description?: string;
@@ -37,6 +45,7 @@ export class McpService {
 
   // ========== CRUD ==========
 
+  /** 创建 MCP 服务器：按传输方式校验必填字段 */
   async create(userId: string, dto: CreateMcpServerDto) {
     if (dto.transportType === 'stdio' && !dto.command) {
       throw new BadRequestException('stdio 模式必须提供启动命令 (command)');
@@ -59,6 +68,7 @@ export class McpService {
     });
   }
 
+  /** 获取用户的所有服务器（附带连接状态） */
   async findAll(userId: string) {
     const servers = await this.prisma.mcpServer.findMany({
       where: { userId },
@@ -74,6 +84,7 @@ export class McpService {
     }));
   }
 
+  /** 获取单个服务器（校验归属权，附带连接状态） */
   async findOne(userId: string, id: string) {
     const server = await this.prisma.mcpServer.findUnique({ where: { id } });
     if (!server || server.userId !== userId) {
@@ -87,6 +98,7 @@ export class McpService {
     };
   }
 
+  /** 更新服务器：配置变更前先断开旧连接 */
   async update(userId: string, id: string, dto: UpdateMcpServerDto) {
     await this.findOne(userId, id);
 
@@ -106,6 +118,7 @@ export class McpService {
     });
   }
 
+  /** 删除服务器：先断开连接 */
   async remove(userId: string, id: string) {
     await this.findOne(userId, id);
 
@@ -240,6 +253,7 @@ export class McpService {
   /**
    * 应用关闭时清理所有连接
    */
+  /** 应用关闭时清理所有活跃连接 */
   onModuleDestroy() {
     for (const [id, client] of this.clients) {
       client.disconnect();

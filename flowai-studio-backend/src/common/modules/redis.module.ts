@@ -1,3 +1,6 @@
+/**
+ * Redis 全局模块：向所有模块提供 RedisService。
+ */
 import { Global, Module } from '@nestjs/common';
 import { RedisService } from '../services/redis.service';
 

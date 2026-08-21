@@ -1,3 +1,6 @@
+/**
+ * 工作流执行器：按拓扑序执行节点，支持超时/重试/取消/SSE 推送。
+ */
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../common/services/prisma.service';
 import { NodeExecutorFactory } from './node-executor.factory';
@@ -34,6 +37,14 @@ export class WorkflowExecutorService {
     @Optional() private readonly tracingService?: TracingService,
   ) {}
 
+  /**
+   * 执行工作流：按拓扑序（入度 0 起步）逐节点执行。
+   *
+   * - 条件节点只激活匹配分支，另一分支递归标记为 skipped；
+   * - 支持节点级超时、重试与整体超时，可随时取消；
+   * - 通过 SSE Subject 实时推送节点状态与最终上下文；
+   * - 全程写入全链路追踪（trace/span）。
+   */
   async executeWorkflow(
     workflowId: string,
     runDto: RunWorkflowDto,
@@ -48,7 +59,7 @@ export class WorkflowExecutorService {
       throw new Error('Workflow not found');
     }
 
-    // 合并执行控制配置
+    // 合并执行控制配置：调用方参数覆盖默认值
     const control: Required<ExecutionControlDto> = {
       ...DEFAULT_CONTROL,
       ...(runDto.control || {}),
@@ -62,9 +73,9 @@ export class WorkflowExecutorService {
     const nodes = JSON.parse(workflow.nodes) as any[];
     const edges = JSON.parse(workflow.edges) as any[];
 
-    // Build adjacency: nodeId → [{target, sourceHandle}]
+    // 构建邻接表：nodeId → [{target, sourceHandle}]
     const adjList = new Map<string, { target: string; sourceHandle?: string }[]>();
-    // Build in-degree map (only non-condition-dependent)
+    // 构建入度表（条件分支的跳过会在运行时动态调整）
     const inDegree = new Map<string, number>();
 
     for (const node of nodes) {
@@ -80,7 +91,7 @@ export class WorkflowExecutorService {
       inDegree.set(edge.target, (inDegree.get(edge.target) || 0) + 1);
     }
 
-    // Start Trace (全链路追踪)
+    // 开始全链路追踪
     let traceId: string | undefined;
     if (this.tracingService) {
       try {
@@ -96,7 +107,7 @@ export class WorkflowExecutorService {
       }
     }
 
-    // BFS-style execution: start from nodes with in-degree 0
+    // BFS 式执行：从入度为 0 的根节点开始
     const context: Record<string, any> = {
       ...runDto.inputs,
       // 注入元数据供节点执行器使用（如 Token 使用量记录）
@@ -111,10 +122,10 @@ export class WorkflowExecutorService {
     const failed = new Set<string>();
     let currentNodeId: string | undefined;
 
-    // Track remaining in-degree for runtime (some edges may be "pruned" by conditions)
+    // 运行时入度：条件分支会剪掉未命中的边，需动态递减
     const runtimeInDegree = new Map<string, number>(inDegree);
 
-    // Seed queue with root nodes (in-degree = 0)
+    // 初始队列：所有入度为 0 的根节点
     const queue: string[] = nodes
       .filter((n) => inDegree.get(n.id) === 0)
       .map((n) => n.id);
@@ -137,7 +148,7 @@ export class WorkflowExecutorService {
       },
     });
 
-    // 整体工作流执行逻辑
+    // 整体工作流执行逻辑（BFS 主循环）
     const runLoop = async () => {
       while (queue.length > 0) {
         // 检查取消
@@ -147,7 +158,7 @@ export class WorkflowExecutorService {
 
         const nodeId = queue.shift()!;
 
-        // Skip if already executed or skipped
+        // 跳过已执行/已跳过/已失败的节点
         if (executed.has(nodeId) || skipped.has(nodeId) || failed.has(nodeId)) continue;
 
         const node = nodes.find((n) => n.id === nodeId);
@@ -156,7 +167,7 @@ export class WorkflowExecutorService {
         currentNodeId = nodeId;
         const executor = this.factory.getExecutor(node.type);
 
-        // Start Span (全链路追踪 - 节点级别)
+        // 开始节点级 Span（全链路追踪）
         let spanId: string | undefined;
         if (this.tracingService && traceId) {
           try {
@@ -220,7 +231,7 @@ export class WorkflowExecutorService {
           context[nodeId] = output;
           executed.add(nodeId);
 
-          // End Span - 成功
+          // 结束 Span（成功）
           if (this.tracingService && spanId) {
             try {
               await this.tracingService.endSpan(spanId, 'ok', [
@@ -246,9 +257,10 @@ export class WorkflowExecutorService {
             },
           });
 
-          // Get downstream edges
+          // 获取下游连线
           const downstream = adjList.get(nodeId) || [];
 
+          // 条件节点：只激活匹配分支，另一分支递归跳过
           if (node.type === 'condition') {
             // Condition node: only activate the matching branch
             const conditionResult = output?.result;
@@ -257,19 +269,19 @@ export class WorkflowExecutorService {
 
             for (const edge of downstream) {
               if (edge.sourceHandle === matchHandle) {
-                // Decrement in-degree for the active branch target
+            // 命中分支：递减入度，归零则入队
                 const deg = (runtimeInDegree.get(edge.target) || 1) - 1;
                 runtimeInDegree.set(edge.target, deg);
                 if (deg <= 0) {
                   queue.push(edge.target);
                 }
               } else if (edge.sourceHandle === skipHandle) {
-                // Mark skipped branch — recursively skip all descendants
+                // 未命中分支：递归标记整个下游为 skipped
                 this.skipBranch(edge.target, adjList, skipped, sseSubject);
               }
             }
           } else {
-            // Normal node: activate all downstream
+            // 普通节点：激活全部下游
             for (const edge of downstream) {
               const deg = (runtimeInDegree.get(edge.target) || 1) - 1;
               runtimeInDegree.set(edge.target, deg);
@@ -340,7 +352,7 @@ export class WorkflowExecutorService {
       // 工作流整体超时控制
       await withTimeout(runLoop(), control.workflowTimeoutMs, 'workflow', workflow.name);
 
-      // End Trace - 成功
+      // 结束 Trace（成功）
       if (this.tracingService && traceId) {
         try {
           await this.tracingService.endTrace(traceId, 'success', context);
@@ -368,7 +380,7 @@ export class WorkflowExecutorService {
       const isTimeout = error instanceof TimeoutError;
       const isCancelled = error instanceof CancelledError;
 
-      // End Trace - 失败
+      // 结束 Trace（失败）
       if (this.tracingService && traceId) {
         try {
           await this.tracingService.endTrace(traceId, 'failed', undefined, error.message);
@@ -427,6 +439,7 @@ export class WorkflowExecutorService {
   /**
    * Recursively mark a branch as skipped and notify via SSE
    */
+  /** 递归标记一个分支为 skipped，并通过 SSE 通知 */
   private skipBranch(
     nodeId: string,
     adjList: Map<string, { target: string; sourceHandle?: string }[]>,

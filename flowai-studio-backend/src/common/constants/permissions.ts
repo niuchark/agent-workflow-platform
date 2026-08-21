@@ -179,6 +179,7 @@ export function teamAppHasPermission(
 // API Key Scopes
 // ============================================================
 
+/** API Key 的权限范围常量 */
 export const API_KEY_SCOPES = {
   APP_READ: 'app:read',
   WORKFLOW_EXECUTE: 'workflow:execute',

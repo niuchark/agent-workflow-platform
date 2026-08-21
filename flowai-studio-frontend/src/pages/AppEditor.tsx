@@ -1,3 +1,12 @@
+/**
+ * 应用编辑器页面：工作流画布 + 节点库 + 右侧检查器的一体化编辑器。
+ *
+ * 布局：顶栏（返回/应用信息/面板切换/保存/运行/导出）+
+ * 左侧节点库 + 中间 React Flow 画布 + 右侧配置/调试/分享面板。
+ *
+ * 支持桌面端与移动端两种形态：窄屏下节点库与检查器变为抽屉，
+ * 通过底部工具栏切换；左右两个面板都支持拖拽/键盘调整宽度。
+ */
 import { useState, useEffect, useRef } from 'react'
 import { Button, message, Tag, Tooltip, Dropdown, Modal } from 'antd'
 import {
@@ -25,14 +34,17 @@ import ConfigPanel from '../components/workflow/ConfigPanel'
 import RunPanel from '../components/workflow/RunPanel'
 import AppShareSettings from '../components/AppShareSettings'
 
+/** 右侧面板类型：配置 / 调试 / 分享 */
 type RightPanel = 'config' | 'debug' | 'share'
 
+/** 右侧面板的切换项定义（顶栏与移动端工具栏共用） */
 const RIGHT_PANELS = [
   { key: 'config', label: '配置', icon: SettingOutlined },
   { key: 'debug', label: '调试', icon: BugOutlined },
   { key: 'share', label: '分享', icon: ShareAltOutlined },
 ] satisfies Array<{ key: RightPanel; label: string; icon: React.ComponentType }>
 
+/** 工作流运行状态 → 标签颜色与文案 */
 const STATUS_TAGS: Record<string, { color: string; label: string }> = {
   running: { color: 'processing', label: '运行中' },
   success: { color: 'success', label: '成功' },
@@ -40,17 +52,23 @@ const STATUS_TAGS: Record<string, { color: string; label: string }> = {
   stopped: { color: 'default', label: '已停止' },
 }
 
+/** 右侧检查器宽度约束 */
 const DEFAULT_PANEL_WIDTH = 360
 const MIN_PANEL_WIDTH = 300
 const MAX_PANEL_WIDTH = 560
+/** 左侧节点库宽度约束 */
 const DEFAULT_NODE_PANEL_WIDTH = 176
 const MIN_NODE_PANEL_WIDTH = 120
 const MAX_NODE_PANEL_WIDTH = 300
+/** 桌面端断点：≥1024px 视为宽屏 */
 const EDITOR_DESKTOP_MEDIA_QUERY = '(min-width: 1024px)'
 
+/** 把面板宽度限制在允许范围内 */
 const clampPanelWidth = (width: number) => Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, width))
+/** 把节点库宽度限制在允许范围内 */
 const clampNodePanelWidth = (width: number) => Math.min(MAX_NODE_PANEL_WIDTH, Math.max(MIN_NODE_PANEL_WIDTH, width))
 
+/** 应用编辑器页面组件 */
 const AppEditor: React.FC = () => {
   const { appId } = useParams<{ appId: string }>()
   const navigate = useNavigate()
@@ -73,6 +91,7 @@ const AppEditor: React.FC = () => {
   } = useStore()
 
   const [rightPanel, setRightPanel] = useState<RightPanel>('config')
+  // 窄屏（<1024px）与面板开关的初始值按当前视口决定
   const [isCompactViewport, setIsCompactViewport] = useState(() =>
     typeof window !== 'undefined' && !window.matchMedia(EDITOR_DESKTOP_MEDIA_QUERY).matches
   )
@@ -80,12 +99,14 @@ const AppEditor: React.FC = () => {
     typeof window === 'undefined' || window.matchMedia(EDITOR_DESKTOP_MEDIA_QUERY).matches
   )
   const [isNodePanelOpen, setIsNodePanelOpen] = useState(false)
+  // 两个可调宽度面板的当前宽度
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
   const [nodePanelWidth, setNodePanelWidth] = useState(DEFAULT_NODE_PANEL_WIDTH)
 
   // 使用 ref 防止 React StrictMode 下 useEffect 重复执行导致弹两次错误
   const initRef = useRef(false)
 
+  // 初始化编辑器：加载应用详情与第一个工作流，没有工作流则自动创建
   useEffect(() => {
     if (initRef.current) return
     initRef.current = true
@@ -113,6 +134,7 @@ const AppEditor: React.FC = () => {
     initEditor()
   }, [appId, createWorkflow, fetchAppById, fetchWorkflowById, fetchWorkflows, messageApi])
 
+  // 监听视口变化：进入窄屏自动收起面板，回到宽屏恢复
   useEffect(() => {
     const mediaQuery = window.matchMedia(EDITOR_DESKTOP_MEDIA_QUERY)
     const handleViewportChange = (event: MediaQueryListEvent) => {
@@ -125,6 +147,7 @@ const AppEditor: React.FC = () => {
     return () => mediaQuery.removeEventListener('change', handleViewportChange)
   }, [])
 
+  /** 保存当前画布节点与连线 */
   const handleSave = async () => {
     const workflowId = currentWorkflow?.id
     if (!workflowId) {
@@ -139,30 +162,36 @@ const AppEditor: React.FC = () => {
     }
   }
 
+  /** 点击运行：切换到调试面板 */
   const handleRun = () => {
     handlePanelSelect('debug')
   }
 
+  /** 切换右侧面板：打开检查器并收起节点库 */
   const handlePanelSelect = (panel: RightPanel) => {
     setRightPanel(panel)
     setIsPanelOpen(true)
     setIsNodePanelOpen(false)
   }
 
+  /** 切换节点库抽屉：打开时收起右侧检查器 */
   const handleNodePanelToggle = () => {
     const nextIsOpen = !isNodePanelOpen
     setIsNodePanelOpen(nextIsOpen)
     if (nextIsOpen) setIsPanelOpen(false)
   }
 
+  /** 移动端关闭节点库 */
   const handleMobilePanelDismiss = () => {
     setIsNodePanelOpen(false)
   }
 
+  /** 画布节点被点击：切到配置面板打开检查器 */
   const handleCanvasNodeSelect = () => {
     handlePanelSelect('config')
   }
 
+  /** 删除选中节点：弹窗确认后删除 */
   const handleDeleteSelectedNode = () => {
     if (!selectedNode) return
     const nodeName = String(selectedNode.data?.label || '未命名节点')
@@ -180,6 +209,11 @@ const AppEditor: React.FC = () => {
     })
   }
 
+  /**
+   * 通用横向拖拽缩放逻辑：
+   * 记录起始宽度与指针位置，跟随 pointermove 更新宽度，
+   * pointerup 后移除监听；direction 控制拖拽方向（左拉/右拉）。
+   */
   const startHorizontalResize = (
     event: React.PointerEvent<HTMLDivElement>,
     startWidth: number,
@@ -190,10 +224,12 @@ const AppEditor: React.FC = () => {
     event.preventDefault()
     const startX = event.clientX
 
+    // 指针移动：按方向计算新宽度并应用钳制
     const handlePointerMove = (moveEvent: PointerEvent) => {
       updateWidth(clampWidth(startWidth + (moveEvent.clientX - startX) * direction))
     }
 
+    // 指针抬起：清理监听与拖拽样式
     const handlePointerUp = () => {
       document.removeEventListener('pointermove', handlePointerMove)
       document.removeEventListener('pointerup', handlePointerUp)
@@ -205,10 +241,12 @@ const AppEditor: React.FC = () => {
     document.addEventListener('pointerup', handlePointerUp)
   }
 
+  /** 右侧检查器拖拽开始（向左拖变宽） */
   const handleResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
     startHorizontalResize(event, panelWidth, -1, setPanelWidth, clampPanelWidth)
   }
 
+  /** 右侧检查器键盘调整：左右方向键 ±16px */
   const handleResizeKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'ArrowLeft') {
       event.preventDefault()
@@ -220,10 +258,12 @@ const AppEditor: React.FC = () => {
     }
   }
 
+  /** 节点库拖拽开始（向右拖变宽） */
   const handleNodePanelResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
     startHorizontalResize(event, nodePanelWidth, 1, setNodePanelWidth, clampNodePanelWidth)
   }
 
+  /** 节点库键盘调整：左右方向键 ±16px */
   const handleNodePanelResizeKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'ArrowLeft') {
       event.preventDefault()
@@ -235,6 +275,7 @@ const AppEditor: React.FC = () => {
     }
   }
 
+  /** 导出工作流为 YAML/JSON：生成 Blob 并触发浏览器下载 */
   const handleExport = async (format: 'yaml' | 'json') => {
     const workflowId = currentWorkflow?.id
     if (!workflowId) {
@@ -246,7 +287,7 @@ const AppEditor: React.FC = () => {
       const ext = format === 'yaml' ? 'yaml' : 'json'
       const fileName = `${currentApp?.name || 'workflow'}-${currentWorkflow?.name || 'untitled'}.${ext}`
 
-      // 创建下载链接
+      // 通过临时 <a> 触发下载，随后释放对象 URL
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -262,6 +303,7 @@ const AppEditor: React.FC = () => {
     }
   }
 
+  // 当前运行状态对应的标签
   const tag = executionStatus ? STATUS_TAGS[executionStatus] : null
 
   return (

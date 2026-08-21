@@ -1,3 +1,4 @@
+/** 凭证加密服务单元测试 */
 import { ConfigService } from '@nestjs/config';
 import { CredentialCryptoService } from '../credential-crypto.service';
 
@@ -40,4 +41,3 @@ describe('CredentialCryptoService', () => {
     );
   });
 });
-

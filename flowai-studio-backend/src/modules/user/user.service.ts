@@ -1,3 +1,9 @@
+/**
+ * 用户服务：注册、登录（含 Redis 防暴力破解）与个人资料。
+ *
+ * 登录失败会累计尝试次数，超过阈值锁定账户 15 分钟；
+ * 锁定状态存在 Redis，服务重启后不丢失。
+ */
 import {
   Injectable,
   ConflictException,
@@ -12,6 +18,7 @@ import { RedisService } from '../../common/services/redis.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
+/** 用户服务 */
 @Injectable()
 export class UserService {
   private readonly MAX_LOGIN_ATTEMPTS = 5;
@@ -49,6 +56,7 @@ export class UserService {
     return remainingAttempts ?? 0;
   }
 
+  /** 注册用户：校验输入 → 检查重名 → 密码哈希 → 创建 */
   async register(registerDto: RegisterDto) {
     const { username, password } = registerDto;
 
@@ -99,6 +107,7 @@ export class UserService {
     }
   }
 
+  /** 登录：校验锁定状态 → 验证密码 → 签发 JWT */
   async login(loginDto: LoginDto) {
     const { username, password } = loginDto;
 
@@ -155,6 +164,7 @@ export class UserService {
     }
   }
 
+  /** 获取用户资料 */
   async getProfile(userId: string) {
     try {
       const user = await this.prisma.user.findUnique({
@@ -180,6 +190,7 @@ export class UserService {
     }
   }
 
+  /** 更新用户资料 */
   async updateProfile(userId: string, data: { username?: string; avatar?: string }) {
     try {
       return this.prisma.user.update({

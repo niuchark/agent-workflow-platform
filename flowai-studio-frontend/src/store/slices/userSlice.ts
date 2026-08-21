@@ -1,9 +1,15 @@
+/**
+ * 用户状态切片：管理登录/注册/退出/资料拉取及鉴权错误。
+ *
+ * token 与 user 会同步写入 localStorage，页面刷新后仍可恢复会话；
+ * 所有接口错误统一通过 parseAuthError 归一化为 AuthError，供表单展示。
+ */
 import { StateCreator } from 'zustand'
 import axios from 'axios'
 import { User, LoginForm, RegisterForm } from '../../types'
 import request, { getResponseData } from '../../utils/axios'
 
-// 错误类型定义
+/** 鉴权错误类型：按错误来源区分，便于表单给出针对性提示 */
 interface AuthError {
   type: 'VALIDATION' | 'AUTHENTICATION' | 'NETWORK' | 'SERVER' | 'LOCKED';
   message: string;
@@ -11,6 +17,7 @@ interface AuthError {
 
 export type UserError = AuthError
 
+/** 用户切片对外暴露的状态与 Actions 类型 */
 export interface UserSlice {
   user: User | null
   token: string | null
@@ -30,9 +37,7 @@ export interface UserSlice {
   fetchProfile: () => Promise<void>
 }
 
-/**
- * 解析错误信息
- */
+/** 把接口异常统一解析为 AuthError，按 HTTP 状态码映射错误类型与提示文案 */
 const parseAuthError = (error: unknown): AuthError => {
   if (error instanceof Error && !axios.isAxiosError(error)) {
     return { type: 'VALIDATION', message: error.message }
@@ -91,6 +96,7 @@ const parseAuthError = (error: unknown): AuthError => {
   }
 };
 
+/** 创建用户切片：提供会话状态与登录/注册/登出/拉取资料等操作 */
 export const createUserSlice: StateCreator<UserSlice> = (set, get) => ({
   user: null,
   token: localStorage.getItem('token'),
@@ -100,6 +106,7 @@ export const createUserSlice: StateCreator<UserSlice> = (set, get) => ({
 
   setUser: (user) => set({ user }),
   
+  /** 设置 token：同步写入/清除 localStorage，并更新登录态 */
   setToken: (token) => {
     if (token) {
       localStorage.setItem('token', token)
@@ -115,6 +122,7 @@ export const createUserSlice: StateCreator<UserSlice> = (set, get) => ({
 
   clearError: () => set({ authError: null }),
 
+  /** 登录：调用登录接口，成功后保存 token 与用户信息到本地存储 */
   login: async (data) => {
     set({ isLoading: true, authError: null })
     
@@ -146,6 +154,7 @@ export const createUserSlice: StateCreator<UserSlice> = (set, get) => ({
     }
   },
 
+  /** 注册：调用注册接口，成功后仅清除加载态（登录由用户手动完成） */
   register: async (data) => {
     set({ isLoading: true, authError: null })
     
@@ -164,6 +173,7 @@ export const createUserSlice: StateCreator<UserSlice> = (set, get) => ({
     }
   },
 
+  /** 退出登录：清除本地存储与内存中的会话状态 */
   logout: () => {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
@@ -175,6 +185,7 @@ export const createUserSlice: StateCreator<UserSlice> = (set, get) => ({
     })
   },
 
+  /** 拉取当前用户资料；失败（如 token 失效）则自动登出 */
   fetchProfile: async () => {
     try {
       const user = getResponseData<User>(await request.get('/users/profile'))

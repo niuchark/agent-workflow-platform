@@ -1,3 +1,10 @@
+/**
+ * 成本统计页面：按时间/应用维度统计 token 用量与费用。
+ *
+ * 顶部为汇总卡片（总用量/总费用/调用次数/平均费用），
+ * 中部为 Token 趋势柱状图与按模型费用分布饼图，
+ * 下方为模型费用排行与调用明细表格。
+ */
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   DatePicker, Select, Spin, Empty, Table, Tag,
@@ -22,6 +29,7 @@ import { useStore } from '../store'
 
 const { RangePicker } = DatePicker
 
+/** 成本统计页面组件 */
 const CostStatistics: React.FC = () => {
   const { apps, fetchApps } = useStore()
   const initDone = useRef(false)
@@ -41,6 +49,7 @@ const CostStatistics: React.FC = () => {
   const [recordsTotal, setRecordsTotal] = useState(0)
   const [recordsPage, setRecordsPage] = useState(1)
 
+  /** 并行加载用量汇总、成本报表与模型排行 */
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
@@ -67,6 +76,7 @@ const CostStatistics: React.FC = () => {
     }
   }, [dateRange, applicationId, groupBy])
 
+  /** 加载调用明细（分页） */
   const loadRecords = useCallback(async (page: number) => {
     try {
       const params: Record<string, string> = {}
@@ -83,43 +93,51 @@ const CostStatistics: React.FC = () => {
     }
   }, [dateRange, applicationId])
 
+  // 初始化：加载应用列表
   useEffect(() => {
     if (initDone.current) return
     initDone.current = true
     fetchApps()
   }, [])
 
+  // 筛选条件变化时重新加载数据
   useEffect(() => {
     loadData()
   }, [loadData])
 
+  /** 大数字格式化：万/千缩写 */
   const formatNumber = (num: number) => {
     if (num >= 1_000_000) return (num / 1_000_000).toFixed(2) + 'M'
     if (num >= 1_000) return (num / 1_000).toFixed(1) + 'K'
     return num.toLocaleString()
   }
 
+  /** 费用格式化：按金额大小自适应小数位 */
   const formatCost = (cost: number) => {
     if (cost >= 1) return `$${cost.toFixed(2)}`
     if (cost >= 0.01) return `$${cost.toFixed(4)}`
     return `$${cost.toFixed(6)}`
   }
 
+  // 柱状图数据：按时间展开为输入/输出两类
   const trendData = costGroups.map((g) => [
     { time: g.groupKey, value: g.promptTokens, type: '输入 Token' },
     { time: g.groupKey, value: g.completionTokens, type: '输出 Token' },
   ]).flat()
 
+  // 饼图数据：按模型聚合费用
   const costByModel = modelRanking.map((m) => ({
     model: `${m.provider}/${m.model}`,
     value: Number(m.cost.toFixed(6)),
   }))
 
+  // 排行图数据：取费用最高的 10 个模型
   const rankingData = modelRanking.slice(0, 10).map((m) => ({
     model: m.model,
     cost: Number(m.cost.toFixed(4)),
   }))
 
+  /** 调用明细表格列定义 */
   const recordColumns = [
     {
       title: '时间',

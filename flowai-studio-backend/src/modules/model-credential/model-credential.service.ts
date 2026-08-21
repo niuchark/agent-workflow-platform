@@ -1,3 +1,9 @@
+/**
+ * 模型凭证服务：用户级凭证的加密存储、测试与模型发现。
+ *
+ * 凭证按用户隔离，API Key 用 AES-256-GCM 加密落库；
+ * 保存前对 Base URL 做 SSRF 安全校验，测试成功后才能启用。
+ */
 import {
   BadGatewayException,
   Injectable,
@@ -36,6 +42,7 @@ interface QwenCatalogResponse {
   };
 }
 
+/** 模型凭证服务 */
 @Injectable()
 export class ModelCredentialService {
   private readonly logger = new Logger(ModelCredentialService.name);
@@ -46,6 +53,7 @@ export class ModelCredentialService {
     private readonly baseUrlSecurity: BaseUrlSecurityService,
   ) {}
 
+  /** 列出所有供应商的凭证摘要（未配置的给出默认值） */
   async list(userId: string) {
     const credentials = await this.prisma.modelCredential.findMany({ where: { userId } });
     const byProvider = new Map(credentials.map((item) => [item.provider, item]));
@@ -64,6 +72,7 @@ export class ModelCredentialService {
     });
   }
 
+  /** 保存/更新凭证：安全校验 URL → 加密 Key → upsert */
   async upsert(userId: string, rawProvider: string, dto: UpsertModelCredentialDto) {
     const provider = this.parseProvider(rawProvider);
     const baseUrl = await this.baseUrlSecurity.assertAllowed(dto.baseUrl);
@@ -109,12 +118,14 @@ export class ModelCredentialService {
     return this.toSummary(saved);
   }
 
+  /** 删除凭证 */
   async remove(userId: string, rawProvider: string) {
     const provider = this.parseProvider(rawProvider);
     await this.prisma.modelCredential.deleteMany({ where: { userId, provider } });
     return { success: true };
   }
 
+  /** 设置启用状态：只有测试通过的凭证才能启用 */
   async setEnabled(userId: string, rawProvider: string, enabled: boolean) {
     const provider = this.parseProvider(rawProvider);
     const existing = await this.getRecord(userId, provider);
@@ -131,6 +142,7 @@ export class ModelCredentialService {
     return this.toSummary(updated);
   }
 
+  /** 测试连通性：成功标记 valid，失败标记 invalid */
   async test(userId: string, rawProvider: string, model?: string) {
     const provider = this.parseProvider(rawProvider);
     await this.getRecord(userId, provider);

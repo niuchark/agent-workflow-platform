@@ -1,8 +1,13 @@
+/**
+ * 输出节点执行器：解析输出模板中的变量引用并汇总最终输出。
+ */
 import { Injectable } from '@nestjs/common';
 import { INodeExecutor } from '../../types';
 
+/** 输出节点执行器 */
 @Injectable()
 export class OutputNodeExecutor implements INodeExecutor {
+  /** 解析 outputValue 中的 {{node.field}} 引用后返回 finalOutput */
   async execute(node: any, context: Record<string, any>): Promise<Record<string, any>> {
     const nodeData = node.data as any;
     const { outputValue } = nodeData;
@@ -12,6 +17,7 @@ export class OutputNodeExecutor implements INodeExecutor {
     return { finalOutput: resolvedOutput };
   }
 
+  /** 把模板字符串中的变量引用替换为上下文实际值 */
   private resolveVariables(template: any, context: Record<string, any>): any {
     if (typeof template !== 'string') {
       return template;

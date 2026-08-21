@@ -1,3 +1,10 @@
+/**
+ * 应用分享设置组件：管理分享链接、公开访问与嵌入代码。
+ *
+ * - 生成/撤销分享链接，并控制是否公开访问；
+ * - 配置 iframe/script 嵌入的尺寸、主题与标题栏；
+ * - 生成并复制嵌入代码片段。
+ */
 import { useState, useEffect } from 'react'
 import {
   Button, Card, Switch, Form, Input, Select, Space, message,
@@ -12,19 +19,23 @@ import { AppShare, EmbedConfig, UpdateShareSettingsForm } from '../types'
 
 const { Text, Paragraph, Title } = Typography
 
+/** 分享设置组件 props */
 interface AppShareSettingsProps {
   appId: string
 }
 
+/** 应用分享设置组件 */
 const AppShareSettings: React.FC<AppShareSettingsProps> = ({ appId }) => {
   const [shareInfo, setShareInfo] = useState<AppShare | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [embedCode, setEmbedCode] = useState<{ iframeCode: string; scriptCode: string } | null>(null)
 
+  // 打开时加载当前分享信息
   useEffect(() => {
     loadShareInfo()
   }, [appId])
 
+  /** 加载分享信息（应用可能尚未生成分享，按空处理） */
   const loadShareInfo = async () => {
     setIsLoading(true)
     try {
@@ -38,6 +49,7 @@ const AppShareSettings: React.FC<AppShareSettingsProps> = ({ appId }) => {
     }
   }
 
+  /** 生成分享链接 */
   const handleGenerateShareLink = async () => {
     setIsLoading(true)
     try {
@@ -51,6 +63,7 @@ const AppShareSettings: React.FC<AppShareSettingsProps> = ({ appId }) => {
     }
   }
 
+  /** 撤销分享链接：同时清空嵌入代码 */
   const handleRevokeShareLink = async () => {
     try {
       await shareApi.revokeShareLink(appId)
@@ -62,6 +75,7 @@ const AppShareSettings: React.FC<AppShareSettingsProps> = ({ appId }) => {
     }
   }
 
+  /** 切换公开访问开关 */
   const handleTogglePublic = async (isPublic: boolean) => {
     try {
       const response = await shareApi.updateShareSettings(appId, { isPublic }) as any
@@ -72,6 +86,7 @@ const AppShareSettings: React.FC<AppShareSettingsProps> = ({ appId }) => {
     }
   }
 
+  /** 保存嵌入设置（宽高/主题/标题栏） */
   const handleUpdateEmbed = async (values: { width?: string; height?: string; theme?: string; showHeader?: boolean }) => {
     try {
       const embedConfig: EmbedConfig = {
@@ -89,6 +104,7 @@ const AppShareSettings: React.FC<AppShareSettingsProps> = ({ appId }) => {
     }
   }
 
+  /** 生成嵌入代码 */
   const handleGetEmbedCode = async () => {
     try {
       const response = await shareApi.getEmbedCode(appId) as any
@@ -98,6 +114,7 @@ const AppShareSettings: React.FC<AppShareSettingsProps> = ({ appId }) => {
     }
   }
 
+  /** 复制文本到剪贴板 */
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
       message.success('已复制到剪贴板')
@@ -106,6 +123,7 @@ const AppShareSettings: React.FC<AppShareSettingsProps> = ({ appId }) => {
     })
   }
 
+  // 完整分享链接：origin + /share/ + shareLink
   const shareUrl = shareInfo
     ? `${window.location.origin}/share/${shareInfo.shareLink}`
     : ''

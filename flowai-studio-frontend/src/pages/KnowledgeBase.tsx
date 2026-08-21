@@ -1,3 +1,11 @@
+/**
+ * 知识库页面：管理知识库配置、文档上传与分块预览。
+ *
+ * - 知识库 CRUD：embedding 服务、向量存储、检索模式（向量/关键词/混合）、
+ *   分块参数、相似度阈值与重排序配置；
+ * - 文档管理：拖拽上传（后台异步向量化）、删除、分块预览；
+ * - 混合检索可调向量权重与 RRF 常数 K。
+ */
 import { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Input, Table, message, Modal, Upload, Space, Typography, Empty, Spin, Select, Slider, InputNumber, Divider, Tag, Tooltip, Switch } from 'antd'
 import {
@@ -27,6 +35,7 @@ const { Text } = Typography
 const { TextArea } = Input
 const { Dragger } = Upload
 
+/** 知识库页面组件 */
 const KnowledgeBase: React.FC = () => {
   const navigate = useNavigate()
   const { availableProviders, loading: modelCatalogLoading } = useModelCatalog()
@@ -72,9 +81,11 @@ const KnowledgeBase: React.FC = () => {
   const [chunks, setChunks] = useState<DocumentChunk[]>([])
   const [chunksLoading, setChunksLoading] = useState(false)
 
+  // 进入页面加载知识库列表
   useEffect(() => { fetchKnowledgeBases() }, [])
 
   const safeKnowledgeBases = Array.isArray(knowledgeBases) ? knowledgeBases : []
+  // 全库文档总量统计
   const totalDocuments = useMemo(
     () => safeKnowledgeBases.reduce((count, kb) => count + (kb.documents?.length || 0), 0),
     [safeKnowledgeBases],
@@ -82,6 +93,7 @@ const KnowledgeBase: React.FC = () => {
 
   // Embedding 模型配置来自 types/index.ts 中的 EMBEDDING_MODELS 常量
 
+  /** 打开新建知识库弹窗：重置表单为默认配置 */
   const handleAddKb = () => {
     setEditingKb(null)
     setFormData({
@@ -97,6 +109,7 @@ const KnowledgeBase: React.FC = () => {
     setModalVisible(true)
   }
 
+  /** 打开编辑弹窗：回填知识库配置 */
   const handleEditKb = (kb: any) => {
     setEditingKb(kb)
     setFormData({
@@ -118,6 +131,7 @@ const KnowledgeBase: React.FC = () => {
     setModalVisible(true)
   }
 
+  /** 保存知识库（新建或更新） */
   const handleSaveKb = async () => {
     if (!formData.name) { message.error('请输入知识库名称'); return }
     try {
@@ -132,15 +146,18 @@ const KnowledgeBase: React.FC = () => {
     } catch { message.error('操作失败，请重试') }
   }
 
+  /** 删除知识库 */
   const handleDeleteKb = async (id: string) => {
     try { await deleteKnowledgeBase(id); message.success('知识库删除成功') }
     catch { message.error('删除失败，请重试') }
   }
 
+  /** 打开文档管理弹窗 */
   const handleViewDocuments = async (kb: any) => {
     setSelectedKb(kb); setDocuments(kb.documents || []); setDocumentModalVisible(true)
   }
 
+  /** 上传文档：成功后刷新文档列表（向量化在后台进行） */
   const handleUploadDocument = async (options: any) => {
     const { file, onSuccess, onError } = options
     try {
@@ -155,6 +172,7 @@ const KnowledgeBase: React.FC = () => {
     }
   }
 
+  /** 删除文档：成功后刷新列表 */
   const handleDeleteDocument = async (documentId: string) => {
     try {
       await deleteDocument(documentId); message.success('文档删除成功')
@@ -163,6 +181,7 @@ const KnowledgeBase: React.FC = () => {
     } catch { message.error('删除失败，请重试') }
   }
 
+  /** 查看文档分块：拉取分块数据并在弹窗中预览 */
   const handleViewChunks = async (doc: any) => {
     setChunkDocName(doc.name); setChunks([]); setChunkModalVisible(true); setChunksLoading(true)
     try { const result = await fetchDocumentChunks(doc.id); setChunks(result.chunks || []) }
@@ -170,6 +189,7 @@ const KnowledgeBase: React.FC = () => {
     finally { setChunksLoading(false) }
   }
 
+  /** 知识库表格列定义 */
   const kbColumns = [
     {
       title: '知识库名称', dataIndex: 'name', key: 'name',

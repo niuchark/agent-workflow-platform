@@ -1,3 +1,6 @@
+/**
+ * 注册 DTO：用户名（3–20 位字母数字下划线）+ 密码（至少 6 位）。
+ */
 import {
   IsString,
   MinLength,
@@ -5,6 +8,7 @@ import {
   Matches,
 } from 'class-validator';
 
+/** 注册请求体 */
 export class RegisterDto {
   @IsString({ message: 'Username must be a string' })
   @MinLength(3, { message: 'Username must be at least 3 characters long' })

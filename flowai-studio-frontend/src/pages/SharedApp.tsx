@@ -1,3 +1,9 @@
+/**
+ * 分享应用页面：通过 /share/:shareLink 公开访问的应用落地页。
+ *
+ * 无需登录即可访问；根据后端返回展示应用名称、描述与交互界面。
+ * 当前交互界面为占位实现，后续接入真实应用运行器。
+ */
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Spin, Result, Button, Typography, Card } from 'antd'
@@ -6,19 +12,23 @@ import BrandLogo from '../components/BrandLogo'
 
 const { Title, Text, Paragraph } = Typography
 
+/** 分享应用页面组件 */
 const SharedApp: React.FC = () => {
   const { shareLink } = useParams<{ shareLink: string }>()
   const navigate = useNavigate()
+  /** 分享应用的数据 */
   const [appData, setAppData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // 分享链接变化时重新加载
   useEffect(() => {
     if (shareLink) {
       loadSharedApp()
     }
   }, [shareLink])
 
+  /** 加载分享应用：按 404/403 区分错误提示 */
   const loadSharedApp = async () => {
     setIsLoading(true)
     setError(null)

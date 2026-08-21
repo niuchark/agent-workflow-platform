@@ -1,3 +1,10 @@
+/**
+ * 工作流状态切片：管理工作流列表、画布节点/连线与实时运行状态。
+ *
+ * - 画布编辑（拖拽/连线/删除）由 React Flow 的 change 回调驱动；
+ * - 运行状态分为普通 run 与 SSE 流式运行（streamRunWorkflow），
+ *   后者逐节点更新 executionStates，供画布展示执行进度。
+ */
 import { StateCreator } from 'zustand'
 import { Workflow, WorkflowNode, WorkflowEdge, NodeExecution } from '../../types'
 import request from '../../utils/axios'
@@ -14,6 +21,7 @@ import {
 
 import { createParser } from 'eventsource-parser'
 
+/** 工作流切片对外暴露的状态与 Actions 类型 */
 export interface WorkflowSlice {
   workflows: Workflow[]
   currentWorkflow: Workflow | null
@@ -53,6 +61,7 @@ export interface WorkflowSlice {
   clearExecutionStates: () => void
 }
 
+/** 创建工作流切片：提供画布编辑、运行与 CRUD 操作 */
 export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
   workflows: [],
   currentWorkflow: null,
@@ -66,6 +75,7 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
 
   setWorkflows: (workflows) => set({ workflows }),
   
+  /** 切换当前工作流：同步把其节点与连线载入画布 */
   setCurrentWorkflow: (workflow) => {
     if (workflow) {
       set({ currentWorkflow: workflow, nodes: workflow.nodes, edges: workflow.edges })
@@ -78,6 +88,7 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
   
   setEdges: (edges) => set({ edges }),
 
+  /** React Flow 节点变更回调：删除节点时同步清理其执行状态与选中态 */
   onNodesChange: (changes) => {
     set((state) => {
       const removedNodeIds = new Set(
@@ -96,26 +107,31 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
     })
   },
 
+  /** React Flow 连线变更回调 */
   onEdgesChange: (changes) => {
     set({
       edges: applyEdgeChanges(changes, get().edges),
     })
   },
 
+  /** 画布连线回调：把新连线追加到 edges */
   onConnect: (connection) => {
     set({
       edges: addEdge(connection, get().edges),
     })
   },
 
+  /** 重连已有连线（换一头） */
   reconnectWorkflowEdge: (edge, connection) => {
     set((state) => ({
       edges: reconnectEdge(edge, connection, state.edges),
     }))
   },
   
+  /** 设置画布当前选中的节点（用于右侧配置面板） */
   setSelectedNode: (node) => set({ selectedNode: node }),
 
+  /** 删除节点：同时移除关联连线、执行状态与选中态 */
   deleteNode: (nodeId) => {
     set((state) => {
       const executionStates = { ...state.executionStates }
@@ -130,12 +146,14 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
     })
   },
 
+  /** 删除单条连线 */
   deleteEdge: (edgeId) => {
     set((state) => ({
       edges: state.edges.filter((edge) => edge.id !== edgeId),
     }))
   },
   
+  /** 更新节点配置数据：同步反映到画布与当前选中节点 */
   updateNodeData: (nodeId, data) => {
     set((state) => ({
       nodes: state.nodes.map((node) =>
@@ -148,8 +166,10 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
     }));
   },
   
+  /** 记录画布缩放比例 */
   setCanvasZoom: (zoom) => set({ canvasZoom: zoom }),
   
+  /** 更新单个节点的运行状态（用于画布高亮） */
   setExecutionState: (nodeId, state) => {
     set({
       executionStates: {
@@ -163,6 +183,7 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
   
   setExecutionStates: (states) => set({ executionStates: states }),
   
+  /** 普通方式运行工作流：不接收节点级流式输出 */
   runWorkflow: async (workflowId) => {
     set({ isLoading: true, executionStatus: 'running', executionStates: {} })
     try {
@@ -175,6 +196,10 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
     }
   },
 
+  /**
+   * 流式运行工作流：通过 SSE 接收节点状态事件，
+   * 逐节点更新 executionStates 并在结束时切换整体状态。
+   */
   streamRunWorkflow: async (workflowId, inputs) => {
     set({ executionStatus: 'running', executionStates: {} })
     
@@ -228,6 +253,7 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
     }
   },
 
+  /** 拉取某应用下的工作流列表 */
   fetchWorkflows: async (appId) => {
     set({ isLoading: true })
     try {
@@ -242,6 +268,7 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
     }
   },
 
+  /** 按 ID 拉取工作流并载入画布（节点/连线） */
   fetchWorkflowById: async (id) => {
     set({ isLoading: true })
     try {
@@ -255,6 +282,7 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
     }
   },
 
+  /** 创建工作流：成功后追加到列表末尾 */
   createWorkflow: async (appId, data) => {
     set({ isLoading: true })
     try {
@@ -269,6 +297,7 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
     }
   },
 
+  /** 更新工作流：同步更新列表与当前工作流 */
   updateWorkflow: async (id, data) => {
     set({ isLoading: true })
     try {
@@ -289,6 +318,7 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
     }
   },
 
+  /** 保存画布：仅更新当前工作流的节点与连线 */
   saveWorkflow: async (id, data) => {
     set({ isLoading: true })
     try {
@@ -302,6 +332,7 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
     }
   },
 
+  /** 删除工作流：若删除的是当前工作流则清空画布 */
   deleteWorkflow: async (id) => {
     set({ isLoading: true })
     try {
@@ -317,5 +348,6 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
     }
   },
 
+  /** 清空全部节点执行状态（运行开始前调用） */
   clearExecutionStates: () => set({ executionStates: {} }),
 })

@@ -1,3 +1,9 @@
+/**
+ * 工作流 DSL API：封装 DSL 的导出、校验与导入。
+ *
+ * DSL 是工作流节点/连线的声明式表示（YAML/JSON），
+ * 用于工作流的备份、迁移与批量创建。
+ */
 import request from './axios'
 
 /**

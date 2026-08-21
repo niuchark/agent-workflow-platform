@@ -1,7 +1,14 @@
+/**
+ * RAG 知识库状态切片：管理知识库、文档及其分块检索。
+ *
+ * 覆盖知识库 CRUD、文档上传/删除、文档分块查看与向量检索（retrieve），
+ * 上传/删除文档后会自动刷新列表，保证页面展示与后端一致。
+ */
 import { StateCreator } from 'zustand'
 import { KnowledgeBase, Document, DocumentChunksResponse } from '../../types'
 import request from '../../utils/axios'
 
+/** RAG 切片对外暴露的状态与 Actions 类型 */
 export interface RAGSlice {
   knowledgeBases: KnowledgeBase[]
   currentKnowledgeBase: KnowledgeBase | null
@@ -26,6 +33,7 @@ export interface RAGSlice {
   retrieve: (query: string, knowledgeBaseId: string, topK?: number) => Promise<any>
 }
 
+/** 创建 RAG 切片：提供知识库与文档的增删改查、上传与检索操作 */
 export const createRAGSlice: StateCreator<RAGSlice> = (set, get) => ({
   knowledgeBases: [],
   currentKnowledgeBase: null,
@@ -43,6 +51,7 @@ export const createRAGSlice: StateCreator<RAGSlice> = (set, get) => ({
   
   setError: (error) => set({ error }),
 
+  /** 拉取知识库列表 */
   fetchKnowledgeBases: async () => {
     set({ isLoading: true, error: null })
     try {
@@ -55,6 +64,7 @@ export const createRAGSlice: StateCreator<RAGSlice> = (set, get) => ({
     }
   },
 
+  /** 按 ID 拉取知识库详情，并同步其文档列表 */
   fetchKnowledgeBaseById: async (id) => {
     set({ isLoading: true, error: null })
     try {
@@ -68,6 +78,7 @@ export const createRAGSlice: StateCreator<RAGSlice> = (set, get) => ({
     }
   },
 
+  /** 创建知识库：成功后追加到列表末尾 */
   createKnowledgeBase: async (data) => {
     set({ isLoading: true, error: null })
     try {
@@ -85,6 +96,7 @@ export const createRAGSlice: StateCreator<RAGSlice> = (set, get) => ({
     }
   },
 
+  /** 更新知识库配置：同步更新列表与当前知识库 */
   updateKnowledgeBase: async (id, data) => {
     set({ isLoading: true, error: null })
     try {
@@ -103,6 +115,7 @@ export const createRAGSlice: StateCreator<RAGSlice> = (set, get) => ({
     }
   },
 
+  /** 删除知识库：从列表移除，若删除的是当前知识库则清空 */
   deleteKnowledgeBase: async (id) => {
     set({ isLoading: true, error: null })
     try {
@@ -118,6 +131,7 @@ export const createRAGSlice: StateCreator<RAGSlice> = (set, get) => ({
     }
   },
 
+  /** 上传文档：以 multipart/form-data 提交，成功后刷新列表与当前知识库 */
   uploadDocument: async (knowledgeBaseId, file) => {
     set({ isLoading: true, error: null })
     try {
@@ -153,6 +167,7 @@ export const createRAGSlice: StateCreator<RAGSlice> = (set, get) => ({
     }
   },
 
+  /** 删除文档：成功后刷新知识库列表与当前知识库的文档列表 */
   deleteDocument: async (documentId) => {
     set({ isLoading: true, error: null })
     try {
@@ -173,6 +188,7 @@ export const createRAGSlice: StateCreator<RAGSlice> = (set, get) => ({
     }
   },
 
+  /** 拉取指定文档的分块结果（用于查看切分效果） */
   fetchDocumentChunks: async (documentId) => {
     set({ isLoading: true, error: null })
     try {
@@ -185,6 +201,7 @@ export const createRAGSlice: StateCreator<RAGSlice> = (set, get) => ({
     }
   },
 
+  /** 向量检索：按 query 在指定知识库中召回 topK 条相关片段 */
   retrieve: async (query, knowledgeBaseId, topK = 5) => {
     set({ isLoading: true, error: null })
     try {

@@ -1,3 +1,9 @@
+/**
+ * 注册页面：用户名 + 密码 + 确认密码。
+ *
+ * 确认密码通过 Form 依赖校验与密码保持一致；
+ * 注册成功后跳转登录页，由用户主动登录。
+ */
 import { Form, Input, Button, Alert, message } from 'antd'
 import { LockOutlined, UserOutlined } from '@ant-design/icons'
 import { useNavigate, Link } from 'react-router-dom'
@@ -10,6 +16,7 @@ const Register: React.FC = () => {
   const { register, isLoading, authError, clearError } = useStore()
   const [form] = Form.useForm()
 
+  /** 提交注册：成功后提示并跳转登录页 */
   const onSubmit = async (values: { username: string; password: string; confirmPassword: string }) => {
     clearError()
     try {

@@ -1,3 +1,9 @@
+/**
+ * 工作流模块：工作流 CRUD、执行、版本、模板与 DSL 导入导出。
+ *
+ * 依赖 RAG/Skill/AI/Agent 模块以支持各类型节点的执行；
+ * 通过 forwardRef 解决 AiModule 与执行器之间的循环依赖。
+ */
 import { Module, forwardRef } from '@nestjs/common';
 import { WorkflowController } from './workflow.controller';
 import { WorkflowVersionController } from './controllers/workflow-version.controller';
@@ -26,6 +32,7 @@ import { AiModule } from '../ai/ai.module';
 import { AgentModule } from '../agent/agent.module';
 import { RateLimiterService, CircuitBreakerService } from '../../common/guards/rate-limit.guard';
 
+/** 工作流模块：注册控制器、执行服务与全部节点执行器 */
 @Module({
   imports: [PrismaModule, RAGModule, SkillModule, forwardRef(() => AiModule), AgentModule],
   controllers: [WorkflowController, WorkflowVersionController, WorkflowTemplateController, WorkflowDslController, WorkflowTraceController],

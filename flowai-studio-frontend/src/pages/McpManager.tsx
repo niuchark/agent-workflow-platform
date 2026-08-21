@@ -1,3 +1,10 @@
+/**
+ * MCP 服务器管理页面：配置、连接并测试外部 MCP 工具。
+ *
+ * - 添加/编辑/删除 MCP 服务器（当前支持 STDIO 传输方式）；
+ * - 连接后拉取工具列表，并可在弹窗中传入 JSON 参数试运行工具；
+ * - 卡片上直观展示连接状态与传输方式。
+ */
 import { useState, useEffect } from 'react'
 import { Button, Input, message, Modal, Select, Empty, Dropdown, Spin, Tag, Form, Switch } from 'antd'
 import {
@@ -18,6 +25,7 @@ import request from '../utils/axios'
 
 const { TextArea } = Input
 
+/** MCP 服务器配置实体 */
 interface McpServer {
   id: string
   name: string
@@ -32,6 +40,7 @@ interface McpServer {
   createdAt: string
 }
 
+/** MCP 服务器暴露的一个工具 */
 interface McpTool {
   name: string
   description?: string
@@ -42,11 +51,13 @@ interface McpTool {
   }
 }
 
+/** MCP 管理页面组件 */
 const McpManager: React.FC = () => {
   const [servers, setServers] = useState<McpServer[]>([])
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
   const [editingServer, setEditingServer] = useState<McpServer | null>(null)
+  // 新增/编辑表单的字段值（args 在表单中按字符串编辑，提交时拆分）
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -56,13 +67,13 @@ const McpManager: React.FC = () => {
     url: '',
   })
 
-  // 工具面板
+  // ===== 工具面板状态 =====
   const [selectedServer, setSelectedServer] = useState<McpServer | null>(null)
   const [tools, setTools] = useState<McpTool[]>([])
   const [toolsPanelVisible, setToolsPanelVisible] = useState(false)
   const [connectingId, setConnectingId] = useState<string | null>(null)
 
-  // 工具执行
+  // ===== 工具执行状态 =====
   const [execModalVisible, setExecModalVisible] = useState(false)
   const [execTool, setExecTool] = useState<McpTool | null>(null)
   const [execServerId, setExecServerId] = useState<string>('')
@@ -70,10 +81,12 @@ const McpManager: React.FC = () => {
   const [execResult, setExecResult] = useState<any>(null)
   const [executing, setExecuting] = useState(false)
 
+  // 进入页面加载服务器列表
   useEffect(() => {
     fetchServers()
   }, [])
 
+  /** 拉取 MCP 服务器列表 */
   const fetchServers = async () => {
     setLoading(true)
     try {
@@ -86,12 +99,14 @@ const McpManager: React.FC = () => {
     }
   }
 
+  /** 打开新增弹窗：重置表单 */
   const handleAdd = () => {
     setEditingServer(null)
     setFormData({ name: '', description: '', transportType: 'stdio', command: '', args: '', url: '' })
     setModalVisible(true)
   }
 
+  /** 打开编辑弹窗：回填服务器信息 */
   const handleEdit = (server: McpServer) => {
     setEditingServer(server)
     setFormData({
@@ -105,6 +120,7 @@ const McpManager: React.FC = () => {
     setModalVisible(true)
   }
 
+  /** 保存服务器：按传输方式组装 payload */
   const handleSave = async () => {
     if (!formData.name.trim()) {
       message.error('请输入服务器名称')
@@ -115,6 +131,7 @@ const McpManager: React.FC = () => {
       return
     }
 
+    // 按传输方式区分：stdio 提交命令+参数，sse 提交 URL
     const payload: any = {
       name: formData.name.trim(),
       description: formData.description.trim() || undefined,
@@ -143,6 +160,7 @@ const McpManager: React.FC = () => {
     }
   }
 
+  /** 删除服务器 */
   const handleDelete = async (id: string) => {
     try {
       await request.delete(`/mcp/servers/${id}`)
@@ -153,6 +171,7 @@ const McpManager: React.FC = () => {
     }
   }
 
+  /** 连接服务器：成功后自动拉取并展示工具面板 */
   const handleConnect = async (server: McpServer) => {
     setConnectingId(server.id)
     try {
@@ -172,6 +191,7 @@ const McpManager: React.FC = () => {
     }
   }
 
+  /** 断开连接：若断开的是当前查看的服务器则关闭工具面板 */
   const handleDisconnect = async (server: McpServer) => {
     try {
       await request.post(`/mcp/servers/${server.id}/disconnect`)
@@ -187,6 +207,7 @@ const McpManager: React.FC = () => {
     }
   }
 
+  /** 查看已连接服务器的工具列表 */
   const handleViewTools = async (server: McpServer) => {
     if (!server.isConnected) {
       message.warning('请先连接该服务器')
@@ -202,6 +223,7 @@ const McpManager: React.FC = () => {
     }
   }
 
+  /** 打开工具执行弹窗：按 inputSchema 生成示例参数 */
   const handleExecTool = (tool: McpTool, serverId: string) => {
     setExecTool(tool)
     setExecServerId(serverId)
@@ -225,6 +247,7 @@ const McpManager: React.FC = () => {
     setExecModalVisible(true)
   }
 
+  /** 执行工具：解析 JSON 参数并调用后端 */
   const handleRunExec = async () => {
     if (!execTool) return
     setExecuting(true)
@@ -253,6 +276,7 @@ const McpManager: React.FC = () => {
     }
   }
 
+  /** 服务器卡片的下拉菜单：编辑/查看工具/连接或断开/删除 */
   const getCardMenu = (server: McpServer) => ({
     items: [
       { key: 'edit', label: '编辑', icon: <EditOutlined />, onClick: (e: any) => { e.domEvent?.stopPropagation(); handleEdit(server) } },

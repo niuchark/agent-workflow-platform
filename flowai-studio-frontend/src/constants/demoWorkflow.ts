@@ -10,6 +10,7 @@
  *   在调试面板输入 {"question": "你好，请介绍一下自己"}，点击运行即可
  */
 
+/** 示例画布节点：开始 → 用户输入 → 大模型 → 条件分支 → 两个输出 */
 export const DEMO_NODES = [
   {
     id: 'start_1',
@@ -81,6 +82,7 @@ export const DEMO_NODES = [
   },
 ]
 
+/** 示例连线：把上面的节点按主流程和条件分支连接起来 */
 export const DEMO_EDGES = [
   { id: 'e-start-input', source: 'start_1', target: 'userInput_1' },
   { id: 'e-input-llm', source: 'userInput_1', target: 'llm_1' },

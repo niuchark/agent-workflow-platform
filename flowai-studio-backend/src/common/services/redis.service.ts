@@ -1,3 +1,6 @@
+/**
+ * Redis 服务 — 缓存、会话、限流的基础（详见下方竞品对标说明）。
+ */
 import { Injectable, OnModuleDestroy, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
@@ -53,6 +56,7 @@ export class RedisService implements OnModuleDestroy {
   /**
    * 获取 Redis 客户端实例（用于高级操作）
    */
+  /** 获取底层 Redis 客户端（用于高级操作） */
   getClient(): Redis {
     return this.client;
   }
@@ -61,10 +65,12 @@ export class RedisService implements OnModuleDestroy {
   // 基础 Key-Value 操作
   // ============================================================
 
+  /** 读取字符串值 */
   async get(key: string): Promise<string | null> {
     return this.client.get(key);
   }
 
+  /** 写入字符串值（可带 TTL） */
   async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
     if (ttlSeconds) {
       await this.client.set(key, value, 'EX', ttlSeconds);
@@ -73,19 +79,23 @@ export class RedisService implements OnModuleDestroy {
     }
   }
 
+  /** 删除键 */
   async del(key: string): Promise<void> {
     await this.client.del(key);
   }
 
+  /** 判断键是否存在 */
   async exists(key: string): Promise<boolean> {
     const result = await this.client.exists(key);
     return result === 1;
   }
 
+  /** 设置键的过期时间 */
   async expire(key: string, ttlSeconds: number): Promise<void> {
     await this.client.expire(key, ttlSeconds);
   }
 
+  /** 查询键的剩余 TTL */
   async ttl(key: string): Promise<number> {
     return this.client.ttl(key);
   }
@@ -94,10 +104,12 @@ export class RedisService implements OnModuleDestroy {
   // Hash 操作
   // ============================================================
 
+  /** 读取 Hash 字段 */
   async hget(key: string, field: string): Promise<string | null> {
     return this.client.hget(key, field);
   }
 
+  /** 写入 Hash 字段（可带 TTL） */
   async hset(key: string, field: string, value: string, ttlSeconds?: number): Promise<void> {
     await this.client.hset(key, field, value);
     if (ttlSeconds) {
@@ -105,10 +117,12 @@ export class RedisService implements OnModuleDestroy {
     }
   }
 
+  /** 读取整个 Hash */
   async hgetall(key: string): Promise<Record<string, string>> {
     return this.client.hgetall(key);
   }
 
+  /** 删除 Hash 字段 */
   async hdel(key: string, ...fields: string[]): Promise<void> {
     await this.client.hdel(key, ...fields);
   }
@@ -120,6 +134,7 @@ export class RedisService implements OnModuleDestroy {
   /**
    * 获取缓存 — 自动 JSON 反序列化
    */
+  /** 获取缓存 — 自动 JSON 反序列化 */
   async getCached<T>(key: string): Promise<T | null> {
     const value = await this.client.get(key);
     if (value === null) return null;
@@ -137,6 +152,7 @@ export class RedisService implements OnModuleDestroy {
    * @param value 缓存值
    * @param ttlSeconds 过期时间（秒），默认使用策略中的 TTL
    */
+  /** 设置缓存 — 自动 JSON 序列化 */
   async setCached<T>(key: string, value: T, ttlSeconds?: number): Promise<void> {
     const serialized = typeof value === 'string' ? value : JSON.stringify(value);
     await this.set(key, serialized, ttlSeconds);
@@ -145,6 +161,7 @@ export class RedisService implements OnModuleDestroy {
   /**
    * 缓存穿透保护 — 使用缓存空值防止频繁查库
    */
+  /** 缓存穿透保护：缓存未命中时执行 factory 回源并写回缓存 */
   async getOrSet<T>(key: string, factory: () => Promise<T>, ttlSeconds: number): Promise<T> {
     const cached = await this.getCached<T>(key);
     if (cached !== null) return cached;
@@ -165,6 +182,7 @@ export class RedisService implements OnModuleDestroy {
    * @param maxRequests 窗口内最大请求数
    * @returns 是否允许请求
    */
+  /** 滑动窗口限流：用 Sorted Set 记录窗口内请求时间戳 */
   async rateLimit(key: string, windowSeconds: number, maxRequests: number): Promise<{ allowed: boolean; remaining: number; retryAfter?: number }> {
     const now = Date.now();
     const windowStart = now - windowSeconds * 1000;
@@ -208,6 +226,7 @@ export class RedisService implements OnModuleDestroy {
    * Redis Key: login_attempts:{username}
    * 使用 Hash 存储: attempts, lastAttempt, lockedUntil
    */
+  /** 记录登录尝试：失败计数，超阈值锁定；成功清除记录 */
   async recordLoginAttempt(username: string, success: boolean, maxAttempts: number = 5, lockoutDuration: number = 900): Promise<void> {
     const key = `login_attempts:${username}`;
 
@@ -234,6 +253,7 @@ export class RedisService implements OnModuleDestroy {
   /**
    * 检查账户是否被锁定
    */
+  /** 检查账户是否被锁定（锁定期已过则自动清除） */
   async checkAccountLock(username: string): Promise<{ locked: boolean; remainingMinutes?: number; remainingAttempts?: number }> {
     const key = `login_attempts:${username}`;
     const data = await this.client.hgetall(key);
@@ -264,6 +284,7 @@ export class RedisService implements OnModuleDestroy {
   // 健康检查
   // ============================================================
 
+  /** 健康检查：ping Redis 并返回延迟 */
   async healthCheck(): Promise<{ status: string; latency: number }> {
     const start = Date.now();
     try {

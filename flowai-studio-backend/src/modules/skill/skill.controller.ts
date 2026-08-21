@@ -1,3 +1,6 @@
+/**
+ * 技能控制器：内置/自定义工具的 CRUD 与执行接口。
+ */
 import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -5,18 +8,19 @@ import { SkillService } from './services/skill.service';
 import { CreateSkillDto } from './dto/create-skill.dto';
 import { UpdateSkillDto } from './dto/update-skill.dto';
 
+/** 技能 REST 控制器 */
 @Controller('skill')
 @UseGuards(JwtAuthGuard)
 export class SkillController {
   constructor(private skillService: SkillService) {}
 
-  // 获取内置工具列表（必须在 :id 路由之前，否则 "builtin" 会被当作 id）
+  /** 获取内置工具列表（必须在 :id 路由之前，否则 "builtin" 会被当作 id） */
   @Get('builtin/list')
   getBuiltinSkills() {
     return this.skillService.getBuiltinSkills();
   }
 
-  // 创建工具
+  /** 创建工具 */
   @Post()
   createSkill(
     @CurrentUser('userId') userId: string,
@@ -25,13 +29,13 @@ export class SkillController {
     return this.skillService.createSkill(userId, createSkillDto);
   }
 
-  // 获取用户的所有工具
+  /** 获取用户的所有工具 */
   @Get()
   findSkills(@CurrentUser('userId') userId: string) {
     return this.skillService.findSkills(userId);
   }
 
-  // 获取工具详情
+  /** 获取工具详情 */
   @Get(':id')
   findSkillById(
     @CurrentUser('userId') userId: string,
@@ -40,7 +44,7 @@ export class SkillController {
     return this.skillService.findSkillById(userId, id);
   }
 
-  // 更新工具
+  /** 更新工具 */
   @Put(':id')
   updateSkill(
     @CurrentUser('userId') userId: string,
@@ -50,7 +54,7 @@ export class SkillController {
     return this.skillService.updateSkill(userId, id, updateSkillDto);
   }
 
-  // 删除工具
+  /** 删除工具 */
   @Delete(':id')
   deleteSkill(
     @CurrentUser('userId') userId: string,
@@ -59,7 +63,7 @@ export class SkillController {
     return this.skillService.deleteSkill(userId, id);
   }
 
-  // 执行工具
+  /** 执行工具 */
   @Post(':id/execute')
   executeSkill(
     @CurrentUser('userId') userId: string,

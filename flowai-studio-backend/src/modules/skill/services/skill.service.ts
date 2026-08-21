@@ -1,3 +1,6 @@
+/**
+ * 技能服务：内置/自定义工具的 CRUD 与执行。
+ */
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../common/services/prisma.service';
 import { CreateSkillDto } from '../dto/create-skill.dto';
@@ -5,11 +8,13 @@ import { UpdateSkillDto } from '../dto/update-skill.dto';
 import { executeBuiltinSkill } from '../utils/builtin-skills';
 import axios from 'axios';
 
+/** 技能服务 */
 @Injectable()
 export class SkillService {
   constructor(private prisma: PrismaService) {}
 
   // 创建工具
+  /** 创建技能：内置技能直接保存，自定义技能校验配置 */
   async createSkill(userId: string, createSkillDto: CreateSkillDto) {
     // 检查工具名称是否已存在
     const existingSkill = await this.prisma.skill.findFirst({
@@ -36,6 +41,7 @@ export class SkillService {
   }
 
   // 获取用户的所有工具
+  /** 获取用户的所有技能 */
   async findSkills(userId: string) {
     return this.prisma.skill.findMany({
       where: { userId },
@@ -43,6 +49,7 @@ export class SkillService {
   }
 
   // 获取工具详情
+  /** 获取技能详情（校验归属权） */
   async findSkillById(userId: string, id: string) {
     const skill = await this.prisma.skill.findUnique({
       where: { id },
@@ -60,6 +67,7 @@ export class SkillService {
   }
 
   // 更新工具
+  /** 更新技能（校验归属权） */
   async updateSkill(userId: string, id: string, updateSkillDto: UpdateSkillDto) {
     const skill = await this.findSkillById(userId, id);
 
@@ -79,6 +87,7 @@ export class SkillService {
   }
 
   // 删除工具
+  /** 删除技能（校验归属权） */
   async deleteSkill(userId: string, id: string) {
     const skill = await this.findSkillById(userId, id);
 
@@ -87,6 +96,7 @@ export class SkillService {
 
   // 执行工具
   // userId 可选：从 controller 直接调用时传入做权限校验，工作流内部调用可省略
+  /** 执行技能：内置走内置执行器，自定义走 HTTP 调用 */
   async executeSkill(skillId: string, params: Record<string, any>, userId?: string) {
     const skill = await this.prisma.skill.findUnique({
       where: { id: skillId },
@@ -113,6 +123,7 @@ export class SkillService {
   }
 
   // 执行自定义工具
+  /** 执行自定义技能：按配置的 URL/方法/请求头发送 HTTP 请求 */
   private async executeCustomSkill(skill: any, params: Record<string, any>) {
     const config = JSON.parse(skill.config || '{}');
     const { url, method = 'POST', headers = {} } = config;
@@ -144,6 +155,7 @@ export class SkillService {
   }
 
   // 获取内置工具列表
+  /** 获取内置技能列表 */
   async getBuiltinSkills() {
     return [
       {

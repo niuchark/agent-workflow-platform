@@ -1,3 +1,9 @@
+/**
+ * 限流与熔断监控页面：展示熔断器状态并提供手动重置。
+ *
+ * 同时展示一份限流策略说明（窗口/上限/并发），
+ * 帮助管理员快速了解当前服务的保护配置。
+ */
 import { useState, useEffect } from 'react'
 import { Spin, Tag, Button, message, Progress } from 'antd'
 import { SafetyOutlined, ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons'
@@ -7,22 +13,26 @@ import {
   CircuitBreakerStats,
 } from '../utils/rateLimitApi'
 
+/** 熔断器状态 → 标签颜色与文案 */
 const CIRCUIT_STATE_MAP: Record<string, { color: string; label: string }> = {
   closed: { color: 'green', label: '关闭（正常）' },
   open: { color: 'red', label: '熔断（拒绝）' },
   half_open: { color: 'orange', label: '半开（探测）' },
 }
 
+/** 熔断器名称 → 中文名 */
 const CIRCUIT_NAME_MAP: Record<string, string> = {
   workflow: '工作流执行',
   ai: 'AI 模型调用',
   knowledge_base: '知识库操作',
 }
 
+/** 限流监控页面组件 */
 const RateLimitMonitor: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [circuits, setCircuits] = useState<CircuitBreakerStats[]>([])
 
+  /** 加载熔断器数据 */
   const loadData = async () => {
     setLoading(true)
     try {
@@ -36,10 +46,12 @@ const RateLimitMonitor: React.FC = () => {
     }
   }
 
+  // 进入页面时加载一次
   useEffect(() => {
     loadData()
   }, [])
 
+  /** 手动重置熔断器并刷新列表 */
   const handleReset = async (name: string) => {
     try {
       await resetCircuitBreaker(name)
@@ -50,11 +62,13 @@ const RateLimitMonitor: React.FC = () => {
     }
   }
 
+  /** 剩余配额百分比（用于进度条展示） */
   const getQuotaPercent = (remaining: number, max: number) => {
     if (max === 0) return 100
     return Math.round((remaining / max) * 100)
   }
 
+  /** 按剩余比例分档（高/中/低） */
   const getQuotaLevel = (percent: number) => {
     if (percent > 60) return 'high'
     if (percent > 20) return 'medium'

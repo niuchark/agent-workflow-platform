@@ -1,3 +1,9 @@
+/**
+ * Tailwind CSS 配置：设计令牌（颜色/字体/阴影）与内容扫描范围。
+ *
+ * preflight 关闭以兼容 Ant Design；品牌色/语义色与全局样式层
+ * （src/index.css 中的 CSS 变量）保持一致。
+ */
 /** @type {import('tailwindcss').Config} */
 export default {
   content: {
@@ -9,6 +15,7 @@ export default {
   },
   theme: {
     extend: {
+      // 品牌与语义色板（与 index.css 的 CSS 变量同源）
       colors: {
         brand: {
           50: '#f0f9ff',

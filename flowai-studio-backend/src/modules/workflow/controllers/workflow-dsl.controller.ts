@@ -1,3 +1,6 @@
+/**
+ * Workflow DSL 控制器：导出、导入与校验接口。
+ */
 import {
   Controller,
   Get,

@@ -17,6 +17,7 @@ export class RateLimitController {
   /**
    * 获取所有限流配置
    */
+  /** 获取所有限流配置 */
   @Get('config')
   getConfig() {
     return {
@@ -27,6 +28,7 @@ export class RateLimitController {
   /**
    * 获取用户剩余配额
    */
+  /** 获取用户在各限流规则下的剩余配额 */
   @Get('quota/:userId')
   async getUserQuota(@Param('userId') userId: string) {
     const checks = await Promise.all(
@@ -50,6 +52,7 @@ export class RateLimitController {
   /**
    * 获取所有熔断器状态
    */
+  /** 获取所有熔断器状态 */
   @Get('circuit-breakers')
   async getCircuitBreakers() {
     const circuits = ['workflow', 'ai', 'knowledge_base'];
@@ -66,6 +69,7 @@ export class RateLimitController {
   /**
    * 重置熔断器
    */
+  /** 重置指定熔断器 */
   @Post('circuit-breakers/:name/reset')
   async resetCircuitBreaker(@Param('name') name: string) {
     await this.circuitBreakerService.reset(name);

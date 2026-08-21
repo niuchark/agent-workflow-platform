@@ -1,3 +1,9 @@
+/**
+ * 统一响应拦截器：所有成功响应包装为固定结构。
+ *
+ * { success, code, message, data, timestamp }
+ * 与 AllExceptionsFilter 的错误响应结构对齐，方便前端统一处理。
+ */
 import {
   Injectable,
   NestInterceptor,
@@ -7,6 +13,7 @@ import {
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
+/** 统一成功响应结构 */
 export interface ApiResponse<T> {
   success: boolean;
   code: string;
@@ -15,6 +22,7 @@ export interface ApiResponse<T> {
   timestamp: string;
 }
 
+/** 响应拦截器：把 controller 返回值包装为 ApiResponse */
 @Injectable()
 export class ResponseInterceptor<T>
   implements NestInterceptor<T, ApiResponse<T>>

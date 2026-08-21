@@ -1,3 +1,6 @@
+/**
+ * Token 用量控制器：用量明细、成本报表与模型排行查询接口。
+ */
 import {
   Controller,
   Get,

@@ -1,3 +1,6 @@
+/**
+ * MCP Client：基于 stdio 传输 + JSON-RPC 2.0 的轻量客户端。
+ */
 import { spawn, ChildProcess } from 'child_process';
 import { Logger } from '@nestjs/common';
 

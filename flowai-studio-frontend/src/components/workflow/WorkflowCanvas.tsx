@@ -1,3 +1,12 @@
+/**
+ * 工作流画布组件：基于 React Flow 的节点编辑区。
+ *
+ * 负责：
+ * - 渲染节点/连线，并把 store 中的编辑回调接入 React Flow；
+ * - 从节点库拖入新节点（onDrop）并生成默认配置；
+ * - 节点点击回调 onNodeSelect，供父组件打开右侧配置面板；
+ * - 连线重连与删除前的二次确认，以及删除后的提示。
+ */
 import { useCallback, useRef, useState } from 'react'
 import { ReactFlow,
   Background,
@@ -19,7 +28,7 @@ import OutputNode from './nodes/OutputNode'
 import AgentNode from './nodes/AgentNode'
 import { NodeType, WorkflowEdge, WorkflowNode } from '../../types'
 
-// 自定义节点类型
+/** 节点类型 → 画布渲染组件的映射 */
 const nodeTypes = {
   start: StartNode,
   userInput: UserInputNode,
@@ -31,6 +40,7 @@ const nodeTypes = {
   agent: AgentNode,
 }
 
+/** 按节点类型生成默认配置数据（拖入画布时使用） */
 const createNodeData = (type: NodeType): WorkflowNode['data'] => {
   switch (type) {
     case 'start':
@@ -87,10 +97,13 @@ const createNodeData = (type: NodeType): WorkflowNode['data'] => {
   }
 }
 
+/** 画布组件 props */
 interface WorkflowCanvasProps {
+  /** 节点被点击时的回调（由父组件打开配置面板） */
   onNodeSelect?: (node: WorkflowNode) => void
 }
 
+/** 工作流画布组件 */
 const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({ onNodeSelect }) => {
   const [modal, modalContextHolder] = Modal.useModal()
   const [messageApi, messageContextHolder] = message.useMessage()
@@ -107,30 +120,36 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({ onNodeSelect }) => {
   } = useStore()
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null)
+  // 记录本次重连是否成功，用于判断是否需要"断开连线"确认
   const reconnectSuccessful = useRef(true)
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
   const { screenToFlowPosition } = useReactFlow()
 
+  /** 节点点击：选中节点并通知父组件打开配置面板 */
   const onNodeClick = useCallback((event: React.MouseEvent, node: any) => {
     setSelectedEdgeId(null)
     setSelectedNode(node)
     onNodeSelect?.(node)
   }, [onNodeSelect, setSelectedNode])
 
+  /** 连线点击：清空节点选中态 */
   const onEdgeClick = useCallback(() => {
     setSelectedNode(null)
   }, [setSelectedNode])
 
+  /** 重连开始：重置成功标记 */
   const onReconnectStart = useCallback(() => {
     reconnectSuccessful.current = false
   }, [])
 
+  /** 重连成功：更新连线并提示 */
   const onReconnect = useCallback((edge: WorkflowEdge, connection: Connection) => {
     reconnectSuccessful.current = true
     reconnectWorkflowEdge(edge, connection)
     messageApi.success('连线已重新连接')
   }, [messageApi, reconnectWorkflowEdge])
 
+  /** 重连结束：若未成功则弹窗询问是否断开原连线 */
   const onReconnectEnd = useCallback((_event: MouseEvent | TouchEvent, edge: WorkflowEdge) => {
     if (reconnectSuccessful.current) {
       return
@@ -150,6 +169,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({ onNodeSelect }) => {
     })
   }, [deleteEdge, messageApi, modal])
 
+  /** 删除前确认：节点与连线统一弹窗二次确认 */
   const onBeforeDelete = useCallback(({ nodes: nodesToDelete, edges: edgesToDelete }: {
     nodes: WorkflowNode[]
     edges: WorkflowEdge[]
@@ -174,6 +194,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({ onNodeSelect }) => {
     })
   }), [modal])
 
+  /** 节点删除后：清空选中并提示 */
   const onNodesDelete = useCallback((deletedNodes: WorkflowNode[]) => {
     if (deletedNodes.length > 0) {
       setSelectedNode(null)
@@ -181,6 +202,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({ onNodeSelect }) => {
     }
   }, [messageApi, setSelectedNode])
 
+  /** 连线删除后：清空选中连线并提示 */
   const onEdgesDelete = useCallback((deletedEdges: WorkflowEdge[]) => {
     if (deletedEdges.length > 0) {
       setSelectedEdgeId(null)
@@ -188,18 +210,20 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({ onNodeSelect }) => {
     }
   }, [messageApi])
 
+  /** 拖拽经过画布：允许放置 */
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault()
     event.dataTransfer.dropEffect = 'copy'
   }, [])
 
+  /** 放下节点：按拖入类型创建节点并放到鼠标位置 */
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault()
 
       const type = event.dataTransfer.getData('application/reactflow') as NodeType
 
-      // check if the dropped element is valid
+      // 校验拖入类型是否合法
       if (typeof type === 'undefined' || !type) {
         return
       }

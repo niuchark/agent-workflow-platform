@@ -1,8 +1,15 @@
+/**
+ * 品牌 Logo 组件：以 SVG 绘制的 "A" 形图标。
+ *
+ * 纯矢量实现，颜色跟随 currentColor，可用于侧边栏、登录页与分享页，
+ * 通过 title 提供无障碍名称。
+ */
 interface BrandLogoProps {
   className?: string
   title?: string
 }
 
+/** 品牌图标：三个圆点 + 折线组成字母 A */
 const BrandLogo: React.FC<BrandLogoProps> = ({ className, title }) => (
   <svg
     className={className}

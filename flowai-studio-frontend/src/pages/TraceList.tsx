@@ -1,3 +1,9 @@
+/**
+ * 全链路追踪列表页：展示工作流运行的 Trace 统计与慢追踪明细。
+ *
+ * 顶部为成功/失败/成功率统计卡片，下方为可筛选的追踪表格，
+ * 点击 Trace ID 或"详情"跳转到追踪详情页。
+ */
 import { useState, useEffect } from 'react'
 import {
   Spin, Table, Tag, Button, Input, Card, Statistic, Row, Col, message,
@@ -12,6 +18,7 @@ import {
   SlowTrace, TraceStats,
 } from '../utils/traceApi'
 
+/** 追踪状态 → 标签颜色、图标与文案 */
 const STATUS_MAP: Record<string, { color: string; icon: React.ReactNode; label: string }> = {
   running: { color: 'processing', icon: <ClockCircleOutlined />, label: '运行中' },
   success: { color: 'success', icon: <CheckCircleOutlined />, label: '成功' },
@@ -19,6 +26,7 @@ const STATUS_MAP: Record<string, { color: string; icon: React.ReactNode; label: 
   cancelled: { color: 'default', icon: <CloseCircleOutlined />, label: '已取消' },
 }
 
+/** 耗时格式化：ms/s/min 自适应 */
 const formatDuration = (ms: number | null | undefined): string => {
   if (ms == null) return '-'
   if (ms < 1000) return `${ms}ms`
@@ -26,11 +34,13 @@ const formatDuration = (ms: number | null | undefined): string => {
   return `${(ms / 60000).toFixed(1)}min`
 }
 
+/** 时间格式化：ISO → 本地时间字符串 */
 const formatTime = (iso: string | null | undefined): string => {
   if (!iso) return '-'
   return new Date(iso).toLocaleString('zh-CN')
 }
 
+/** 追踪列表页面组件 */
 const TraceList: React.FC = () => {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
@@ -39,6 +49,7 @@ const TraceList: React.FC = () => {
   const [workflowIdFilter, setWorkflowIdFilter] = useState('')
   const safeSlowTraces = Array.isArray(slowTraces) ? slowTraces : []
 
+  /** 并行加载慢追踪列表与统计概览 */
   const loadData = async () => {
     setLoading(true)
     try {
@@ -56,10 +67,12 @@ const TraceList: React.FC = () => {
     }
   }
 
+  // 进入页面时加载一次
   useEffect(() => {
     loadData()
   }, [])
 
+  /** 表格列定义：Trace ID、状态、耗时、时间与详情跳转 */
   const columns = [
     {
       title: 'Trace ID',

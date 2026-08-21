@@ -1,12 +1,20 @@
+/**
+ * 认证页面外壳：登录/注册页的左右分栏布局。
+ *
+ * 左侧是品牌介绍区（Logo、平台定位），右侧为表单区，
+ * 通过 children 注入实际表单内容，保证两个认证页视觉一致。
+ */
 import type { ReactNode } from 'react'
 import BrandLogo from '../BrandLogo'
 
+/** 认证外壳 props */
 interface AuthShellProps {
   title: string
   subtitle: string
   children: ReactNode
 }
 
+/** 认证页面外壳组件：品牌区 + 表单区 */
 const AuthShell: React.FC<AuthShellProps> = ({ title, subtitle, children }) => (
   <div className="auth-page">
     <div className="auth-brand">

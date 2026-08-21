@@ -1,7 +1,14 @@
+/**
+ * 应用状态切片：管理应用（App）列表、当前打开的应用及其生命周期。
+ *
+ * 生命周期操作（发布/取消发布/归档/取消归档）会复用
+ * updateAppLifecycle，用服务端返回的最新字段原地更新列表与当前应用。
+ */
 import { StateCreator } from 'zustand'
 import { Application, CreateAppForm } from '../../types'
 import request, { getResponseData } from '../../utils/axios'
 
+/** 应用切片对外暴露的状态与 Actions 类型 */
 export interface AppSlice {
   apps: Application[]
   currentApp: Application | null
@@ -21,7 +28,12 @@ export interface AppSlice {
   unarchiveApp: (id: string) => Promise<void>
 }
 
+/** 创建应用切片：提供列表加载、详情、增删改与生命周期操作 */
 export const createAppSlice: StateCreator<AppSlice> = (set, get) => {
+  /**
+   * 应用生命周期通用处理：调用对应 PATCH 接口后，
+   * 用返回的部分字段同步更新列表与当前应用，避免整页刷新。
+   */
   const updateAppLifecycle = async (
     id: string,
     action: 'publish' | 'unpublish' | 'archive' | 'unarchive',
@@ -46,10 +58,13 @@ export const createAppSlice: StateCreator<AppSlice> = (set, get) => {
     currentApp: null,
     isLoading: false,
 
+    /** 整体替换应用列表 */
     setApps: (apps) => set({ apps }),
   
+    /** 设置当前打开的应用 */
     setCurrentApp: (app) => set({ currentApp: app }),
 
+    /** 拉取应用列表；失败时清空列表并继续抛错 */
     fetchApps: async () => {
       set({ isLoading: true })
       try {
@@ -63,6 +78,7 @@ export const createAppSlice: StateCreator<AppSlice> = (set, get) => {
       }
     },
 
+    /** 按 ID 拉取应用详情并设为当前应用 */
     fetchAppById: async (id) => {
       set({ isLoading: true })
       try {
@@ -75,6 +91,7 @@ export const createAppSlice: StateCreator<AppSlice> = (set, get) => {
       }
     },
 
+    /** 创建应用：成功后追加到列表末尾 */
     createApp: async (data) => {
       set({ isLoading: true })
       try {
@@ -88,6 +105,7 @@ export const createAppSlice: StateCreator<AppSlice> = (set, get) => {
       }
     },
 
+    /** 更新应用：同步更新列表与当前应用 */
     updateApp: async (id, data) => {
       set({ isLoading: true })
       try {
@@ -107,6 +125,7 @@ export const createAppSlice: StateCreator<AppSlice> = (set, get) => {
       }
     },
 
+    /** 删除应用：从列表移除，若删除的是当前应用则清空 */
     deleteApp: async (id) => {
       set({ isLoading: true })
       try {
@@ -123,12 +142,16 @@ export const createAppSlice: StateCreator<AppSlice> = (set, get) => {
       }
     },
 
+    /** 发布应用 */
     publishApp: (id) => updateAppLifecycle(id, 'publish'),
 
+    /** 取消发布应用 */
     unpublishApp: (id) => updateAppLifecycle(id, 'unpublish'),
 
+    /** 归档应用 */
     archiveApp: (id) => updateAppLifecycle(id, 'archive'),
 
+    /** 取消归档应用 */
     unarchiveApp: (id) => updateAppLifecycle(id, 'unarchive'),
   }
 }

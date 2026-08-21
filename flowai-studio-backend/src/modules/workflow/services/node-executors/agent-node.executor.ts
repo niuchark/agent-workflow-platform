@@ -21,6 +21,7 @@ import {
 export class AgentNodeExecutor implements INodeExecutor {
   constructor(private readonly agentExecutor: AgentExecutorService) {}
 
+  /** 构建 Agent 配置 → 解析输入 → 交给 AgentExecutorService 执行 */
   async execute(
     node: any,
     context: Record<string, any>,
@@ -50,6 +51,7 @@ export class AgentNodeExecutor implements INodeExecutor {
   /**
    * 从节点数据构建 AgentNodeConfig
    */
+  /** 从节点数据构建 AgentNodeConfig（single / supervisor 两种模式） */
   private buildAgentConfig(data: any): AgentNodeConfig {
     const mode = data.agentMode || 'single';
     const maxIterations = data.maxIterations || 10;
@@ -105,6 +107,7 @@ export class AgentNodeExecutor implements INodeExecutor {
     return config;
   }
 
+  /** 根据模型名推断供应商 */
   private inferProvider(model: string): 'qwen' | 'openai' | 'ollama' {
     if (model.startsWith('gpt-') || model.startsWith('o1-')) return 'openai';
     if (model.includes(':')) return 'ollama';
@@ -114,6 +117,7 @@ export class AgentNodeExecutor implements INodeExecutor {
   /**
    * 解析输入（支持模板变量）
    */
+  /** 解析输入模板中的变量引用 */
   private resolveInput(template: string, context: Record<string, any>): string {
     if (!template) return '';
 

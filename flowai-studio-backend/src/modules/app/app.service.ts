@@ -1,8 +1,15 @@
+/**
+ * 应用服务：实现应用 CRUD 与生命周期操作，并做访问控制。
+ *
+ * 访问规则：所有者完全访问；团队成员按 team_applications.permission
+ * （full_access / can_edit / can_view）分级校验。
+ */
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { CreateAppDto } from './dto/create-app.dto';
 import { UpdateAppDto } from './dto/update-app.dto';
 
+/** 应用服务 */
 @Injectable()
 export class AppService {
   constructor(private prisma: PrismaService) {}
@@ -78,6 +85,7 @@ export class AppService {
     return userLevel >= requiredLevel;
   }
 
+  /** 创建应用：归属当前用户 */
   async create(userId: string, createAppDto: CreateAppDto) {
     return this.prisma.application.create({
       data: {
@@ -96,6 +104,7 @@ export class AppService {
     });
   }
 
+  /** 获取用户可见的应用列表：自有应用 + 团队授权的应用 */
   async findAll(userId: string) {
     // 获取用户自己的应用
     const ownedApps = await this.prisma.application.findMany({
@@ -150,6 +159,7 @@ export class AppService {
     return [...ownedAppResults, ...teamAppResults];
   }
 
+  /** 获取应用详情（含工作流列表） */
   async findOne(userId: string, id: string) {
     await this.assertAppAccess(userId, id);
 
@@ -171,6 +181,7 @@ export class AppService {
     return app;
   }
 
+  /** 更新应用：非所有者需要 can_edit 权限 */
   async update(userId: string, id: string, updateAppDto: UpdateAppDto) {
     await this.assertAppAccess(userId, id);
 
@@ -199,6 +210,7 @@ export class AppService {
     });
   }
 
+  /** 删除应用：非所有者需要 full_access 权限 */
   async remove(userId: string, id: string) {
     await this.assertAppAccess(userId, id);
 
@@ -215,6 +227,7 @@ export class AppService {
     return { success: true };
   }
 
+  /** 发布应用：状态置为 published */
   async publish(userId: string, id: string) {
     await this.assertAppAccess(userId, id);
 
@@ -234,6 +247,7 @@ export class AppService {
     });
   }
 
+  /** 取消发布：状态回到 draft */
   async unpublish(userId: string, id: string) {
     await this.assertAppAccess(userId, id);
 
@@ -253,6 +267,7 @@ export class AppService {
     });
   }
 
+  /** 归档应用：状态置为 archived */
   async archive(userId: string, id: string) {
     await this.assertAppAccess(userId, id);
 
@@ -272,6 +287,7 @@ export class AppService {
     });
   }
 
+  /** 取消归档：状态回到 draft */
   async unarchive(userId: string, id: string) {
     await this.assertAppAccess(userId, id);
 

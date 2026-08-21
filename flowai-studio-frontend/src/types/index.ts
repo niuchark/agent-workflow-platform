@@ -1,4 +1,13 @@
-// 用户相关类型
+/**
+ * 前端全局类型定义：集中管理所有业务实体、表单与配置选项。
+ *
+ * 涵盖用户/应用/工作流/知识库/技能/模板/团队/API Key/分享等
+ * 各功能域的类型与下拉选项常量，是全站类型共享的唯一来源。
+ */
+
+// ============ 用户相关类型 ============
+
+/** 用户实体 */
 export interface User {
   id: string
   username: string
@@ -6,17 +15,21 @@ export interface User {
   createdAt: string
 }
 
+/** 登录表单 */
 export interface LoginForm {
   username: string
   password: string
 }
 
+/** 注册表单 */
 export interface RegisterForm {
   username: string
   password: string
 }
 
-// 应用相关类型
+// ============ 应用相关类型 ============
+
+/** 应用实体：状态为草稿/已发布/已归档 */
 export interface Application {
   id: string
   name: string
@@ -28,28 +41,35 @@ export interface Application {
   updatedAt: string
 }
 
+/** 创建应用表单 */
 export interface CreateAppForm {
   name: string
   description?: string
   icon?: string
 }
 
-// 工作流相关类型
+// ============ 工作流相关类型 ============
+
+/** 画布节点类型（与后端节点执行器一一对应） */
 export type NodeType = 'start' | 'userInput' | 'llm' | 'rag' | 'skill' | 'condition' | 'output' | 'agent'
 
+/** 节点数据的公共基类 */
 export interface BaseNodeData {
   label: string
   [key: string]: unknown
 }
 
+/** 开始节点：声明一组可直接注入的静态变量 */
 export interface StartNodeData extends BaseNodeData {
   variables: { key: string; value: any }[]
 }
 
+/** 用户输入节点：声明需要外部传入的输入字段 */
 export interface UserInputNodeData extends BaseNodeData {
   inputField: string
 }
 
+/** 大模型节点：模型、提示词与生成参数 */
 export interface LLMNodeData extends BaseNodeData {
   provider: 'qwen' | 'openai' | 'ollama'
   model: string
@@ -59,6 +79,7 @@ export interface LLMNodeData extends BaseNodeData {
   maxTokens: number
 }
 
+/** 知识库检索节点：指定知识库与检索参数 */
 export interface RAGNodeData extends BaseNodeData {
   knowledgeBaseId: string
   query: string
@@ -66,16 +87,19 @@ export interface RAGNodeData extends BaseNodeData {
   similarityThreshold: number
 }
 
+/** 技能调用节点：指定技能 ID 与入参 */
 export interface SkillNodeData extends BaseNodeData {
   skillId: string
   skillType: 'builtin' | 'custom'
   parameters: Record<string, any>
 }
 
+/** 条件分支节点：一组"变量 + 运算符 + 值"的条件列表 */
 export interface ConditionNodeData extends BaseNodeData {
   conditions: { variable: string; operator: string; value: any }[]
 }
 
+/** 输出节点：定义输出表达式 */
 export interface OutputNodeData extends BaseNodeData {
   outputValue: any
 }
@@ -136,6 +160,7 @@ export interface AgentNodeData extends BaseNodeData {
   workers?: WorkerConfig[]
 }
 
+/** 所有节点数据的联合类型（按节点 type 区分） */
 export type WorkflowNodeData =
   | StartNodeData
   | UserInputNodeData
@@ -146,6 +171,7 @@ export type WorkflowNodeData =
   | OutputNodeData
   | AgentNodeData
 
+/** 画布节点：位置 + 类型 + 配置数据 */
 export interface WorkflowNode {
   id: string
   type: NodeType
@@ -153,6 +179,7 @@ export interface WorkflowNode {
   data: WorkflowNodeData
 }
 
+/** 画布连线 */
 export interface WorkflowEdge {
   id: string
   source: string
@@ -160,6 +187,7 @@ export interface WorkflowEdge {
   label?: string
 }
 
+/** 工作流实体：名称、节点、连线与可选全局变量 */
 export interface Workflow {
   id: string
   name: string
@@ -171,7 +199,7 @@ export interface Workflow {
   updatedAt: string
 }
 
-// 知识库相关类型
+// ============ 知识库相关类型 ============
 
 /** Embedding Provider 类型 */
 export type EmbeddingProviderType = 'qwen' | 'openai' | 'ollama'
@@ -209,6 +237,7 @@ export const VECTOR_STORE_OPTIONS: { label: string; value: VectorStoreType; desc
 /** Reranker Provider 类型 */
 export type RerankerProviderType = 'cohere' | 'ollama' | 'none'
 
+/** 知识库实体：embedding/向量库/分块/检索模式/重排序等完整配置 */
 export interface KnowledgeBase {
   id: string
   name: string
@@ -263,6 +292,7 @@ export const OLLAMA_RERANK_MODELS = [
   { label: 'bge-reranker-v2-gemma（更高精度）', value: 'bge-reranker-v2-gemma' },
 ]
 
+/** 文档实体（属于某个知识库） */
 export interface Document {
   id: string
   name: string
@@ -273,6 +303,7 @@ export interface Document {
   updatedAt: string
 }
 
+/** 文档分块结果 */
 export interface DocumentChunk {
   id: string
   content: string
@@ -283,6 +314,7 @@ export interface DocumentChunk {
   createdAt: string
 }
 
+/** 文档分块查询响应 */
 export interface DocumentChunksResponse {
   documentId: string
   documentName: string
@@ -290,7 +322,9 @@ export interface DocumentChunksResponse {
   chunks: DocumentChunk[]
 }
 
-// Skill工具相关类型
+// ============ 技能（Skill）相关类型 ============
+
+/** 技能实体：内置或自定义，含输入输出 schema */
 export interface Skill {
   id: string
   name: string
@@ -305,9 +339,12 @@ export interface Skill {
   updatedAt: string
 }
 
-// 节点执行状态
+// ============ 节点执行状态 ============
+
+/** 节点运行状态：待运行/运行中/成功/失败 */
 export type NodeExecutionStatus = 'pending' | 'running' | 'success' | 'failed'
 
+/** 单个节点的一次执行结果（用于画布运行态高亮） */
 export interface NodeExecution {
   nodeId: string
   status: NodeExecutionStatus
@@ -318,13 +355,18 @@ export interface NodeExecution {
   completedAt?: string
 }
 
-// 模板市场相关类型
+// ============ 模板市场相关类型 ============
+
+/** 模板分类 */
 export type TemplateCategory = 'productivity' | 'customer-service' | 'content-creation' | 'data-analysis' | 'education' | 'development' | 'other'
 
+/** 模板排序方式：最新/热门/评分 */
 export type TemplateSort = 'newest' | 'popular' | 'rating'
 
+/** 模板状态：草稿/已发布/已归档 */
 export type TemplateStatus = 'draft' | 'published' | 'archived'
 
+/** 工作流模板实体：含完整节点连线与市场统计 */
 export interface WorkflowTemplate {
   id: string
   name: string
@@ -346,6 +388,7 @@ export interface WorkflowTemplate {
   updatedAt: string
 }
 
+/** 模板列表分页响应 */
 export interface TemplateListResponse {
   items: WorkflowTemplate[]
   total: number
@@ -354,6 +397,7 @@ export interface TemplateListResponse {
   totalPages: number
 }
 
+/** 模板分类计数（用于市场侧栏筛选） */
 export interface TemplateCategoryCount {
   category: TemplateCategory
   count: number
@@ -370,15 +414,18 @@ export const TEMPLATE_CATEGORY_OPTIONS: { label: string; value: TemplateCategory
   { label: '其他', value: 'other' },
 ]
 
-// ============================================================
-// 团队与权限 (Phase 5 - RBAC)
-// ============================================================
+// ============ 团队与权限（RBAC） ============
 
+/** 团队角色：所有者/管理员/编辑者/查看者 */
 export type TeamRole = 'owner' | 'admin' | 'editor' | 'viewer'
+/** 团队内应用的访问权限 */
 export type TeamAppPermission = 'full_access' | 'can_edit' | 'can_view'
+/** 全局角色 */
 export type GlobalRole = 'admin' | 'member'
+/** API Key 的权限范围 */
 export type ApiKeyScope = 'app:read' | 'app:write' | 'app:execute' | 'workflow:read' | 'workflow:write' | 'knowledge:read' | 'knowledge:write'
 
+/** 团队实体 */
 export interface Team {
   id: string
   name: string
@@ -392,6 +439,7 @@ export interface Team {
   applications?: TeamApplication[]
 }
 
+/** 团队成员 */
 export interface TeamMember {
   id: string
   teamId: string
@@ -401,6 +449,7 @@ export interface TeamMember {
   user?: User
 }
 
+/** 团队内的应用授权 */
 export interface TeamApplication {
   id: string
   teamId: string
@@ -410,6 +459,7 @@ export interface TeamApplication {
   application?: any
 }
 
+/** API Key（列表中展示，不包含完整密钥） */
 export interface ApiKey {
   id: string
   name: string
@@ -421,6 +471,7 @@ export interface ApiKey {
   createdAt: string
 }
 
+/** 创建 API Key 的响应：完整 key 仅在此返回一次 */
 export interface ApiKeyCreatedResponse {
   id: string
   name: string
@@ -429,6 +480,7 @@ export interface ApiKeyCreatedResponse {
   createdAt: string
 }
 
+/** 应用分享配置 */
 export interface AppShare {
   id: string
   applicationId: string
@@ -439,6 +491,7 @@ export interface AppShare {
   createdAt: string
 }
 
+/** 嵌入（iframe/script）配置 */
 export interface EmbedConfig {
   enabled: boolean
   width?: string
@@ -447,34 +500,42 @@ export interface EmbedConfig {
   showHeader?: boolean
 }
 
-// 表单类型
+// ============ 表单类型 ============
+
+/** 创建团队表单 */
 export interface CreateTeamForm {
   name: string
   description?: string
 }
 
+/** 添加成员表单 */
 export interface AddMemberForm {
   userId: string
   role: TeamRole
 }
 
+/** 添加应用到团队的表单 */
 export interface AddTeamAppForm {
   applicationId: string
   permission: TeamAppPermission
 }
 
+/** 创建 API Key 表单 */
 export interface CreateApiKeyForm {
   name: string
   scopes: ApiKeyScope[]
   expiresAt?: string
 }
 
+/** 更新分享设置表单 */
 export interface UpdateShareSettingsForm {
   isPublic?: boolean
   embedConfig?: EmbedConfig
 }
 
-// 常量
+// ============ 展示常量 ============
+
+/** 团队角色的中文标签 */
 export const TEAM_ROLE_LABELS: Record<TeamRole, string> = {
   owner: '所有者',
   admin: '管理员',
@@ -482,12 +543,14 @@ export const TEAM_ROLE_LABELS: Record<TeamRole, string> = {
   viewer: '查看者',
 }
 
+/** 团队应用权限的中文标签 */
 export const TEAM_APP_PERMISSION_LABELS: Record<TeamAppPermission, string> = {
   full_access: '完全访问',
   can_edit: '可编辑',
   can_view: '仅查看',
 }
 
+/** API Key 权限范围选项（供创建表单勾选） */
 export const API_KEY_SCOPE_OPTIONS: { label: string; value: ApiKeyScope }[] = [
   { label: '应用读取', value: 'app:read' },
   { label: '应用写入', value: 'app:write' },
@@ -498,20 +561,25 @@ export const API_KEY_SCOPE_OPTIONS: { label: string; value: ApiKeyScope }[] = [
   { label: '知识库写入', value: 'knowledge:write' },
 ]
 
-// 补充类型
+// ============ 补充类型 ============
+
+/** 更新团队表单 */
 export interface UpdateTeamForm {
   name?: string
   description?: string
 }
 
+/** 更新成员角色表单 */
 export interface UpdateMemberRoleForm {
   role: TeamRole
 }
 
+/** 更新团队应用权限表单 */
 export interface UpdateTeamAppPermissionForm {
   permission: TeamAppPermission
 }
 
+/** 嵌入代码响应（iframe 与 script 两种方式） */
 export interface EmbedCodeResponse {
   iframeCode: string
   scriptCode: string

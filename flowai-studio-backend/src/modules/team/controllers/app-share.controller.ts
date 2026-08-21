@@ -1,3 +1,6 @@
+/**
+ * 应用分享控制器：分享链接管理（认证）+ 公开访问（免认证）。
+ */
 import {
   Controller,
   Get,
@@ -27,6 +30,7 @@ class UpdateShareSettingsDto {
   };
 }
 
+/** 认证的分享管理控制器 */
 @Controller('apps')
 @UseGuards(JwtAuthGuard)
 export class AppShareController {
@@ -89,6 +93,7 @@ export class AppShareController {
 export class AppSharePublicController {
   constructor(private readonly appShareService: AppShareService) {}
 
+  /** 公开访问分享应用（无需登录） */
   @Get(':shareLink')
   getSharedApp(@Param('shareLink') shareLink: string) {
     return this.appShareService.getSharedApp(shareLink);

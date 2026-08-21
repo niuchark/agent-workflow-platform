@@ -1,8 +1,13 @@
+/**
+ * 用户输入节点执行器：从运行输入中取出指定字段。
+ */
 import { Injectable } from '@nestjs/common';
 import { INodeExecutor } from '../../types';
 
+/** 用户输入节点执行器 */
 @Injectable()
 export class UserInputNodeExecutor implements INodeExecutor {
+  /** 读取 inputField 指定的输入值，缺失则报错 */
   async execute(node: any, context: Record<string, any>): Promise<Record<string, any>> {
     const nodeData = node.data as any;
     const { inputField } = nodeData;

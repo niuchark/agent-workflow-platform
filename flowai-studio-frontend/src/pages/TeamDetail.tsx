@@ -1,3 +1,11 @@
+/**
+ * 团队详情页面：管理团队信息、成员与团队内应用授权。
+ *
+ * 三个核心能力：
+ * - 编辑团队信息、删除团队；
+ * - 成员管理：添加成员、调整角色（所有者不可改/不可移除）、移除成员；
+ * - 应用授权：把应用加入团队、调整访问权限、移除应用。
+ */
 import { useState, useEffect } from 'react'
 import {
   Button, Modal, Form, Input, Select, Table, Card, Tag, Space, message,
@@ -17,12 +25,14 @@ import {
 
 const { Title, Text } = Typography
 
+/** 日期格式化：无效或空值显示占位符 */
 const formatDate = (value?: string) => {
   if (!value) return '—'
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('zh-CN')
 }
 
+/** 团队详情页面组件 */
 const TeamDetail: React.FC = () => {
   const { teamId } = useParams<{ teamId: string }>()
   const navigate = useNavigate()
@@ -42,6 +52,7 @@ const TeamDetail: React.FC = () => {
   const [editForm] = Form.useForm()
   const [activeTab, setActiveTab] = useState('members')
 
+  // 进入页面加载团队详情与应用列表
   useEffect(() => {
     if (teamId) {
       fetchTeam(teamId)
@@ -49,6 +60,7 @@ const TeamDetail: React.FC = () => {
     }
   }, [teamId])
 
+  /** 打开编辑弹窗：回填团队信息 */
   const handleEditTeam = () => {
     if (currentTeam) {
       editForm.setFieldsValue({
@@ -59,6 +71,7 @@ const TeamDetail: React.FC = () => {
     }
   }
 
+  /** 提交团队信息修改 */
   const handleEditTeamSubmit = async (values: { name: string; description?: string }) => {
     try {
       await updateTeam(teamId!, values)
@@ -69,6 +82,7 @@ const TeamDetail: React.FC = () => {
     }
   }
 
+  /** 删除团队：成功后返回团队列表 */
   const handleDeleteTeam = async () => {
     try {
       await deleteTeam(teamId!)
@@ -79,7 +93,8 @@ const TeamDetail: React.FC = () => {
     }
   }
 
-  // 成员操作
+  // ===== 成员操作 =====
+  /** 添加团队成员 */
   const handleAddMember = async (values: AddMemberForm) => {
     try {
       await addTeamMember(teamId!, values)
@@ -91,6 +106,7 @@ const TeamDetail: React.FC = () => {
     }
   }
 
+  /** 修改成员角色 */
   const handleUpdateRole = async (memberId: string, role: TeamRole) => {
     try {
       await updateMemberRole(teamId!, memberId, { role })
@@ -100,6 +116,7 @@ const TeamDetail: React.FC = () => {
     }
   }
 
+  /** 移除成员 */
   const handleRemoveMember = async (memberId: string) => {
     try {
       await removeTeamMember(teamId!, memberId)
@@ -109,7 +126,8 @@ const TeamDetail: React.FC = () => {
     }
   }
 
-  // 应用操作
+  // ===== 应用操作 =====
+  /** 添加应用到团队 */
   const handleAddApp = async (values: AddTeamAppForm) => {
     try {
       await addTeamApp(teamId!, values)
@@ -121,6 +139,7 @@ const TeamDetail: React.FC = () => {
     }
   }
 
+  /** 调整团队应用的访问权限 */
   const handleUpdateAppPermission = async (teamAppId: string, permission: TeamAppPermission) => {
     try {
       await updateTeamAppPermission(teamId!, teamAppId, { permission })
@@ -130,6 +149,7 @@ const TeamDetail: React.FC = () => {
     }
   }
 
+  /** 从团队移除应用 */
   const handleRemoveApp = async (teamAppId: string) => {
     try {
       await removeTeamApp(teamId!, teamAppId)
@@ -139,7 +159,7 @@ const TeamDetail: React.FC = () => {
     }
   }
 
-  // 成员列表列
+  /** 成员列表列定义：角色下拉切换、所有者特殊标记 */
   const memberColumns = [
     {
       title: '用户',
@@ -200,7 +220,7 @@ const TeamDetail: React.FC = () => {
     },
   ]
 
-  // 应用列表列
+  /** 应用列表列定义：权限下拉切换 */
   const appColumns = [
     {
       title: '应用',
@@ -259,7 +279,7 @@ const TeamDetail: React.FC = () => {
     },
   ]
 
-  // 可添加的应用（排除已在团队中的）
+  // 可添加的应用：排除已在团队中的
   const availableApps = Array.isArray(apps)
     ? apps.filter((app) => !teamApps.some((ta) => ta.applicationId === app.id))
     : []

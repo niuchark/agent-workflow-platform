@@ -1,3 +1,6 @@
+/**
+ * 大模型节点执行器：调用 LLM 生成回答并记录 Token 用量。
+ */
 import { Injectable } from '@nestjs/common';
 import { INodeExecutor } from '../../types';
 import { AiService } from '../../../ai/ai.service';
@@ -10,6 +13,7 @@ export class LLMNodeExecutor implements INodeExecutor {
     private readonly tokenUsageService: TokenUsageService,
   ) {}
 
+  /** 解析提示词 → 调用模型 → 异步记录用量 → 返回 result */
   async execute(node: any, context: Record<string, any>): Promise<Record<string, any>> {
     const nodeData = node.data as any;
     const { model, provider, systemPrompt, userPrompt, temperature, maxTokens } = nodeData;
@@ -54,6 +58,7 @@ export class LLMNodeExecutor implements INodeExecutor {
   /**
    * 根据模型名称推断 Provider
    */
+  /** 根据模型名称推断 Provider */
   private inferProvider(model: string): string {
     if (model.startsWith('gpt-') || model.startsWith('o1-')) return 'openai';
     if (model.startsWith('claude-')) return 'claude';
@@ -63,6 +68,7 @@ export class LLMNodeExecutor implements INodeExecutor {
     return 'qwen';
   }
 
+  /** 把提示词模板中的变量引用替换为上下文实际值 */
   private resolveVariables(template: string, context: Record<string, any>): string {
     return template.replace(/\{\{(.+?)\}\}/g, (match, p1) => {
       const keys = p1.trim().split('.');

@@ -1,8 +1,17 @@
+/**
+ * 全局 Axios 实例：统一管理 API 请求的前缀、鉴权与错误处理。
+ *
+ * - baseURL 为 /api，配合 Vite 代理转发到后端；
+ * - 请求拦截器自动附加 Bearer token，并支持 cacheBust 时间戳防缓存；
+ * - 响应拦截器直接返回 data，并把各种 HTTP 错误统一改写为可读的中文提示。
+ */
 import axios from 'axios'
 
+/** 从 Axios 响应中取出 data 字段（兼容响应拦截器已解包的情况） */
 export const getResponseData = <T>(response: unknown): T =>
   (response as { data: T }).data
 
+/** 扩展 Axios 配置类型：允许在请求里声明 cacheBust（GET 防缓存） */
 declare module 'axios' {
   interface AxiosRequestConfig {
     cacheBust?: boolean

@@ -1,7 +1,15 @@
+/**
+ * 团队状态切片：管理团队、成员与应用授权。
+ *
+ * 覆盖三组操作：团队 CRUD、成员管理（加入/改角色/移除/退出）、
+ * 团队应用授权（添加/调整权限/移除），状态保存在内存中，
+ * 页面切换后通过 fetch 重新拉取。
+ */
 import { StateCreator } from 'zustand'
 import { Team, TeamMember, TeamApplication, CreateTeamForm, UpdateTeamForm, AddMemberForm, UpdateMemberRoleForm, AddTeamAppForm, UpdateTeamAppPermissionForm } from '../../types'
 import * as teamApi from '../../utils/teamApi'
 
+/** 团队切片对外暴露的状态与 Actions 类型 */
 export interface TeamSlice {
   teams: Team[]
   currentTeam: Team | null
@@ -30,6 +38,7 @@ export interface TeamSlice {
   removeTeamApp: (teamId: string, teamAppId: string) => Promise<void>
 }
 
+/** 创建团队切片：提供团队、成员与应用授权三类操作 */
 export const createTeamSlice: StateCreator<TeamSlice> = (set, get) => ({
   teams: [],
   currentTeam: null,
@@ -40,6 +49,7 @@ export const createTeamSlice: StateCreator<TeamSlice> = (set, get) => ({
   setTeams: (teams) => set({ teams }),
   setCurrentTeam: (team) => set({ currentTeam: team }),
 
+  /** 拉取当前用户加入的团队列表 */
   fetchMyTeams: async () => {
     set({ isLoading: true })
     try {
@@ -53,6 +63,7 @@ export const createTeamSlice: StateCreator<TeamSlice> = (set, get) => ({
     }
   },
 
+  /** 按 ID 拉取团队详情，并同步成员与应用列表 */
   fetchTeam: async (teamId) => {
     set({ isLoading: true })
     try {
@@ -71,6 +82,7 @@ export const createTeamSlice: StateCreator<TeamSlice> = (set, get) => ({
     }
   },
 
+  /** 创建团队：成功后追加到列表末尾 */
   createTeam: async (data) => {
     set({ isLoading: true })
     try {
@@ -85,6 +97,7 @@ export const createTeamSlice: StateCreator<TeamSlice> = (set, get) => ({
     }
   },
 
+  /** 更新团队信息：同步更新列表与当前团队 */
   updateTeam: async (teamId, data) => {
     set({ isLoading: true })
     try {
@@ -103,6 +116,7 @@ export const createTeamSlice: StateCreator<TeamSlice> = (set, get) => ({
     }
   },
 
+  /** 删除团队：从列表移除，若删除的是当前团队则清空 */
   deleteTeam: async (teamId) => {
     set({ isLoading: true })
     try {
@@ -119,6 +133,7 @@ export const createTeamSlice: StateCreator<TeamSlice> = (set, get) => ({
     }
   },
 
+  /** 添加团队成员：成功后追加到成员列表 */
   addTeamMember: async (teamId, data) => {
     try {
       const response = await teamApi.addTeamMember(teamId, data) as any
@@ -130,6 +145,7 @@ export const createTeamSlice: StateCreator<TeamSlice> = (set, get) => ({
     }
   },
 
+  /** 修改成员角色：用最新结果替换列表中的对应项 */
   updateMemberRole: async (teamId, memberId, data) => {
     try {
       const response = await teamApi.updateMemberRole(teamId, memberId, data) as any
@@ -145,6 +161,7 @@ export const createTeamSlice: StateCreator<TeamSlice> = (set, get) => ({
     }
   },
 
+  /** 移除团队成员 */
   removeTeamMember: async (teamId, memberId) => {
     try {
       await teamApi.removeTeamMember(teamId, memberId)
@@ -154,6 +171,7 @@ export const createTeamSlice: StateCreator<TeamSlice> = (set, get) => ({
     }
   },
 
+  /** 退出团队：从列表移除并清空当前团队 */
   leaveTeam: async (teamId) => {
     try {
       await teamApi.leaveTeam(teamId)
@@ -167,6 +185,7 @@ export const createTeamSlice: StateCreator<TeamSlice> = (set, get) => ({
     }
   },
 
+  /** 把应用加入团队：成功后追加到应用列表 */
   addTeamApp: async (teamId, data) => {
     try {
       const response = await teamApi.addTeamApp(teamId, data) as any
@@ -178,6 +197,7 @@ export const createTeamSlice: StateCreator<TeamSlice> = (set, get) => ({
     }
   },
 
+  /** 调整团队应用的访问权限 */
   updateTeamAppPermission: async (teamId, teamAppId, data) => {
     try {
       const response = await teamApi.updateTeamAppPermission(teamId, teamAppId, data) as any
@@ -193,6 +213,7 @@ export const createTeamSlice: StateCreator<TeamSlice> = (set, get) => ({
     }
   },
 
+  /** 从团队移除应用授权 */
   removeTeamApp: async (teamId, teamAppId) => {
     try {
       await teamApi.removeTeamApp(teamId, teamAppId)

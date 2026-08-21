@@ -1,3 +1,6 @@
+/**
+ * DSL 导入导出 DTO：YAML/JSON 两种格式的导入校验与导出参数。
+ */
 import { IsString, IsOptional, IsEnum, IsArray, ValidateNested, IsObject } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -10,8 +13,10 @@ import { Type } from 'class-transformer';
  * - 节点类型校验
  */
 
+/** DSL 支持的文件格式 */
 export type DslFormat = 'yaml' | 'json';
 
+/** 导入 DSL 的请求体 */
 export class ImportWorkflowDslDto {
   @IsString({ message: 'DSL content is required' })
   dsl!: string;
@@ -27,6 +32,7 @@ export class ImportWorkflowDslDto {
   nameOverride?: string;
 }
 
+/** 导出 DSL 的请求体（仅格式） */
 export class ExportWorkflowDslDto {
   @IsEnum(['yaml', 'json'], { message: 'Format must be yaml or json' })
   format!: DslFormat;

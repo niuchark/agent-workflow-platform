@@ -65,6 +65,7 @@ export class RAGService {
   // 知识库管理
   // ============================================================
 
+  /** 创建知识库：先验证 Embedding 凭证，再初始化向量存储与全文索引 */
   async createKnowledgeBase(userId: string, createKnowledgeBaseDto: CreateKnowledgeBaseDto) {
     // 在创建数据前验证当前用户的 Embedding 凭证，避免创建一个无法工作的知识库。
     const embeddingProvider = await this.embeddingFactory.createForUser(
@@ -161,6 +162,7 @@ export class RAGService {
     return kb;
   }
 
+  /** 更新知识库：embedding 相关配置变更时先验证新凭证 */
   async updateKnowledgeBase(userId: string, id: string, updateKnowledgeBaseDto: UpdateKnowledgeBaseDto) {
     const kb = await this.findKnowledgeBaseById(userId, id);
 
@@ -187,6 +189,7 @@ export class RAGService {
     return updated;
   }
 
+  /** 删除知识库：清理向量存储与文档数据并失效缓存 */
   async deleteKnowledgeBase(userId: string, id: string) {
     const kb = await this.findKnowledgeBaseById(userId, id);
 
@@ -217,6 +220,7 @@ export class RAGService {
   // 文档管理
   // ============================================================
 
+  /** 上传文档：校验格式 → 解析内容 → 创建记录 → 异步分块向量化 */
   async uploadDocument(userId: string, knowledgeBaseId: string, file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException('请选择要上传的文件');
@@ -422,6 +426,7 @@ export class RAGService {
     };
   }
 
+  /** 删除文档：清理向量数据与分块并失效相关缓存 */
   async deleteDocument(userId: string, documentId: string) {
     const document = await this.prisma.document.findUnique({
       where: { id: documentId },
@@ -807,6 +812,7 @@ export class RAGService {
   // 结果增强
   // ============================================================
 
+  /** 把检索结果统一为对外格式并补充文档名称 */
   private enrichRetrievalResults(results: RetrievalResult[]): Promise<any[]> {
     return this.enrichResultsWithDocNames(
       results.map(({ id, content, score, metadata }) => ({

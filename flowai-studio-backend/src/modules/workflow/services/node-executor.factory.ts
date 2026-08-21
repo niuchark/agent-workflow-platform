@@ -1,3 +1,6 @@
+/**
+ * 节点执行器工厂：按节点类型分发到对应的执行器实例。
+ */
 import { Injectable } from '@nestjs/common';
 import { INodeExecutor } from '../types';
 import { StartNodeExecutor } from './node-executors/start-node.executor';
@@ -9,6 +12,7 @@ import { OutputNodeExecutor } from './node-executors/output-node.executor';
 import { UserInputNodeExecutor } from './node-executors/user-input-node.executor';
 import { AgentNodeExecutor } from './node-executors/agent-node.executor';
 
+/** 节点执行器工厂：维护类型 → 执行器的映射 */
 @Injectable()
 export class NodeExecutorFactory {
   private executors: Map<string, INodeExecutor> = new Map();
@@ -33,6 +37,7 @@ export class NodeExecutorFactory {
     this.executors.set('agent', this.agentNodeExecutor);
   }
 
+  /** 获取指定节点类型的执行器（未知类型抛错） */
   getExecutor(nodeType: string): INodeExecutor {
     const executor = this.executors.get(nodeType);
     if (!executor) {

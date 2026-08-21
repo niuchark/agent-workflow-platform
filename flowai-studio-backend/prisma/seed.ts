@@ -1,3 +1,6 @@
+/**
+ * 数据库种子脚本：创建管理员账号与默认知识库。
+ */
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 

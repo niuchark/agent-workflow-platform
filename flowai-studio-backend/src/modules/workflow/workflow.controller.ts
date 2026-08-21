@@ -1,3 +1,9 @@
+/**
+ * 工作流控制器：工作流 CRUD 与执行（普通 / SSE 流式）接口。
+ *
+ * 执行接口带并发上限与熔断保护；流式执行通过 RxJS Subject
+ * 把节点状态实时写入 SSE 响应，客户端断开时自动取消执行。
+ */
 import {
   Controller,
   Get,
@@ -22,6 +28,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RateLimiterService, CircuitBreakerService, DEFAULT_RATE_LIMITS } from '../../common/guards/rate-limit.guard';
 
+/** 工作流 REST 控制器 */
 @Controller('workflows')
 @UseGuards(JwtAuthGuard)
 export class WorkflowController {
@@ -32,6 +39,7 @@ export class WorkflowController {
     private readonly circuitBreakerService: CircuitBreakerService,
   ) {}
 
+  /** 创建工作流 */
   @Post()
   create(
     @CurrentUser('userId') userId: string,
@@ -40,6 +48,7 @@ export class WorkflowController {
     return this.workflowService.create(userId, createWorkflowDto);
   }
 
+  /** 获取某应用下的工作流列表 */
   @Get('app/:appId')
   findByApp(
     @CurrentUser('userId') userId: string,
@@ -48,6 +57,7 @@ export class WorkflowController {
     return this.workflowService.findByApp(userId, appId);
   }
 
+  /** 获取工作流详情 */
   @Get(':id')
   findOne(
     @CurrentUser('userId') userId: string,
@@ -56,6 +66,7 @@ export class WorkflowController {
     return this.workflowService.findOne(userId, id);
   }
 
+  /** 更新工作流 */
   @Patch(':id')
   update(
     @CurrentUser('userId') userId: string,
@@ -65,6 +76,7 @@ export class WorkflowController {
     return this.workflowService.update(userId, id, updateWorkflowDto);
   }
 
+  /** 删除工作流 */
   @Delete(':id')
   remove(
     @CurrentUser('userId') userId: string,
@@ -73,6 +85,7 @@ export class WorkflowController {
     return this.workflowService.remove(userId, id);
   }
 
+  /** 普通方式运行工作流：阻塞等待完整结果 */
   @Post(':id/run')
   async run(
     @CurrentUser('userId') userId: string,
@@ -118,6 +131,7 @@ export class WorkflowController {
     }
   }
 
+  /** 流式运行工作流：SSE 推送节点级状态 */
   @Post(':id/run/stream')
   async streamRun(
     @CurrentUser('userId') userId: string,
@@ -204,6 +218,7 @@ export class WorkflowController {
    *
    * Phase 4.1: 主动取消机制
    */
+  /** 取消正在运行的工作流执行 */
   @Post(':id/cancel/:executionId')
   cancelExecution(
     @CurrentUser('userId') userId: string,
@@ -221,6 +236,7 @@ export class WorkflowController {
   /**
    * 获取正在运行的工作流执行列表
    */
+  /** 获取正在运行的工作流执行列表 */
   @Get(':id/running')
   getRunningExecutions(@CurrentUser('userId') userId: string) {
     return {

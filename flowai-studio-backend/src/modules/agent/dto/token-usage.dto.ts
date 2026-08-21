@@ -1,3 +1,6 @@
+/**
+ * Token 用量 DTO：记录、查询与成本报表的请求体。
+ */
 import { IsString, IsNumber, IsOptional, IsDateString, IsEnum, Min } from 'class-validator';
 
 export enum CallType {

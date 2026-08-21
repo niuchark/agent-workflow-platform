@@ -1,3 +1,10 @@
+/**
+ * 主布局组件：受保护页面共用的侧边栏 + 顶栏 + 内容区框架。
+ *
+ * - 侧边栏提供全站导航，移动端自动折叠并显示遮罩；
+ * - 顶栏展示当前页面标题、折叠按钮与用户菜单（退出登录）；
+ * - 内容区通过 Outlet 渲染当前路由页面，编辑器路由使用全宽布局。
+ */
 import { useEffect, useMemo, useState } from 'react'
 import { Layout as AntLayout, Menu, Button, Avatar, Dropdown, Typography, Grid } from 'antd'
 import { useLocation, useNavigate, Outlet } from 'react-router-dom'
@@ -28,6 +35,7 @@ const { Header, Sider, Content } = AntLayout
 const { Title } = Typography
 const { useBreakpoint } = Grid
 
+/** 路由路径 → 顶栏标题 的映射 */
 const routeMeta: Record<string, { title: string }> = {
   '/apps': { title: '工作台' },
   '/knowledge-bases': { title: '知识库' },
@@ -44,6 +52,7 @@ const routeMeta: Record<string, { title: string }> = {
   '/trace-detail': { title: '追踪详情' },
 }
 
+/** 主布局组件：导航、顶栏与内容区 */
 const Layout: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -52,15 +61,18 @@ const Layout: React.FC = () => {
   const { globalConfig, toggleSidebar, user, logout } = useStore()
   const [collapsed, setCollapsed] = useState(globalConfig.sidebarCollapsed)
 
+  // 移动端始终折叠侧边栏
   useEffect(() => {
     if (isMobile) setCollapsed(true)
   }, [isMobile])
 
+  /** 切换侧边栏折叠：本地状态 + 全局 store 同步 */
   const handleToggle = () => {
     setCollapsed(!collapsed)
     toggleSidebar()
   }
 
+  /** 侧边栏导航项 */
   const menuItems = [
     { key: '/apps', icon: <AppstoreOutlined />, label: '工作台' },
     { key: '/knowledge-bases', icon: <BookOutlined />, label: '知识库' },
@@ -76,23 +88,29 @@ const Layout: React.FC = () => {
     { key: '/trace-list', icon: <NodeIndexOutlined />, label: '全链路追踪' },
   ]
 
+  /** 用户下拉菜单项 */
   const userMenu = [
     { key: 'profile', label: '个人资料', icon: <UserOutlined /> },
     { type: 'divider' as const },
     { key: 'logout', label: '退出登录', icon: <LogoutOutlined />, danger: true },
   ]
 
+  /** 用户菜单点击：退出登录并跳转登录页 */
   const handleUserMenuClick = ({ key }: { key: string }) => {
     if (key === 'logout') { logout(); navigate('/login') }
   }
 
+  /** 导航菜单点击：跳转路由，移动端跳转后收起侧边栏 */
   const handleMenuClick = ({ key }: { key: string }) => {
     navigate(key)
     if (isMobile) setCollapsed(true)
   }
 
+  // 当前选中的菜单项：取路径第一段作为 key
   const selectedKey = '/' + (location.pathname.split('/')[1] || 'apps')
+  // 当前页面标题元信息
   const pageMeta = useMemo(() => routeMeta[selectedKey] || routeMeta['/apps'], [selectedKey])
+  // 编辑器路由使用全宽内容区
   const isEditorRoute = /^\/apps\/[^/]+\/editor\/?$/.test(location.pathname)
 
   return (

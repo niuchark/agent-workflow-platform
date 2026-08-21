@@ -1,3 +1,11 @@
+/**
+ * 根模块：组装全局配置与所有业务模块。
+ *
+ * 集中登记：
+ * - 全局配置（env 校验）与 JWT 模块；
+ * - 基础设施模块（Prisma/Redis/Cache）；
+ * - 各业务模块（用户/应用/工作流/RAG/技能/AI/MCP/团队/模型凭证）。
+ */
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
@@ -15,6 +23,7 @@ import { McpModule } from './modules/mcp/mcp.module';
 import { TeamModule } from './modules/team/team.module';
 import { ModelCredentialModule } from './modules/model-credential/model-credential.module';
 
+/** 根模块：导入全局配置、基础设施与全部业务模块 */
 @Module({
   imports: [
     ConfigModule.forRoot({

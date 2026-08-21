@@ -1,3 +1,6 @@
+/**
+ * 运行工作流 DTO：定义输入参数与执行控制选项。
+ */
 import { IsObject, IsOptional, IsNumber, IsBoolean, Min, Max, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -41,6 +44,7 @@ export class ExecutionControlDto {
   continueOnError?: boolean;
 }
 
+/** 运行工作流的请求体 */
 export class RunWorkflowDto {
   @IsObject({ message: 'Inputs must be an object' })
   inputs: Record<string, any>;

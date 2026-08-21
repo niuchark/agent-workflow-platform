@@ -1,5 +1,12 @@
+/**
+ * Token 用量与成本统计 API：查询用量明细、成本报表与模型排行。
+ *
+ * 供成本统计页展示按时间/应用/模型/供应商维度聚合的
+ * token 消耗与费用数据。
+ */
 import request from './axios'
 
+/** 一段查询时间内的汇总统计 */
 export interface TokenUsageSummary {
   promptTokens: number
   completionTokens: number
@@ -8,6 +15,7 @@ export interface TokenUsageSummary {
   callCount: number
 }
 
+/** 单次 LLM 调用的用量记录 */
 export interface TokenUsageRecord {
   id: string
   userId: string
@@ -24,12 +32,14 @@ export interface TokenUsageRecord {
   createdAt: string
 }
 
+/** Token 用量查询响应：明细 + 总数 + 汇总 */
 export interface TokenUsageResponse {
   records: TokenUsageRecord[]
   total: number
   summary: TokenUsageSummary
 }
 
+/** 成本报表中的一组聚合结果 */
 export interface CostReportGroup {
   groupKey: string
   promptTokens: number
@@ -39,11 +49,13 @@ export interface CostReportGroup {
   callCount: number
 }
 
+/** 成本报表响应：分组结果 + 总计 */
 export interface CostReportResponse {
   groups: CostReportGroup[]
   total: TokenUsageSummary
 }
 
+/** 模型排行中的单项 */
 export interface ModelRankingItem {
   model: string
   provider: string

@@ -879,12 +879,14 @@ export class AgentExecutorService {
     }
   }
 
+  /** 从运行上下文取用户 ID（模型凭证按用户维度解析） */
   private requireUserId(options?: AgentRunOptions): string {
     const userId = options?.context?._userId as string | undefined;
     if (!userId) throw new Error('MODEL_CREDENTIAL_REQUIRED: agent execution user is missing');
     return userId;
   }
 
+  /** 记录一次 Agent 调用的 Token 用量 */
   private recordTokenUsage(
     response: { usage?: { promptTokens: number; completionTokens: number; totalTokens: number } },
     provider: string,

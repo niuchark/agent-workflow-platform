@@ -1,3 +1,9 @@
+/**
+ * 应用控制器：暴露应用 CRUD 与生命周期操作的 REST 接口。
+ *
+ * 所有接口需要 JWT 认证；涉及资源的操作（读/改/删/发布/归档）
+ * 由 PermissionGuard 按所有权与团队权限校验。
+ */
 import {
   Controller,
   Get,
@@ -16,11 +22,13 @@ import { PermissionGuard } from '../../common/guards/permission.guard';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
+/** 应用 REST 控制器 */
 @Controller('apps')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
+  /** 创建应用 */
   @Post()
   create(
     @CurrentUser('userId') userId: string,
@@ -29,11 +37,13 @@ export class AppController {
     return this.appService.create(userId, createAppDto);
   }
 
+  /** 获取当前用户的应用列表 */
   @Get()
   findAll(@CurrentUser('userId') userId: string) {
     return this.appService.findAll(userId);
   }
 
+  /** 获取应用详情 */
   @Get(':id')
   @RequirePermissions('app:read')
   findOne(
@@ -43,6 +53,7 @@ export class AppController {
     return this.appService.findOne(userId, id);
   }
 
+  /** 更新应用信息 */
   @Patch(':id')
   @RequirePermissions('app:update')
   update(
@@ -53,6 +64,7 @@ export class AppController {
     return this.appService.update(userId, id, updateAppDto);
   }
 
+  /** 删除应用 */
   @Delete(':id')
   @RequirePermissions('app:delete')
   remove(
@@ -62,6 +74,7 @@ export class AppController {
     return this.appService.remove(userId, id);
   }
 
+  /** 发布应用 */
   @Patch(':id/publish')
   @RequirePermissions('app:publish')
   publish(
@@ -71,6 +84,7 @@ export class AppController {
     return this.appService.publish(userId, id);
   }
 
+  /** 取消发布 */
   @Patch(':id/unpublish')
   @RequirePermissions('app:publish')
   unpublish(
@@ -80,6 +94,7 @@ export class AppController {
     return this.appService.unpublish(userId, id);
   }
 
+  /** 归档应用 */
   @Patch(':id/archive')
   @RequirePermissions('app:delete')
   archive(
@@ -89,6 +104,7 @@ export class AppController {
     return this.appService.archive(userId, id);
   }
 
+  /** 取消归档 */
   @Patch(':id/unarchive')
   @RequirePermissions('app:delete')
   unarchive(

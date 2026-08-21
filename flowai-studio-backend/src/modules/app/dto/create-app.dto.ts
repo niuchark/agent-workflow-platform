@@ -1,5 +1,9 @@
+/**
+ * 创建应用 DTO：定义请求体字段与校验规则。
+ */
 import { IsString, IsOptional, MaxLength, IsIn } from 'class-validator';
 
+/** 创建应用的请求体 */
 export class CreateAppDto {
   @IsString({ message: 'Name must be a string' })
   @MaxLength(100, { message: 'Name must not exceed 100 characters' })

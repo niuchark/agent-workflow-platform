@@ -1,3 +1,9 @@
+/**
+ * API 密钥管理页面：创建、启用/停用与删除 API 密钥。
+ *
+ * 创建成功后弹出"仅此一次"的完整密钥展示窗（后端只返回一次），
+ * 并提示用户立即保存；列表只展示前缀与权限范围。
+ */
 import { useState, useEffect, useRef } from 'react'
 import {
   Button, Modal, Form, Input, Select, Table, Tag, Space, message,
@@ -12,6 +18,7 @@ import { ApiKey, CreateApiKeyForm, API_KEY_SCOPE_OPTIONS } from '../types'
 
 const { Text, Paragraph } = Typography
 
+/** API 密钥管理页面组件 */
 const ApiKeyManagement: React.FC = () => {
   const {
     apiKeys, createdKey, isLoading,
@@ -24,6 +31,7 @@ const ApiKeyManagement: React.FC = () => {
   const [form] = Form.useForm()
   const initDone = useRef(false)
 
+  // 初始化：只加载一次密钥列表与应用列表
   useEffect(() => {
     if (initDone.current) return
     initDone.current = true
@@ -31,18 +39,20 @@ const ApiKeyManagement: React.FC = () => {
     fetchApps()
   }, [])
 
-  // 创建成功后显示完整密钥
+  // 创建成功后显示完整密钥弹窗
   useEffect(() => {
     if (createdKey) {
       setIsKeyRevealModalOpen(true)
     }
   }, [createdKey])
 
+  /** 打开创建弹窗 */
   const handleCreate = () => {
     form.resetFields()
     setIsCreateModalOpen(true)
   }
 
+  /** 提交创建：成功后刷新列表 */
   const handleCreateSubmit = async (values: CreateApiKeyForm) => {
     try {
       await createApiKey(values)
@@ -54,6 +64,7 @@ const ApiKeyManagement: React.FC = () => {
     }
   }
 
+  /** 删除密钥 */
   const handleDelete = async (keyId: string) => {
     try {
       await deleteApiKey(keyId)
@@ -63,6 +74,7 @@ const ApiKeyManagement: React.FC = () => {
     }
   }
 
+  /** 切换密钥启用/停用 */
   const handleToggle = async (keyId: string, isActive: boolean) => {
     try {
       await toggleApiKey(keyId, !isActive)
@@ -72,6 +84,7 @@ const ApiKeyManagement: React.FC = () => {
     }
   }
 
+  /** 复制完整密钥到剪贴板 */
   const handleCopyKey = (key: string) => {
     navigator.clipboard.writeText(key).then(() => {
       message.success('已复制到剪贴板')
@@ -80,11 +93,13 @@ const ApiKeyManagement: React.FC = () => {
     })
   }
 
+  /** 关闭密钥展示弹窗：清空 createdKey 防止再次弹出 */
   const handleCloseKeyReveal = () => {
     setIsKeyRevealModalOpen(false)
     setCreatedKey(null)
   }
 
+  /** 密钥列表列定义 */
   const columns = [
     {
       title: '名称',

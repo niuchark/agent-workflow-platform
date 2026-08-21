@@ -1,3 +1,8 @@
+/**
+ * 团队管理列表页：展示我的团队，支持创建、进入管理、离开与删除。
+ *
+ * 支持按名称/描述搜索；创建成功后直接跳转到团队详情页。
+ */
 import { useState, useEffect, useRef } from 'react'
 import {
   Button, Modal, Form, Input, Select, Table, Card, Tag, Space, message,
@@ -14,6 +19,7 @@ import { Team, TeamMember, CreateTeamForm, TEAM_ROLE_LABELS, TeamRole, TEAM_APP_
 
 const { Title, Text } = Typography
 
+/** 团队管理列表页组件 */
 const TeamManagement: React.FC = () => {
   const navigate = useNavigate()
   const {
@@ -25,17 +31,20 @@ const TeamManagement: React.FC = () => {
   const [searchText, setSearchText] = useState('')
   const initDone = useRef(false)
 
+  // 初始化：只加载一次团队列表
   useEffect(() => {
     if (initDone.current) return
     initDone.current = true
     fetchMyTeams()
   }, [])
 
+  /** 打开创建团队弹窗 */
   const handleCreate = () => {
     form.resetFields()
     setIsCreateModalOpen(true)
   }
 
+  /** 提交创建：成功后进入团队详情 */
   const handleCreateSubmit = async (values: CreateTeamForm) => {
     try {
       const team = await createTeam(values)
@@ -47,6 +56,7 @@ const TeamManagement: React.FC = () => {
     }
   }
 
+  /** 删除团队 */
   const handleDelete = async (teamId: string) => {
     try {
       await deleteTeam(teamId)
@@ -56,6 +66,7 @@ const TeamManagement: React.FC = () => {
     }
   }
 
+  /** 离开团队 */
   const handleLeave = async (teamId: string) => {
     try {
       await leaveTeam(teamId)
@@ -65,6 +76,7 @@ const TeamManagement: React.FC = () => {
     }
   }
 
+  // 按名称/描述过滤团队
   const filteredTeams = Array.isArray(teams)
     ? teams.filter(
         (t) =>

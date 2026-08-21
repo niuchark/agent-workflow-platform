@@ -1,3 +1,6 @@
+/**
+ * API Key 控制器：创建、列表、删除与启用/停用接口。
+ */
 import {
   Controller,
   Get,
@@ -16,6 +19,7 @@ import { RequirePermissions } from '../../../common/decorators/permissions.decor
 import { PERMISSIONS } from '../../../common/constants/permissions';
 import { IsString, IsOptional, IsNotEmpty, IsArray, IsDateString, IsBoolean } from 'class-validator';
 
+/** 创建 API Key 请求体 */
 class CreateApiKeyDto {
   @IsString()
   @IsNotEmpty({ message: '密钥名称不能为空' })
@@ -34,16 +38,19 @@ class CreateApiKeyDto {
   expiresAt?: string;
 }
 
+/** 切换启用状态请求体 */
 class ToggleApiKeyDto {
   @IsBoolean()
   isActive: boolean;
 }
 
+/** API Key REST 控制器 */
 @Controller('api-keys')
 @UseGuards(JwtAuthGuard)
 export class ApiKeyController {
   constructor(private readonly apiKeyService: ApiKeyService) {}
 
+  /** 创建 API Key */
   @Post()
   @RequirePermissions(PERMISSIONS.API_KEY_CREATE)
   create(
@@ -58,6 +65,7 @@ export class ApiKeyController {
     });
   }
 
+  /** 获取 API Key 列表（可按应用过滤） */
   @Get()
   @RequirePermissions(PERMISSIONS.API_KEY_READ)
   list(
@@ -67,6 +75,7 @@ export class ApiKeyController {
     return this.apiKeyService.listApiKeys(userId, applicationId);
   }
 
+  /** 删除 API Key */
   @Delete(':keyId')
   @RequirePermissions(PERMISSIONS.API_KEY_DELETE)
   delete(
@@ -76,6 +85,7 @@ export class ApiKeyController {
     return this.apiKeyService.deleteApiKey(userId, keyId);
   }
 
+  /** 启用/停用 API Key */
   @Patch(':keyId/toggle')
   @RequirePermissions(PERMISSIONS.API_KEY_DELETE)
   toggle(

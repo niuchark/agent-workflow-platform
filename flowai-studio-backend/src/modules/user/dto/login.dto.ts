@@ -1,5 +1,9 @@
+/**
+ * 登录 DTO：用户名 + 密码。
+ */
 import { IsString, MinLength } from 'class-validator';
 
+/** 登录请求体 */
 export class LoginDto {
   @IsString({ message: 'Username must be a string' })
   @MinLength(1, { message: 'Username is required' })

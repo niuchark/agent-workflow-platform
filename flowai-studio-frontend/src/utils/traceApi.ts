@@ -1,3 +1,9 @@
+/**
+ * Trace（调用链追踪）API：封装追踪详情的查询接口。
+ *
+ * 追踪信息来自后端 tracing.service，用于工作流调试页展示
+ * 每次运行的节点级耗时、状态与输入输出。
+ */
 import request from './axios'
 
 /** Span 记录 */

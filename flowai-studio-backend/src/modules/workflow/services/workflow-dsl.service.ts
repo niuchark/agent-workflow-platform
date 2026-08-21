@@ -1,3 +1,6 @@
+/**
+ * Workflow DSL 服务：工作流的 YAML/JSON 导入、导出与校验。
+ */
 import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../common/services/prisma.service';
 import { CacheService } from '../../../common/services/cache.service';

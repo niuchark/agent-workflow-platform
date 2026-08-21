@@ -1,3 +1,4 @@
+/** Base URL 安全校验服务单元测试 */
 import { ConfigService } from '@nestjs/config';
 import { lookup } from 'dns/promises';
 import { BaseUrlSecurityService } from '../base-url-security.service';
