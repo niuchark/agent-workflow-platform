@@ -40,7 +40,7 @@ export class WorkflowExecutorService {
   /**
    * 执行工作流：按拓扑序（入度 0 起步）逐节点执行。
    *
-   * - 条件节点只激活匹配分支，另一分支递归标记为 skipped；
+   * - 条件节点只激活匹配分支，未命中分支以 skipped 结算并参与下游入度统计；
    * - 支持节点级超时、重试与整体超时，可随时取消；
    * - 通过 SSE Subject 实时推送节点状态与最终上下文；
    * - 全程写入全链路追踪（trace/span）。
@@ -124,6 +124,10 @@ export class WorkflowExecutorService {
 
     // 运行时入度：条件分支会剪掉未命中的边，需动态递减
     const runtimeInDegree = new Map<string, number>(inDegree);
+    // 已结算为执行成功的父节点数：join 节点在所有父节点结算后据此决定执行或跳过
+    const executedParentCount = new Map<string, number>(
+      nodes.map((n) => [n.id, 0]),
+    );
 
     // 初始队列：所有入度为 0 的根节点
     const queue: string[] = nodes
@@ -147,6 +151,56 @@ export class WorkflowExecutorService {
         control,
       },
     });
+
+    /**
+     * 父节点执行成功后结算下游：记录成功父节点并递减目标剩余依赖。
+     * 剩余依赖归零表示所有父节点都已结算，目标可以开始执行。
+     */
+    const settleAsExecuted = (targetId: string) => {
+      executedParentCount.set(
+        targetId,
+        (executedParentCount.get(targetId) || 0) + 1,
+      );
+      const deg = (runtimeInDegree.get(targetId) || 1) - 1;
+      runtimeInDegree.set(targetId, deg);
+      if (deg <= 0) {
+        queue.push(targetId);
+      }
+    };
+
+    /**
+     * 父节点以 skipped 结算（剪枝/失败跳过）：同样递减目标剩余依赖。
+     * 剩余依赖归零后：
+     * - 存在成功父节点 → 目标正常执行（被剪分支输入由默认值/上下文兜底）；
+     * - 所有父节点均未成功 → 目标整体跳过，并向其下游继续传播。
+     */
+    const settleAsSkipped = (targetId: string) => {
+      if (executed.has(targetId) || skipped.has(targetId) || failed.has(targetId)) {
+        return;
+      }
+
+      const deg = (runtimeInDegree.get(targetId) || 1) - 1;
+      runtimeInDegree.set(targetId, deg);
+      if (deg > 0) {
+        return;
+      }
+
+      if ((executedParentCount.get(targetId) || 0) > 0) {
+        queue.push(targetId);
+        return;
+      }
+
+      skipped.add(targetId);
+      sseSubject?.next({
+        type: 'node_status',
+        data: { nodeId: targetId, status: 'skipped' },
+      });
+
+      const downstream = adjList.get(targetId) || [];
+      for (const edge of downstream) {
+        settleAsSkipped(edge.target);
+      }
+    };
 
     // 整体工作流执行逻辑（BFS 主循环）
     const runLoop = async () => {
@@ -260,7 +314,7 @@ export class WorkflowExecutorService {
           // 获取下游连线
           const downstream = adjList.get(nodeId) || [];
 
-          // 条件节点：只激活匹配分支，另一分支递归跳过
+          // 条件节点：只激活匹配分支，未命中分支以 skipped 结算（参与 join 入度）
           if (node.type === 'condition') {
             // Condition node: only activate the matching branch
             const conditionResult = output?.result;
@@ -269,25 +323,17 @@ export class WorkflowExecutorService {
 
             for (const edge of downstream) {
               if (edge.sourceHandle === matchHandle) {
-            // 命中分支：递减入度，归零则入队
-                const deg = (runtimeInDegree.get(edge.target) || 1) - 1;
-                runtimeInDegree.set(edge.target, deg);
-                if (deg <= 0) {
-                  queue.push(edge.target);
-                }
+                // 命中分支：父节点执行成功，按普通成功节点结算
+                settleAsExecuted(edge.target);
               } else if (edge.sourceHandle === skipHandle) {
-                // 未命中分支：递归标记整个下游为 skipped
-                this.skipBranch(edge.target, adjList, skipped, sseSubject);
+                // 未命中分支：父节点以 skipped 结算，继续参与下游入度统计
+                settleAsSkipped(edge.target);
               }
             }
           } else {
             // 普通节点：激活全部下游
             for (const edge of downstream) {
-              const deg = (runtimeInDegree.get(edge.target) || 1) - 1;
-              runtimeInDegree.set(edge.target, deg);
-              if (deg <= 0 && !skipped.has(edge.target)) {
-                queue.push(edge.target);
-              }
+              settleAsExecuted(edge.target);
             }
           }
         } catch (error) {
@@ -329,7 +375,8 @@ export class WorkflowExecutorService {
             );
             const downstream = adjList.get(nodeId) || [];
             for (const edge of downstream) {
-              this.skipBranch(edge.target, adjList, skipped, sseSubject);
+              // 失败节点按 skipped 结算：join 节点只要仍有成功父节点即可继续执行
+              settleAsSkipped(edge.target);
             }
             continue;
           }
@@ -434,25 +481,5 @@ export class WorkflowExecutorService {
    */
   getRunningExecutions(): string[] {
     return Array.from(this.cancelTokens.keys());
-  }
-
-  /**
-   * Recursively mark a branch as skipped and notify via SSE
-   */
-  /** 递归标记一个分支为 skipped，并通过 SSE 通知 */
-  private skipBranch(
-    nodeId: string,
-    adjList: Map<string, { target: string; sourceHandle?: string }[]>,
-    skipped: Set<string>,
-    sseSubject?: Subject<any>,
-  ) {
-    if (skipped.has(nodeId)) return;
-    skipped.add(nodeId);
-    sseSubject?.next({ type: 'node_status', data: { nodeId, status: 'skipped' } });
-
-    const downstream = adjList.get(nodeId) || [];
-    for (const edge of downstream) {
-      this.skipBranch(edge.target, adjList, skipped, sseSubject);
-    }
   }
 }
