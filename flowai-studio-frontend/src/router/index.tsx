@@ -5,66 +5,65 @@
  * - 受保护路由：嵌套在 RequireAuth + Layout 下，未登录会重定向到 /login；
  * - 兜底路由：未匹配的地址统一回到首页。
  */
+import { lazy, Suspense, type ReactNode } from 'react'
 import { createBrowserRouter, createRoutesFromElements, Route, Navigate } from 'react-router-dom'
 import Layout from '../components/layout/Layout'
-import Login from '../pages/Login'
-import Register from '../pages/Register'
-import AppList from '../pages/AppList'
-import AppEditor from '../pages/AppEditor'
-import KnowledgeBase from '../pages/KnowledgeBase'
-import Skill from '../pages/Skill'
-import McpManager from '../pages/McpManager'
-import TemplateMarket from '../pages/TemplateMarket'
-import Debug from '../pages/Debug'
-import TeamManagement from '../pages/TeamManagement'
-import TeamDetail from '../pages/TeamDetail'
-import ApiKeyManagement from '../pages/ApiKeyManagement'
-import ModelSettings from '../pages/ModelSettings'
-import SharedApp from '../pages/SharedApp'
-import CostStatistics from '../pages/CostStatistics'
-import RateLimitMonitor from '../pages/RateLimitMonitor'
-import TraceList from '../pages/TraceList'
-import TraceDetail from '../pages/TraceDetail'
-import { useStore } from '../store'
+import RequireAuth from '../components/routing/RequireAuth'
+import RouteLoading from '../components/routing/RouteLoading'
 
-/** 鉴权守卫：未登录时重定向到登录页，已登录才渲染子页面 */
-const RequireAuth = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated } = useStore()
-  
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
-  }
-  
-  return children
-}
+const Login = lazy(() => import('../pages/Login'))
+const Register = lazy(() => import('../pages/Register'))
+const AppList = lazy(() => import('../pages/AppList'))
+const AppEditor = lazy(() => import('../pages/AppEditor'))
+const KnowledgeBase = lazy(() => import('../pages/KnowledgeBase'))
+const Skill = lazy(() => import('../pages/Skill'))
+const McpManager = lazy(() => import('../pages/McpManager'))
+const TemplateMarket = lazy(() => import('../pages/TemplateMarket'))
+const Debug = lazy(() => import('../pages/Debug'))
+const TeamManagement = lazy(() => import('../pages/TeamManagement'))
+const TeamDetail = lazy(() => import('../pages/TeamDetail'))
+const ApiKeyManagement = lazy(() => import('../pages/ApiKeyManagement'))
+const ModelSettings = lazy(() => import('../pages/ModelSettings'))
+const SharedApp = lazy(() => import('../pages/SharedApp'))
+const CostStatistics = lazy(() => import('../pages/CostStatistics'))
+const RateLimitMonitor = lazy(() => import('../pages/RateLimitMonitor'))
+const TraceList = lazy(() => import('../pages/TraceList'))
+const TraceDetail = lazy(() => import('../pages/TraceDetail'))
+
+/** 为每个页面分片提供一致且可访问的加载占位。 */
+const lazyPage = (page: ReactNode) => (
+  <Suspense fallback={<RouteLoading />}>
+    {page}
+  </Suspense>
+)
 
 /** 路由配置：集中登记公共路由、受保护路由与 404 兜底 */
 export const router = createBrowserRouter(
   createRoutesFromElements(
     <>
       {/* 公共路由 */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/share/:shareLink" element={<SharedApp />} />
+      <Route path="/login" element={lazyPage(<Login />)} />
+      <Route path="/register" element={lazyPage(<Register />)} />
+      <Route path="/share/:shareLink" element={lazyPage(<SharedApp />)} />
       
       {/* 受保护路由 */}
       <Route element={<RequireAuth><Layout /></RequireAuth>}>
         <Route path="/" element={<Navigate to="/apps" replace />} />
-        <Route path="/apps" element={<AppList />} />
-        <Route path="/apps/:appId/editor" element={<AppEditor />} />
-        <Route path="/knowledge-bases" element={<KnowledgeBase />} />
-        <Route path="/tools" element={<Skill />} />
-        <Route path="/mcp" element={<McpManager />} />
-        <Route path="/templates" element={<TemplateMarket />} />
-        <Route path="/debug" element={<Debug />} />
-        <Route path="/teams" element={<TeamManagement />} />
-        <Route path="/teams/:teamId" element={<TeamDetail />} />
-        <Route path="/api-keys" element={<ApiKeyManagement />} />
-        <Route path="/model-settings" element={<ModelSettings />} />
-        <Route path="/cost-statistics" element={<CostStatistics />} />
-        <Route path="/rate-limit" element={<RateLimitMonitor />} />
-        <Route path="/trace-list" element={<TraceList />} />
-        <Route path="/trace-detail" element={<TraceDetail />} />
+        <Route path="/apps" element={lazyPage(<AppList />)} />
+        <Route path="/apps/:appId/editor" element={lazyPage(<AppEditor />)} />
+        <Route path="/knowledge-bases" element={lazyPage(<KnowledgeBase />)} />
+        <Route path="/tools" element={lazyPage(<Skill />)} />
+        <Route path="/mcp" element={lazyPage(<McpManager />)} />
+        <Route path="/templates" element={lazyPage(<TemplateMarket />)} />
+        <Route path="/debug" element={lazyPage(<Debug />)} />
+        <Route path="/teams" element={lazyPage(<TeamManagement />)} />
+        <Route path="/teams/:teamId" element={lazyPage(<TeamDetail />)} />
+        <Route path="/api-keys" element={lazyPage(<ApiKeyManagement />)} />
+        <Route path="/model-settings" element={lazyPage(<ModelSettings />)} />
+        <Route path="/cost-statistics" element={lazyPage(<CostStatistics />)} />
+        <Route path="/rate-limit" element={lazyPage(<RateLimitMonitor />)} />
+        <Route path="/trace-list" element={lazyPage(<TraceList />)} />
+        <Route path="/trace-detail" element={lazyPage(<TraceDetail />)} />
       </Route>
       
       {/* 404路由 */}

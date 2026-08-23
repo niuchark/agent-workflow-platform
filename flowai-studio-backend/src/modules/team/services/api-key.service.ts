@@ -5,7 +5,6 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../../common/services/prisma.service';
@@ -27,6 +26,17 @@ export class ApiKeyService {
       expiresAt?: Date;
     },
   ) {
+    if (data.applicationId) {
+      const application = await this.prisma.application.findFirst({
+        where: { id: data.applicationId, userId },
+        select: { id: true },
+      });
+
+      if (!application) {
+        throw new ForbiddenException('无权为此应用创建 API 密钥');
+      }
+    }
+
     // 生成密钥: sk-{random32bytes}
     const rawKey = `sk-${crypto.randomBytes(32).toString('hex')}`;
     const keyHash = this.hashKey(rawKey);

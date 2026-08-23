@@ -6,13 +6,12 @@
  * - 卡片展示启用/禁用状态，点击卡片或菜单可打开执行弹窗，
  *   输入 JSON 参数后调用后端执行并查看结果。
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button, Input, message, Modal, Select, Switch, Form, Empty, Dropdown, Spin } from 'antd'
 import {
   PlusOutlined,
   DeleteOutlined,
   EditOutlined,
-  ToolOutlined,
   PlayCircleOutlined,
   MoreOutlined,
   ThunderboltOutlined,
@@ -28,7 +27,7 @@ const { TextArea } = Input
 const Skill: React.FC = () => {
   const {
     skills,
-    isLoading,
+    skillLoading,
     fetchSkills,
     createSkill,
     updateSkill,
@@ -55,23 +54,23 @@ const Skill: React.FC = () => {
   const [builtinSkills, setBuiltinSkills] = useState<any[]>([])
   const [executionResult, setExecutionResult] = useState<any>(null)
 
-  // 进入页面加载工具列表与内置工具类型
-  useEffect(() => {
-    fetchSkills()
-    fetchBuiltinSkills()
-  }, [])
-
   const safeSkills = Array.isArray(skills) ? skills : []
 
   /** 拉取内置工具类型列表 */
-  const fetchBuiltinSkills = async () => {
+  const fetchBuiltinSkills = useCallback(async () => {
     try {
       const data = await getBuiltinSkills()
       setBuiltinSkills(Array.isArray(data) ? data : [])
     } catch {
       message.error('获取内置工具列表失败')
     }
-  }
+  }, [getBuiltinSkills])
+
+  // 进入页面加载工具列表与内置工具类型
+  useEffect(() => {
+    fetchSkills()
+    fetchBuiltinSkills()
+  }, [fetchBuiltinSkills, fetchSkills])
 
   /** 打开新建弹窗：重置表单 */
   const handleAddSkill = () => {
@@ -217,7 +216,7 @@ const Skill: React.FC = () => {
       </div>
 
       {/* Card grid */}
-      {isLoading ? (
+      {skillLoading ? (
         <div className="skill-grid-loading"><Spin size="large" /></div>
       ) : safeSkills.length > 0 ? (
         <div className="skill-card-grid">
@@ -359,7 +358,7 @@ const Skill: React.FC = () => {
           </Form.Item>
           <div className="modal-footer">
             <Button onClick={() => setModalVisible(false)}>取消</Button>
-            <Button type="primary" onClick={handleSaveSkill} loading={isLoading}>
+            <Button type="primary" onClick={handleSaveSkill} loading={skillLoading}>
               {editingSkill ? '保存修改' : '创建工具'}
             </Button>
           </div>
@@ -407,7 +406,7 @@ const Skill: React.FC = () => {
 
           <div className="modal-footer">
             <Button onClick={() => setExecutionModalVisible(false)}>取消</Button>
-            <Button type="primary" icon={<PlayCircleOutlined />} onClick={handleRunExecution} loading={isLoading}>
+            <Button type="primary" icon={<PlayCircleOutlined />} onClick={handleRunExecution} loading={skillLoading}>
               执行
             </Button>
           </div>

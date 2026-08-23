@@ -1,8 +1,7 @@
 /**
  * DSL 导入导出 DTO：YAML/JSON 两种格式的导入校验与导出参数。
  */
-import { IsString, IsOptional, IsEnum, IsArray, ValidateNested, IsObject } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsString, IsOptional, IsEnum } from 'class-validator';
 
 /**
  * DSL 导入导出 DTO

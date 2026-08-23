@@ -4,7 +4,7 @@
  * 包含基本信息（状态/耗时/输入输出）、按 span 绘制的时间线瀑布图、
  * 以及 Span 明细表（可展开查看事件、属性与父子关系）。
  */
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Spin, Tag, Card, Descriptions, Table, Button, message, Empty } from 'antd'
 import {
@@ -58,7 +58,7 @@ const TraceDetailPage: React.FC = () => {
   const [trace, setTrace] = useState<TraceDetailType | null>(null)
 
   /** 按 URL 中的 traceId 加载追踪详情 */
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!traceId) return
     setLoading(true)
     try {
@@ -70,12 +70,12 @@ const TraceDetailPage: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [traceId])
 
   // traceId 变化时重新加载
   useEffect(() => {
     loadData()
-  }, [traceId])
+  }, [loadData])
 
   /** 计算瀑布图数据 */
   const waterfallData = useMemo<WaterfallRow[]>(() => {
@@ -266,7 +266,6 @@ const TraceDetailPage: React.FC = () => {
             </div>
             {/* 瀑布行 */}
             {waterfallData.map((row) => {
-              const statusInfo = STATUS_MAP[row.span.status] || { color: 'default', label: row.span.status }
               const barColor = row.span.status === 'error' ? '#ef4444'
                 : row.span.status === 'timeout' ? '#f59e0b'
                 : '#3b82f6'

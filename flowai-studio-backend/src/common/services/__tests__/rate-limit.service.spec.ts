@@ -1,11 +1,11 @@
-/** 限流守卫/服务单元测试 */
+/** 限流与熔断服务单元测试 */
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   RateLimiterService,
   CircuitBreakerService,
   DEFAULT_RATE_LIMITS,
-} from '../rate-limit.guard';
-import { RedisService } from '../../services/redis.service';
+} from '../rate-limit.service';
+import { RedisService } from '../redis.service';
 
 describe('RateLimiterService', () => {
   let service: RateLimiterService;
@@ -41,21 +41,21 @@ describe('RateLimiterService', () => {
   describe('checkRateLimit', () => {
     it('should allow request when under limit', async () => {
       mockRedisService.rateLimit.mockResolvedValue({ allowed: true, remaining: 59 });
-      const result = await service.checkRateLimit('test:key', DEFAULT_RATE_LIMITS['api:user']);
+      const result = await service.checkRateLimit('test:key', DEFAULT_RATE_LIMITS['workflow:run']);
       expect(result.allowed).toBe(true);
       expect(result.remaining).toBe(59);
     });
 
     it('should deny request when over limit', async () => {
       mockRedisService.rateLimit.mockResolvedValue({ allowed: false, remaining: 0, retryAfter: 30 });
-      const result = await service.checkRateLimit('test:key', DEFAULT_RATE_LIMITS['api:user']);
+      const result = await service.checkRateLimit('test:key', DEFAULT_RATE_LIMITS['workflow:run']);
       expect(result.allowed).toBe(false);
       expect(result.retryAfter).toBe(30);
     });
 
     it('should allow request when Redis is down', async () => {
       mockRedisService.rateLimit.mockRejectedValue(new Error('Redis down'));
-      const result = await service.checkRateLimit('test:key', DEFAULT_RATE_LIMITS['api:user']);
+      const result = await service.checkRateLimit('test:key', DEFAULT_RATE_LIMITS['workflow:run']);
       expect(result.allowed).toBe(true);
     });
   });

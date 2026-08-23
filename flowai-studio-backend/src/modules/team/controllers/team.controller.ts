@@ -13,7 +13,6 @@ import {
 } from '@nestjs/common';
 import { TeamService } from '../services/team.service';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
-import { PermissionGuard } from '../../../common/guards/permission.guard';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../../../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../../../common/constants/permissions';

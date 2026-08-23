@@ -10,6 +10,14 @@ describe('BaseUrlSecurityService', () => {
     get: jest.fn((_key: string, fallback: string) => allowlist || fallback),
   } as unknown as ConfigService);
 
+  const createWithAllowlists = (model = '', outbound = '') => new BaseUrlSecurityService({
+    get: jest.fn((key: string, fallback: string) => {
+      if (key === 'MODEL_PRIVATE_BASE_URL_ALLOWLIST') return model;
+      if (key === 'OUTBOUND_PRIVATE_URL_ALLOWLIST') return outbound;
+      return fallback;
+    }),
+  } as unknown as ConfigService);
+
   beforeEach(() => {
     jest.resetAllMocks();
   });
@@ -28,6 +36,8 @@ describe('BaseUrlSecurityService', () => {
     'https://192.168.1.10:11434',
     'https://[::1]:11434',
     'https://[fd00::1]:11434',
+    'https://[::ffff:127.0.0.1]:8443/secret',
+    'https://[::ffff:169.254.169.254]/latest/meta-data',
   ])('blocks unsafe base URL %s', async (url) => {
     await expect(create().assertAllowed(url)).rejects.toMatchObject({ status: 422 });
   });
@@ -50,6 +60,19 @@ describe('BaseUrlSecurityService', () => {
   it('does not allow a broader host or port than the exact origin', async () => {
     const service = create('http://127.0.0.1:11434');
     await expect(service.assertAllowed('http://127.0.0.1:11435')).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('allows query parameters on a public outbound request URL', async () => {
+    await expect(create().assertRequestUrlAllowed('https://8.8.8.8/search?q=flowai'))
+      .resolves.toBe('https://8.8.8.8/search?q=flowai');
+  });
+
+  it('keeps model and general outbound private allowlists separate', async () => {
+    const service = createWithAllowlists('http://127.0.0.1:11434');
+    await expect(service.assertAllowed('http://127.0.0.1:11434/v1'))
+      .resolves.toBe('http://127.0.0.1:11434/v1');
+    await expect(service.assertRequestUrlAllowed('http://127.0.0.1:11434/api'))
+      .rejects.toMatchObject({ status: 422 });
   });
 
   it('allows a trusted DashScope hostname resolved through a proxy fake IP', async () => {

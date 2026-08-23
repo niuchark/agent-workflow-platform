@@ -13,6 +13,7 @@ export interface User {
   username: string
   avatar?: string
   createdAt: string
+  globalRole: 'admin' | 'member'
 }
 
 /** 登录表单 */

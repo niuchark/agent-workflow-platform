@@ -23,7 +23,7 @@ export interface UserSlice {
   user: User | null
   token: string | null
   isAuthenticated: boolean
-  isLoading: boolean
+  userLoading: boolean
   authError: UserError | null
 
   // Actions
@@ -105,7 +105,7 @@ export const createUserSlice: StateCreator<UserSlice> = (set, get) => {
     user: getStoredUser(),
     token: initialToken,
     isAuthenticated: !!initialToken,
-    isLoading: false,
+    userLoading: false,
     authError: null,
 
     setUser: (user) => set({ user }),
@@ -118,7 +118,7 @@ export const createUserSlice: StateCreator<UserSlice> = (set, get) => {
 
     /** 登录成功时：调用后端接口，持久化登录态并更新状态 */
     login: async (data) => {
-      set({ isLoading: true, authError: null })
+      set({ userLoading: true, authError: null })
 
       try {
         const { user, token } = getResponseData<{ user: User; token: string }>(
@@ -132,14 +132,14 @@ export const createUserSlice: StateCreator<UserSlice> = (set, get) => {
           user,
           token,
           isAuthenticated: true,
-          isLoading: false,
+          userLoading: false,
           authError: null
         })
       } catch (error: unknown) {
         const loginError = parseAuthError(error)
 
         set({
-          isLoading: false,
+          userLoading: false,
           authError: loginError
         })
 
@@ -149,16 +149,16 @@ export const createUserSlice: StateCreator<UserSlice> = (set, get) => {
 
     /** 注册成功：仅提示并回到登录页，不自动登录 */
     register: async (data) => {
-      set({ isLoading: true, authError: null })
+      set({ userLoading: true, authError: null })
 
       try {
         await request.post('/users/register', data)
-        set({ isLoading: false, authError: null })
+        set({ userLoading: false, authError: null })
       } catch (error: unknown) {
         const loginError = parseAuthError(error)
 
         set({
-          isLoading: false,
+          userLoading: false,
           authError: loginError
         })
 

@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
-import { Permission, hasPermission, ROLES, Role } from '../constants/permissions';
+import { Permission, hasPermission, Role } from '../constants/permissions';
 import { PrismaService } from '../services/prisma.service';
 
 /**

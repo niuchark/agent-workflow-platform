@@ -12,7 +12,7 @@ export class RAGNodeExecutor implements INodeExecutor {
   /** 解析查询模板 → 检索知识库 → 返回 documents */
   async execute(node: any, context: Record<string, any>): Promise<Record<string, any>> {
     const nodeData = node.data as any;
-    const { knowledgeBaseId, query, topK, similarityThreshold } = nodeData;
+    const { knowledgeBaseId, query, topK } = nodeData;
 
     const resolvedQuery = this.resolveVariables(query, context);
     const userId = context._userId;

@@ -83,7 +83,7 @@ const AppEditor: React.FC = () => {
     createWorkflow,
     nodes,
     edges,
-    isLoading,
+    workflowLoading,
     saveWorkflow,
     executionStatus,
     selectedNode,
@@ -393,7 +393,7 @@ const AppEditor: React.FC = () => {
             size="small"
             icon={<SaveOutlined />}
             onClick={handleSave}
-            loading={isLoading}
+            loading={workflowLoading}
             className="editor-action-btn"
             aria-label="保存工作流"
           >

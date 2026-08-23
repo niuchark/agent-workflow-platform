@@ -10,7 +10,7 @@ import { Request } from 'express';
 /** JWT 认证后写入 request.user 的用户负载 */
 interface CurrentUserPayload {
   userId: string;
-  email: string;
+  username: string;
 }
 
 /** 参数装饰器：读取 request.user，可按字段名取子属性 */

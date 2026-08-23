@@ -8,7 +8,8 @@
  */
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
+import { JwtModule, JwtSignOptions } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { envSchema } from './config/env.config';
 import { PrismaModule } from './common/modules/prisma.module';
 import { RedisModule } from './common/modules/redis.module';
@@ -32,12 +33,15 @@ import { ModelCredentialModule } from './modules/model-credential/model-credenti
         return envSchema.parse(config);
       },
     }),
-    JwtModule.register({
+    JwtModule.registerAsync({
       global: true,
-      secret: process.env.JWT_SECRET,
-      signOptions: {
-        expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-      },
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.getOrThrow<string>('JWT_SECRET'),
+        signOptions: {
+          expiresIn: configService.get<string>('JWT_EXPIRES_IN', '7d') as JwtSignOptions['expiresIn'],
+        },
+      }),
     }),
     PrismaModule,
     RedisModule,

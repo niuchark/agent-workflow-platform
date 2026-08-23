@@ -42,12 +42,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
         if (res.code) code = res.code;
       }
       if (code === 'INTERNAL_ERROR') code = this.getErrorCode(status);
-    } else if (exception instanceof Error) {
-      message = exception.message;
     }
 
+    const logMessage = exception instanceof Error ? exception.message : message;
     this.logger.error(
-      `${request.method} ${request.url} - ${status} - ${message}`,
+      `${request.method} ${request.url} - ${status} - ${logMessage}`,
       exception instanceof Error ? exception.stack : undefined,
     );
 

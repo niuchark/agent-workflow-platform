@@ -12,13 +12,7 @@
  * - 多模型路由
  */
 import { AgentExecutorService } from '../services/agent-executor.service';
-import { LLMProviderFactory } from '../providers/llm-provider.factory';
-import { SkillService } from '../../skill/services/skill.service';
-import { RAGService } from '../../rag/services/rag.service';
-import {
-  AgentNodeConfig,
-  LLMResponse,
-} from '../interfaces/agent.interface';
+import { AgentNodeConfig } from '../interfaces/agent.interface';
 
 describe('AgentExecutorService', () => {
   let agentExecutor: AgentExecutorService;
@@ -49,13 +43,21 @@ describe('AgentExecutorService', () => {
       getProviderForModel: jest.fn().mockReturnValue(mockProvider),
       create: jest.fn().mockReturnValue(mockProvider),
       createForUser: jest.fn().mockResolvedValue(mockProvider),
-      inferUserProvider: jest.fn((model: string) => model.startsWith('gpt-') ? 'openai' : 'qwen'),
+      inferUserProvider: jest.fn((model: string) => (model.startsWith('gpt-') ? 'openai' : 'qwen')),
     };
 
     // Mock SkillService
     mockSkillService = {
       getBuiltinSkills: jest.fn().mockResolvedValue([
-        { type: 'calculator', name: '计算器', description: '计算数学表达式', inputSchema: { type: 'object', properties: { expression: { type: 'string' } } } },
+        {
+          type: 'calculator',
+          name: '计算器',
+          description: '计算数学表达式',
+          inputSchema: {
+            type: 'object',
+            properties: { expression: { type: 'string' } },
+          },
+        },
       ]),
       findSkillById: jest.fn(),
       executeSkill: jest.fn(),
@@ -70,6 +72,7 @@ describe('AgentExecutorService', () => {
     mockPrismaService = {
       skill: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
       },
     };
     mockTokenUsageService = { recordFromResponse: jest.fn() };
@@ -128,9 +131,7 @@ describe('AgentExecutorService', () => {
       // 第一次调用返回工具调用
       mockProvider.chat.mockResolvedValueOnce({
         content: '',
-        toolCalls: [
-          { id: 'call_1', name: '___', arguments: { expression: '1+1' } },
-        ],
+        toolCalls: [{ id: 'call_1', name: '___', arguments: { expression: '1+1' } }],
       });
       // 第二次调用返回最终答案
       mockProvider.chat.mockResolvedValueOnce({
@@ -150,9 +151,7 @@ describe('AgentExecutorService', () => {
     it('should stop at max iterations', async () => {
       mockProvider.chat.mockResolvedValue({
         content: '',
-        toolCalls: [
-          { id: 'call_1', name: '___', arguments: { expression: 'loop' } },
-        ],
+        toolCalls: [{ id: 'call_1', name: '___', arguments: { expression: 'loop' } }],
       });
 
       const limitedConfig = { ...singleConfig, maxIterations: 3 };
@@ -185,12 +184,58 @@ describe('AgentExecutorService', () => {
 
       await agentExecutor.execute(singleConfig, '测试', userOptions);
 
-      expect(mockTokenUsageService.recordFromResponse).toHaveBeenCalledWith(expect.objectContaining({
-        userId: 'user-test',
-        provider: 'qwen',
-        model: 'qwen-turbo',
-        callType: 'agent',
-      }));
+      expect(mockTokenUsageService.recordFromResponse).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-test',
+          provider: 'qwen',
+          model: 'qwen-turbo',
+          callType: 'agent',
+        }),
+      );
+    });
+  });
+
+  describe('Tool tenant isolation', () => {
+    it('scopes configured tool metadata to the execution user', async () => {
+      mockPrismaService.skill.findFirst.mockResolvedValue({
+        id: 'skill_1',
+        name: 'safe_tool',
+        description: 'owned tool',
+        inputSchema: '{}',
+      });
+
+      await (agentExecutor as any).loadTools(['skill_1'], 'user-test');
+
+      expect(mockPrismaService.skill.findFirst).toHaveBeenCalledWith({
+        where: { id: 'skill_1', userId: 'user-test' },
+      });
+    });
+
+    it('passes context _userId to SkillService', async () => {
+      mockSkillService.executeSkill.mockResolvedValue({ result: 'ok' });
+      const signal = new AbortController().signal;
+
+      const result = await (agentExecutor as any).executeToolCall(
+        { id: 'call_1', name: 'safe_tool', arguments: { value: 1 } },
+        new Map([['safe_tool', { id: 'skill_1', name: 'safe_tool' }]]),
+        { _userId: 'user-test' },
+        signal,
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockSkillService.executeSkill).toHaveBeenCalledWith('skill_1', { value: 1 }, 'user-test', signal);
+    });
+
+    it('refuses tool execution without user context', async () => {
+      const result = await (agentExecutor as any).executeToolCall(
+        { id: 'call_1', name: 'safe_tool', arguments: {} },
+        new Map([['safe_tool', { id: 'skill_1', name: 'safe_tool' }]]),
+        {},
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('SKILL_EXECUTION_USER_REQUIRED');
+      expect(mockSkillService.executeSkill).not.toHaveBeenCalled();
     });
   });
 
@@ -232,7 +277,11 @@ describe('AgentExecutorService', () => {
       mockProvider.chat.mockResolvedValueOnce({
         content: '',
         toolCalls: [
-          { id: 'call_1', name: 'delegate_to_worker_1', arguments: { task: '搜索信息' } },
+          {
+            id: 'call_1',
+            name: 'delegate_to_worker_1',
+            arguments: { task: '搜索信息' },
+          },
         ],
       });
       // Worker 返回答案
@@ -243,9 +292,7 @@ describe('AgentExecutorService', () => {
       // Supervisor 给出最终答案
       mockProvider.chat.mockResolvedValueOnce({
         content: '',
-        toolCalls: [
-          { id: 'call_2', name: 'finish', arguments: { answer: '最终答案' } },
-        ],
+        toolCalls: [{ id: 'call_2', name: 'finish', arguments: { answer: '最终答案' } }],
       });
 
       const result = await agentExecutor.execute(supervisorConfig, '帮我搜索', userOptions);
@@ -307,7 +354,10 @@ describe('AgentExecutorService', () => {
 
       const failConfig = {
         ...ragConfig,
-        singleAgent: { ...ragConfig.singleAgent!, knowledgeBaseIds: ['kb_404'] },
+        singleAgent: {
+          ...ragConfig.singleAgent!,
+          knowledgeBaseIds: ['kb_404'],
+        },
       };
 
       const result = await agentExecutor.execute(failConfig, '查询', userOptions);
@@ -354,9 +404,7 @@ describe('AgentExecutorService', () => {
     it('should handle tool execution failure', async () => {
       mockProvider.chat.mockResolvedValueOnce({
         content: '',
-        toolCalls: [
-          { id: 'call_1', name: '___', arguments: { expression: 'bad' } },
-        ],
+        toolCalls: [{ id: 'call_1', name: '___', arguments: { expression: 'bad' } }],
       });
 
       mockSkillService.executeSkill.mockRejectedValue(new Error('工具执行失败'));

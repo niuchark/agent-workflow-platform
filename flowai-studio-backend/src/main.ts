@@ -45,7 +45,7 @@ async function bootstrap() {
   // 全局路由前缀：所有接口以 /api 开头
   app.setGlobalPrefix('api');
 
-  const port = process.env.PORT || 3001;
+  const port = process.env.PORT || 3000;
   await app.listen(port);
   
   console.log(`🚀 Agent Flow Platform Backend is running on: http://localhost:${port}`);

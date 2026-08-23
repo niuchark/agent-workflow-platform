@@ -12,7 +12,6 @@
  * - 空值缓存防穿透
  */
 import { CacheService } from '../cache.service';
-import { RedisService } from '../redis.service';
 
 describe('CacheService', () => {
   let cacheService: CacheService;

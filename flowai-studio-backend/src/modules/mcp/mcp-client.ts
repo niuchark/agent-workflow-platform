@@ -59,6 +59,7 @@ interface JsonRpcResponse {
  * 基于 stdio transport + JSON-RPC 2.0 协议
  */
 export class McpClient {
+  private static readonly MAX_STDOUT_BUFFER_BYTES = 1024 * 1024;
   private readonly logger = new Logger(McpClient.name);
   private process: ChildProcess | null = null;
   private requestId = 0;
@@ -92,8 +93,8 @@ export class McpClient {
       try {
         this.process = spawn(this.command, this.args, {
           stdio: ['pipe', 'pipe', 'pipe'],
-          env: { ...process.env, ...this.env },
-          shell: true,
+          env: this.buildProcessEnvironment(),
+          shell: false,
         });
 
         this.process.stdout?.on('data', (data: Buffer) => {
@@ -236,6 +237,12 @@ export class McpClient {
   private handleStdout(data: Buffer): void {
     this.buffer += data.toString();
 
+    if (Buffer.byteLength(this.buffer, 'utf8') > McpClient.MAX_STDOUT_BUFFER_BYTES) {
+      this.logger.warn('MCP stdout buffer exceeded 1 MiB; terminating server process');
+      this.disconnect();
+      return;
+    }
+
     // 按换行符分割，处理完整的 JSON 消息
     const lines = this.buffer.split('\n');
     this.buffer = lines.pop() || ''; // 最后一行可能不完整
@@ -280,10 +287,25 @@ export class McpClient {
    * 拒绝所有挂起的请求
    */
   private rejectAllPending(error: Error): void {
-    for (const [id, pending] of this.pendingRequests) {
+    for (const pending of this.pendingRequests.values()) {
       clearTimeout(pending.timer);
       pending.reject(error);
     }
     this.pendingRequests.clear();
+  }
+
+  /** Build a small, explicit environment instead of leaking backend secrets. */
+  private buildProcessEnvironment(): NodeJS.ProcessEnv {
+    const inheritedKeys = ['PATH', 'HOME', 'TMPDIR', 'LANG', 'LC_ALL'] as const;
+    const processEnvironment: NodeJS.ProcessEnv = {};
+    for (const key of inheritedKeys) {
+      if (process.env[key]) processEnvironment[key] = process.env[key];
+    }
+
+    const blockedKeys = /^(NODE_OPTIONS|PYTHONPATH|PYTHONHOME|RUBYOPT|PERL5OPT|LD_PRELOAD|LD_LIBRARY_PATH|DYLD_.*)$/i;
+    for (const [key, value] of Object.entries(this.env)) {
+      if (!blockedKeys.test(key)) processEnvironment[key] = value;
+    }
+    return processEnvironment;
   }
 }

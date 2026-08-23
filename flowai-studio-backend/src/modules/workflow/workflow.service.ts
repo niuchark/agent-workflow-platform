@@ -168,7 +168,7 @@ export class WorkflowService {
       throw new ForbiddenException('You do not have permission to access this workflow');
     }
 
-    const { application, ...workflowData } = workflow;
+    const workflowData = (({ application: _application, ...rest }) => rest)(workflow);
     return this.serializeWorkflow(workflowData);
   }
 

@@ -30,7 +30,7 @@ import { RAGModule } from '../rag/rag.module';
 import { SkillModule } from '../skill/skill.module';
 import { AiModule } from '../ai/ai.module';
 import { AgentModule } from '../agent/agent.module';
-import { RateLimiterService, CircuitBreakerService } from '../../common/guards/rate-limit.guard';
+import { RateLimiterService, CircuitBreakerService } from '../../common/services/rate-limit.service';
 
 /** 工作流模块：注册控制器、执行服务与全部节点执行器 */
 @Module({

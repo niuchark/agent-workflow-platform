@@ -34,8 +34,6 @@ import {
   RetrievalRequest,
   RetrievalResult,
 } from '../interfaces/retrieval-strategy.interface';
-import { VectorStore } from '../interfaces/vector-store.interface';
-import { EmbeddingProvider } from '../interfaces/embedding-provider.interface';
 import { BM25KeywordService } from '../services/bm25-keyword.service';
 import { RRFFusionService } from '../services/rrf-fusion.service';
 
@@ -57,7 +55,7 @@ export class HybridRetrievalStrategy implements RetrievalStrategy {
    * 这里只负责关键词检索和 RRF 融合逻辑。
    * 实际调用由 RAGService.retrieveWithStrategy() 完成。
    */
-  async retrieve(request: RetrievalRequest): Promise<RetrievalResult[]> {
+  async retrieve(_request: RetrievalRequest): Promise<RetrievalResult[]> {
     // 该方法不应被直接调用，因为需要 VectorStore 和 EmbeddingProvider
     throw new Error(
       'HybridRetrievalStrategy.retrieve() should be called via RAGService which injects ' +

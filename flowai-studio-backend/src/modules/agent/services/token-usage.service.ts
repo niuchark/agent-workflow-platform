@@ -5,6 +5,7 @@
  * 成本报表用原生 SQL 按天/周/月/模型/供应商分组聚合。
  */
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../common/services/prisma.service';
 import { LLMProviderFactory } from '../providers/llm-provider.factory';
 import { RecordTokenUsageDto, GetTokenUsageDto, GetCostReportDto } from '../dto/token-usage.dto';
@@ -42,11 +43,7 @@ export class TokenUsageService {
   recordUsage(dto: RecordTokenUsageDto): void {
     // 自动计算成本（如果未提供）
     if (dto.cost === undefined || dto.cost === 0) {
-      dto.cost = this.llmFactory.estimateCost(
-        dto.model,
-        dto.promptTokens,
-        dto.completionTokens,
-      );
+      dto.cost = this.llmFactory.estimateCost(dto.model, dto.promptTokens, dto.completionTokens);
     }
 
     if (!dto.callType) {
@@ -57,9 +54,7 @@ export class TokenUsageService {
 
     // 达到缓冲区阈值立即刷入
     if (this.buffer.length >= this.BUFFER_MAX) {
-      this.flush().catch((err) =>
-        this.logger.error('Failed to flush token usage buffer', err),
-      );
+      this.flush().catch((err) => this.logger.error('Failed to flush token usage buffer', err));
     }
   }
 
@@ -74,7 +69,11 @@ export class TokenUsageService {
     executionId?: string;
     provider: string;
     model: string;
-    usage: { promptTokens: number; completionTokens: number; totalTokens: number };
+    usage: {
+      promptTokens: number;
+      completionTokens: number;
+      totalTokens: number;
+    };
     callType?: 'chat' | 'embedding' | 'agent';
   }): void {
     this.recordUsage({
@@ -202,29 +201,38 @@ export class TokenUsageService {
     const groupBy = dto.groupBy || 'day';
 
     // 使用原始 SQL 进行分组查询（Prisma 不支持 groupBy + date trunc）
-    let groupExpr: string;
+    let groupExpr: Prisma.Sql;
     switch (groupBy) {
       case 'day':
-        groupExpr = `DATE("createdAt")`;
+        groupExpr = Prisma.sql`DATE("createdAt")`;
         break;
       case 'week':
-        groupExpr = `DATE_TRUNC('week', "createdAt")`;
+        groupExpr = Prisma.sql`DATE_TRUNC('week', "createdAt")`;
         break;
       case 'month':
-        groupExpr = `DATE_TRUNC('month', "createdAt")`;
+        groupExpr = Prisma.sql`DATE_TRUNC('month', "createdAt")`;
         break;
       case 'model':
-        groupExpr = `"model"`;
+        groupExpr = Prisma.sql`"model"`;
         break;
       case 'provider':
-        groupExpr = `"provider"`;
+        groupExpr = Prisma.sql`"provider"`;
         break;
       default:
-        groupExpr = `DATE("createdAt")`;
+        groupExpr = Prisma.sql`DATE("createdAt")`;
     }
 
-    const whereClause = this.buildWhereClause(where);
-    const query = `
+    const whereClause = this.buildWhereClause(userId, dto);
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        groupKey: Date | string;
+        promptTokens: bigint | number;
+        completionTokens: bigint | number;
+        totalTokens: bigint | number;
+        cost: Prisma.Decimal | number;
+        callCount: bigint | number;
+      }>
+    >(Prisma.sql`
       SELECT 
         ${groupExpr} AS "groupKey",
         SUM("promptTokens") AS "promptTokens",
@@ -236,14 +244,17 @@ export class TokenUsageService {
       WHERE ${whereClause}
       GROUP BY ${groupExpr}
       ORDER BY "groupKey" ASC
-    `;
-
-    const rows: any[] = await this.prisma.$queryRawUnsafe(query);
+    `);
 
     // 总计
     const total = await this.prisma.tokenUsageRecord.aggregate({
       where,
-      _sum: { promptTokens: true, completionTokens: true, totalTokens: true, cost: true },
+      _sum: {
+        promptTokens: true,
+        completionTokens: true,
+        totalTokens: true,
+        cost: true,
+      },
       _count: true,
     });
 
@@ -271,14 +282,23 @@ export class TokenUsageService {
    */
   /** 获取模型使用排行（按费用降序，取前 20） */
   async getModelRanking(userId: string, startDate?: string, endDate?: string) {
-    const where: any = { userId };
-    if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) where.createdAt.gte = new Date(startDate);
-      if (endDate) where.createdAt.lte = new Date(endDate);
+    const conditions: Prisma.Sql[] = [Prisma.sql`"userId" = ${userId}`];
+    if (startDate) {
+      conditions.push(Prisma.sql`"createdAt" >= ${new Date(startDate)}`);
+    }
+    if (endDate) {
+      conditions.push(Prisma.sql`"createdAt" <= ${new Date(endDate)}`);
     }
 
-    const rows: any[] = await this.prisma.$queryRawUnsafe(`
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        model: string;
+        provider: string;
+        totalTokens: bigint | number;
+        cost: Prisma.Decimal | number;
+        callCount: bigint | number;
+      }>
+    >(Prisma.sql`
       SELECT 
         "model",
         "provider",
@@ -286,9 +306,7 @@ export class TokenUsageService {
         SUM("cost") AS "cost",
         COUNT(*) AS "callCount"
       FROM "token_usage_records"
-      WHERE "userId" = '${userId}'
-      ${startDate ? `AND "createdAt" >= '${startDate}'` : ''}
-      ${endDate ? `AND "createdAt" <= '${endDate}'` : ''}
+      WHERE ${Prisma.join(conditions, ' AND ')}
       GROUP BY "model", "provider"
       ORDER BY "cost" DESC
       LIMIT 20
@@ -311,20 +329,22 @@ export class TokenUsageService {
    * 构建 SQL WHERE 子句
    */
   /** 构建 SQL WHERE 子句 */
-  private buildWhereClause(where: any): string {
-    const conditions: string[] = [];
+  private buildWhereClause(
+    userId: string,
+    dto: Pick<GetCostReportDto, 'startDate' | 'endDate' | 'applicationId'>,
+  ): Prisma.Sql {
+    const conditions: Prisma.Sql[] = [Prisma.sql`"userId" = ${userId}`];
 
-    if (where.userId) conditions.push(`"userId" = '${where.userId}'`);
-
-    if (where.createdAt) {
-      if (where.createdAt.gte)
-        conditions.push(`"createdAt" >= '${where.createdAt.gte.toISOString()}'`);
-      if (where.createdAt.lte)
-        conditions.push(`"createdAt" <= '${where.createdAt.lte.toISOString()}'`);
+    if (dto.startDate) {
+      conditions.push(Prisma.sql`"createdAt" >= ${new Date(dto.startDate)}`);
+    }
+    if (dto.endDate) {
+      conditions.push(Prisma.sql`"createdAt" <= ${new Date(dto.endDate)}`);
+    }
+    if (dto.applicationId) {
+      conditions.push(Prisma.sql`"applicationId" = ${dto.applicationId}`);
     }
 
-    if (where.applicationId) conditions.push(`"applicationId" = '${where.applicationId}'`);
-
-    return conditions.join(' AND ') || '1=1';
+    return Prisma.join(conditions, ' AND ');
   }
 }

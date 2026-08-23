@@ -1,7 +1,7 @@
 /**
  * 工作流执行器：按拓扑序执行节点，支持超时/重试/取消/SSE 推送。
  */
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../common/services/prisma.service';
 import { NodeExecutorFactory } from './node-executor.factory';
 import { RunWorkflowDto, ExecutionControlDto } from '../dto/run-workflow.dto';
@@ -31,7 +31,12 @@ export class WorkflowExecutorService {
   /** 正在运行的工作流取消标记（含 AbortController，可中止正在执行的节点） */
   private readonly cancelTokens = new Map<
     string,
-    { cancelled: boolean; controller: AbortController }
+    {
+      cancelled: boolean;
+      controller: AbortController;
+      userId: string;
+      workflowId: string;
+    }
   >();
 
   constructor(
@@ -48,18 +53,23 @@ export class WorkflowExecutorService {
    * - 通过 SSE Subject 实时推送节点状态与最终上下文；
    * - 全程写入全链路追踪（trace/span）。
    */
-  async executeWorkflow(
-    workflowId: string,
-    runDto: RunWorkflowDto,
-    sseSubject?: Subject<any>,
-    executionId?: string,
-  ) {
+  async executeWorkflow(workflowId: string, runDto: RunWorkflowDto, sseSubject?: Subject<any>, executionId?: string) {
+    if (!runDto.userId) {
+      throw new BadRequestException('Workflow execution user is required');
+    }
+
     const workflow = await this.prisma.workflow.findUnique({
       where: { id: workflowId },
+      include: {
+        application: { select: { userId: true } },
+      },
     });
 
     if (!workflow) {
       throw new Error('Workflow not found');
+    }
+    if (workflow.application.userId !== runDto.userId) {
+      throw new ForbiddenException('You do not have permission to execute this workflow');
     }
 
     // 合并执行控制配置：调用方参数覆盖默认值
@@ -73,6 +83,8 @@ export class WorkflowExecutorService {
     const cancelToken = {
       cancelled: false,
       controller: new AbortController(),
+      userId: runDto.userId,
+      workflowId,
     };
     this.cancelTokens.set(execId, cancelToken);
 
@@ -92,7 +104,10 @@ export class WorkflowExecutorService {
     for (const edge of edges) {
       const neighbors = adjList.get(edge.source);
       if (neighbors) {
-        neighbors.push({ target: edge.target, sourceHandle: edge.sourceHandle });
+        neighbors.push({
+          target: edge.target,
+          sourceHandle: edge.sourceHandle,
+        });
       }
       inDegree.set(edge.target, (inDegree.get(edge.target) || 0) + 1);
     }
@@ -131,14 +146,10 @@ export class WorkflowExecutorService {
     // 运行时入度：条件分支会剪掉未命中的边，需动态递减
     const runtimeInDegree = new Map<string, number>(inDegree);
     // 已结算为执行成功的父节点数：join 节点在所有父节点结算后据此决定执行或跳过
-    const executedParentCount = new Map<string, number>(
-      nodes.map((n) => [n.id, 0]),
-    );
+    const executedParentCount = new Map<string, number>(nodes.map((n) => [n.id, 0]));
 
     // 初始队列：所有入度为 0 的根节点
-    const queue: string[] = nodes
-      .filter((n) => inDegree.get(n.id) === 0)
-      .map((n) => n.id);
+    const queue: string[] = nodes.filter((n) => inDegree.get(n.id) === 0).map((n) => n.id);
 
     // 启动心跳保活管理器
     const heartbeat = new HeartbeatManager(sseSubject, control.heartbeatIntervalMs);
@@ -163,10 +174,7 @@ export class WorkflowExecutorService {
      * 剩余依赖归零表示所有父节点都已结算，目标可以开始执行。
      */
     const settleAsExecuted = (targetId: string) => {
-      executedParentCount.set(
-        targetId,
-        (executedParentCount.get(targetId) || 0) + 1,
-      );
+      executedParentCount.set(targetId, (executedParentCount.get(targetId) || 0) + 1);
       const deg = (runtimeInDegree.get(targetId) || 1) - 1;
       runtimeInDegree.set(targetId, deg);
       if (deg <= 0) {
@@ -235,7 +243,11 @@ export class WorkflowExecutorService {
               traceId,
               name: `${node.type}:${nodeId}`,
               kind: 'internal',
-              attributes: { nodeId, nodeType: node.type, nodeName: node.name || node.id },
+              attributes: {
+                nodeId,
+                nodeType: node.type,
+                nodeName: node.name || node.id,
+              },
             });
           } catch (e) {
             this.logger.warn(`Failed to start span for node ${nodeId}: ${e instanceof Error ? e.message : 'Unknown'}`);
@@ -306,7 +318,10 @@ export class WorkflowExecutorService {
           if (this.tracingService && spanId) {
             try {
               await this.tracingService.endSpan(spanId, 'ok', [
-                { key: 'output_keys', value: output ? Object.keys(output) : [] },
+                {
+                  key: 'output_keys',
+                  value: output ? Object.keys(output) : [],
+                },
                 { key: 'durationMs', value: nodeDuration },
               ]);
             } catch (e) {
@@ -364,7 +379,10 @@ export class WorkflowExecutorService {
             try {
               await this.tracingService.endSpan(spanId, 'error', [
                 { key: 'error', value: error.message },
-                { key: 'errorType', value: isTimeout ? 'timeout' : isCancelled ? 'cancelled' : 'execution_error' },
+                {
+                  key: 'errorType',
+                  value: isTimeout ? 'timeout' : isCancelled ? 'cancelled' : 'execution_error',
+                },
               ]);
             } catch (e) {
               this.logger.warn(`Failed to end span ${spanId} on error: ${e instanceof Error ? e.message : 'Unknown'}`);
@@ -382,9 +400,7 @@ export class WorkflowExecutorService {
 
           // 取消错误直接抛出，不受 continueOnError 影响
           if (isCancelled) {
-            throw cancelToken.cancelled
-              ? new CancelledError('Workflow execution was cancelled')
-              : error;
+            throw cancelToken.cancelled ? new CancelledError('Workflow execution was cancelled') : error;
           }
 
           // continueOnError 模式：跳过当前节点的下游分支，继续执行其他分支
@@ -416,13 +432,7 @@ export class WorkflowExecutorService {
 
     try {
       // 工作流整体超时控制
-      await withTimeout(
-        runLoop(),
-        control.workflowTimeoutMs,
-        'workflow',
-        workflow.name,
-        cancelToken.controller,
-      );
+      await withTimeout(runLoop(), control.workflowTimeoutMs, 'workflow', workflow.name, cancelToken.controller);
 
       // 结束 Trace（成功）
       if (this.tracingService && traceId) {
@@ -491,9 +501,9 @@ export class WorkflowExecutorService {
    * @param executionId 执行 ID
    * @returns 是否成功标记取消
    */
-  cancelExecution(executionId: string): boolean {
+  cancelExecution(executionId: string, userId: string, workflowId?: string): boolean {
     const token = this.cancelTokens.get(executionId);
-    if (token) {
+    if (token && token.userId === userId && (!workflowId || token.workflowId === workflowId)) {
       token.cancelled = true;
       token.controller.abort();
       this.logger.log(`Workflow execution ${executionId} marked for cancellation`);
@@ -505,7 +515,9 @@ export class WorkflowExecutorService {
   /**
    * 获取正在运行的执行 ID 列表
    */
-  getRunningExecutions(): string[] {
-    return Array.from(this.cancelTokens.keys());
+  getRunningExecutions(userId: string, workflowId?: string): string[] {
+    return Array.from(this.cancelTokens.entries())
+      .filter(([, token]) => token.userId === userId && (!workflowId || token.workflowId === workflowId))
+      .map(([executionId]) => executionId);
   }
 }

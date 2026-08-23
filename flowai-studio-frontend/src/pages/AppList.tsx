@@ -36,7 +36,7 @@ const { Search } = Input
 const AppList: React.FC = () => {
   const navigate = useNavigate()
   const {
-    apps, isLoading, fetchApps, createApp, updateApp, deleteApp, publishApp, unpublishApp,
+    apps, appLoading, fetchApps, createApp, updateApp, deleteApp, publishApp, unpublishApp,
     archiveApp, unarchiveApp,
     createWorkflow,
   } = useStore()
@@ -90,7 +90,7 @@ const AppList: React.FC = () => {
       }
     }
     initAppList()
-  }, [])
+  }, [createApp, createWorkflow, fetchApps])
 
   // 按名称/描述过滤应用
   const filteredApps = Array.isArray(apps)
@@ -146,6 +146,13 @@ const AppList: React.FC = () => {
   /** 进入应用编辑器 */
   const handleEnterEditor = (appId: string) => {
     navigate(`/apps/${appId}/editor`)
+  }
+
+  /** 应用卡片保留整卡点击，同时提供与链接一致的 Enter 键访问。 */
+  const handleCardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, appId: string) => {
+    if (event.target !== event.currentTarget || event.key !== 'Enter') return
+    event.preventDefault()
+    handleEnterEditor(appId)
   }
 
   // ===== DSL 导入处理 =====
@@ -212,7 +219,7 @@ const AppList: React.FC = () => {
         applicationId: importAppId,
         nameOverride: importNameOverride || undefined,
       })
-      message.success(`工作流「${result.workflow.name}」导入成功`)
+      message.success(`工作流「${result.name}」导入成功`)
       setImportModalOpen(false)
       fetchApps()
     } catch {
@@ -369,7 +376,7 @@ const AppList: React.FC = () => {
       </div>
 
       {/* Card grid */}
-      {isLoading ? (
+      {appLoading ? (
         <div className="app-grid-loading">
           <Spin size="large" />
         </div>
@@ -388,7 +395,11 @@ const AppList: React.FC = () => {
               <div
                 key={app.id}
                 className="app-card"
+                role="link"
+                tabIndex={0}
+                aria-label={`编辑应用：${app.name}`}
                 onClick={() => handleEnterEditor(app.id)}
+                onKeyDown={(event) => handleCardKeyDown(event, app.id)}
               >
                 <div className="app-card-header">
                   <div className="app-card-icon">
@@ -404,7 +415,10 @@ const AppList: React.FC = () => {
                     placement="bottomRight"
                   >
                     <button
+                      type="button"
                       className="app-card-menu-btn"
+                      aria-label={`管理应用：${app.name}`}
+                      aria-haspopup="menu"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <MoreOutlined />
@@ -465,7 +479,7 @@ const AppList: React.FC = () => {
           </Form.Item>
           <div className="modal-footer">
             <Button onClick={() => setIsModalOpen(false)}>取消</Button>
-            <Button type="primary" htmlType="submit" loading={isLoading} icon={<RocketOutlined />}>
+            <Button type="primary" htmlType="submit" loading={appLoading} icon={<RocketOutlined />}>
               {isEditing ? '保存修改' : '创建应用'}
             </Button>
           </div>

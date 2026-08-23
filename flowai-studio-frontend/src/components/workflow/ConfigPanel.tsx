@@ -8,7 +8,7 @@
  * 还包含 Agent 的 Supervisor/Worker 编辑、条件分支的可视化构建器、
  * 以及上游变量插入（VariableTextArea）等能力。
  */
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Form, Input, Select, Slider, InputNumber, Switch, Divider, Card, Button, Space, Tag, Empty, Typography, AutoComplete, Alert, Tooltip } from 'antd'
 import { PlusOutlined, DeleteOutlined, RobotOutlined, SettingOutlined, QuestionCircleOutlined, BranchesOutlined } from '@ant-design/icons'
 import { useStore } from '../../store'
@@ -112,6 +112,7 @@ const ConfigPanel: React.FC = () => {
   const { availableProviders, modelsByProvider, loading: modelCatalogLoading } = useModelCatalog()
   const { selectedNode, nodes, edges, updateNodeData, knowledgeBases, fetchKnowledgeBases, skills, fetchSkills } = useStore()
   const [form] = Form.useForm()
+  const initializedNodeKeyRef = useRef<string | null>(null)
   // Agent 的 Worker 列表单独用 state 管理（不属于 Form 字段）
   const [workers, setWorkers] = useState<any[]>([])
   // 监听表单中的 agentMode/provider，驱动条件渲染与模型列表
@@ -127,6 +128,13 @@ const ConfigPanel: React.FC = () => {
 
   // 选中节点变化时，把节点数据回填到表单
   useEffect(() => {
+    const nodeKey = selectedNode ? `${selectedNode.id}:${selectedNode.type}` : null
+    if (initializedNodeKeyRef.current === nodeKey) return
+
+    initializedNodeKeyRef.current = nodeKey
+    form.resetFields()
+    setWorkers([])
+
     if (selectedNode) {
       const data = selectedNode.data as any
       const normalizedConditions = selectedNode.type === 'condition'
@@ -147,16 +155,13 @@ const ConfigPanel: React.FC = () => {
           provider: worker.provider || inferLegacyProvider(worker.model),
         })))
       }
-    } else {
-      form.resetFields()
-      setWorkers([])
     }
   }, [selectedNode, form, updateNodeData])
 
   /** 表单值变化：实时写回选中节点的数据 */
-  const handleValuesChange = (_changedValues: any, allValues: any) => {
+  const handleValuesChange = (changedValues: Record<string, unknown>) => {
     if (selectedNode) {
-      updateNodeData(selectedNode.id, allValues)
+      updateNodeData(selectedNode.id, changedValues)
     }
   }
 
@@ -580,7 +585,14 @@ const ConfigPanel: React.FC = () => {
         </p>
       </div>
       <div className="config-panel-body">
-        <Form form={form} layout="vertical" onValuesChange={handleValuesChange} className="config-panel-form">
+        <Form
+          key={selectedNode ? `${selectedNode.id}:${selectedNode.type}` : 'empty'}
+          form={form}
+          layout="vertical"
+          preserve={false}
+          onValuesChange={handleValuesChange}
+          className="config-panel-form"
+        >
           {selectedNode && availableProviders.length === 0 && !modelCatalogLoading && (
             <Alert
               type="warning"

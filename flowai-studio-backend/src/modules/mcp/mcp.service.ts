@@ -4,35 +4,23 @@
  * 维护一个 serverId → McpClient 的连接池；
  * 连接/断开、工具列表查询与工具调用都先校验归属权。
  */
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { isAbsolute } from 'path';
 import { PrismaService } from '../../common/services/prisma.service';
 import { McpClient, McpTool, McpToolResult } from './mcp-client';
-
-/**
- * MCP 服务器配置 DTO
- */
-/** 创建 MCP 服务器的请求体 */
-export interface CreateMcpServerDto {
-  name: string;
-  description?: string;
-  transportType?: 'stdio' | 'sse';
-  command?: string;
-  args?: string[];
-  env?: Record<string, string>;
-  url?: string;
-}
-
-/** 更新 MCP 服务器的请求体 */
-export interface UpdateMcpServerDto {
-  name?: string;
-  description?: string;
-  transportType?: 'stdio' | 'sse';
-  command?: string;
-  args?: string[];
-  env?: Record<string, string>;
-  url?: string;
-  isActive?: boolean;
-}
+import {
+  CreateMcpServerDto,
+  McpTransportType,
+  UpdateMcpServerDto,
+} from './dto/mcp.dto';
 
 @Injectable()
 export class McpService {
@@ -41,24 +29,24 @@ export class McpService {
   // 活跃的 MCP Client 连接池：key = serverId
   private clients = new Map<string, McpClient>();
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private configService: ConfigService,
+  ) {}
 
   // ========== CRUD ==========
 
   /** 创建 MCP 服务器：按传输方式校验必填字段 */
   async create(userId: string, dto: CreateMcpServerDto) {
-    if (dto.transportType === 'stdio' && !dto.command) {
-      throw new BadRequestException('stdio 模式必须提供启动命令 (command)');
-    }
-    if (dto.transportType === 'sse' && !dto.url) {
-      throw new BadRequestException('SSE 模式必须提供服务器 URL');
-    }
+    const transportType = dto.transportType ?? McpTransportType.STDIO;
+    this.validateTransportConfig(transportType, dto.command, dto.url);
+    this.validateEnvironment(dto.env);
 
     return this.prisma.mcpServer.create({
       data: {
         name: dto.name,
         description: dto.description,
-        transportType: dto.transportType || 'stdio',
+        transportType,
         command: dto.command,
         args: dto.args ? JSON.stringify(dto.args) : null,
         env: dto.env ? JSON.stringify(dto.env) : null,
@@ -100,7 +88,14 @@ export class McpService {
 
   /** 更新服务器：配置变更前先断开旧连接 */
   async update(userId: string, id: string, dto: UpdateMcpServerDto) {
-    await this.findOne(userId, id);
+    const existing = await this.findOne(userId, id);
+    const transportType = dto.transportType ?? existing.transportType;
+    this.validateTransportConfig(
+      transportType,
+      dto.command === undefined ? existing.command ?? undefined : dto.command,
+      dto.url === undefined ? existing.url ?? undefined : dto.url,
+    );
+    this.validateEnvironment(dto.env);
 
     // 如果正在连接，先断开
     if (this.clients.has(id)) {
@@ -147,6 +142,12 @@ export class McpService {
       throw new BadRequestException('MCP 服务器未配置启动命令');
     }
 
+    if (!server.isActive) {
+      throw new BadRequestException('MCP 服务器已停用');
+    }
+
+    this.assertStdioExecutionAllowed(server.command);
+
     // 如果已连接，先断开
     if (this.clients.has(serverId)) {
       this.clients.get(serverId)!.disconnect();
@@ -166,9 +167,10 @@ export class McpService {
       return { tools };
     } catch (err) {
       client.disconnect();
-      throw new BadRequestException(
-        `连接 MCP Server "${server.name}" 失败: ${err instanceof Error ? err.message : err}`,
+      this.logger.warn(
+        `MCP Server "${server.name}" 连接失败: ${err instanceof Error ? err.message : String(err)}`,
       );
+      throw new BadRequestException(`连接 MCP Server "${server.name}" 失败`);
     }
   }
 
@@ -208,7 +210,7 @@ export class McpService {
     userId: string,
     serverId: string,
     toolName: string,
-    args: Record<string, any> = {},
+    args: Record<string, unknown> = {},
   ): Promise<McpToolResult> {
     await this.findOne(userId, serverId);
 
@@ -220,9 +222,10 @@ export class McpService {
     try {
       return await client.callTool(toolName, args);
     } catch (err) {
-      throw new BadRequestException(
-        `调用工具 "${toolName}" 失败: ${err instanceof Error ? err.message : err}`,
+      this.logger.warn(
+        `MCP 工具 "${toolName}" 调用失败: ${err instanceof Error ? err.message : String(err)}`,
       );
+      throw new BadRequestException(`调用工具 "${toolName}" 失败`);
     }
   }
 
@@ -255,9 +258,52 @@ export class McpService {
    */
   /** 应用关闭时清理所有活跃连接 */
   onModuleDestroy() {
-    for (const [id, client] of this.clients) {
+    for (const client of this.clients.values()) {
       client.disconnect();
     }
     this.clients.clear();
+  }
+
+  private validateTransportConfig(
+    transportType: string,
+    command?: string,
+    url?: string,
+  ): void {
+    if (transportType === McpTransportType.STDIO && !command?.trim()) {
+      throw new BadRequestException('stdio 模式必须提供启动命令 (command)');
+    }
+    if (transportType === McpTransportType.SSE && !url?.trim()) {
+      throw new BadRequestException('SSE 模式必须提供服务器 URL');
+    }
+  }
+
+  private validateEnvironment(env?: Record<string, string>): void {
+    if (!env) return;
+    const entries = Object.entries(env);
+    if (entries.length > 64) {
+      throw new BadRequestException('MCP 环境变量数量不能超过 64 个');
+    }
+    for (const [key, value] of entries) {
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || typeof value !== 'string' || value.length > 4096) {
+        throw new BadRequestException(`MCP 环境变量格式无效: ${key}`);
+      }
+    }
+  }
+
+  /** Stdio is disabled unless the deployment opts in to an exact executable. */
+  private assertStdioExecutionAllowed(command: string): void {
+    if (!this.configService.get<boolean>('MCP_STDIO_ENABLED', false)) {
+      throw new ServiceUnavailableException('当前部署未启用 stdio MCP');
+    }
+
+    const allowedCommands = new Set(
+      (this.configService.get<string>('MCP_STDIO_COMMAND_ALLOWLIST', '') || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean),
+    );
+    if (!isAbsolute(command) || !allowedCommands.has(command)) {
+      throw new ForbiddenException('MCP 启动命令不在部署白名单中');
+    }
   }
 }

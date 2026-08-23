@@ -5,7 +5,7 @@
  * - 顶栏展示当前页面标题、折叠按钮与用户菜单（退出登录）；
  * - 内容区通过 Outlet 渲染当前路由页面，编辑器路由使用全宽布局。
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Layout as AntLayout, Menu, Button, Avatar, Dropdown, Typography, Grid } from 'antd'
 import { useLocation, useNavigate, Outlet } from 'react-router-dom'
 import {
@@ -60,17 +60,57 @@ const Layout: React.FC = () => {
   const isMobile = screens.lg === false
   const { globalConfig, toggleSidebar, user, logout } = useStore()
   const [collapsed, setCollapsed] = useState(globalConfig.sidebarCollapsed)
+  const mobileMenuTriggerRef = useRef<HTMLElement | null>(null)
 
   // 移动端始终折叠侧边栏
   useEffect(() => {
     if (isMobile) setCollapsed(true)
   }, [isMobile])
 
-  /** 切换侧边栏折叠：本地状态 + 全局 store 同步 */
-  const handleToggle = () => {
-    setCollapsed(!collapsed)
-    toggleSidebar()
+  /** 切换侧边栏；移动端关闭后把焦点还给打开导航的按钮。 */
+  const handleToggle = (event?: React.MouseEvent<HTMLElement>) => {
+    const nextCollapsed = !collapsed
+
+    if (isMobile && !nextCollapsed) {
+      mobileMenuTriggerRef.current = event?.currentTarget ?? document.activeElement as HTMLElement
+    }
+
+    setCollapsed(nextCollapsed)
+    if (!isMobile) toggleSidebar()
+
+    if (isMobile && nextCollapsed) {
+      requestAnimationFrame(() => mobileMenuTriggerRef.current?.focus())
+    }
   }
+
+  // 路由切换后把辅助技术焦点移到主内容，避免仍停留在旧导航项。
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      document.getElementById('main-content')?.focus({ preventScroll: true })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [location.pathname])
+
+  // 移动导航打开时聚焦关闭按钮，并允许 Escape 关闭和恢复触发点。
+  useEffect(() => {
+    if (!isMobile || collapsed) return
+
+    const focusFrame = requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>('.sidebar-mobile-close')?.focus()
+    })
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      setCollapsed(true)
+      requestAnimationFrame(() => mobileMenuTriggerRef.current?.focus())
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      cancelAnimationFrame(focusFrame)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [collapsed, isMobile])
 
   /** 侧边栏导航项 */
   const menuItems = [
@@ -84,7 +124,9 @@ const Layout: React.FC = () => {
     { key: '/api-keys', icon: <KeyOutlined />, label: 'API 密钥' },
     { key: '/model-settings', icon: <CloudServerOutlined />, label: '模型服务' },
     { key: '/cost-statistics', icon: <BarChartOutlined />, label: '成本统计' },
-    { key: '/rate-limit', icon: <SafetyOutlined />, label: '限流监控' },
+    ...(user?.globalRole === 'admin'
+      ? [{ key: '/rate-limit', icon: <SafetyOutlined />, label: '限流监控' }]
+      : []),
     { key: '/trace-list', icon: <NodeIndexOutlined />, label: '全链路追踪' },
   ]
 

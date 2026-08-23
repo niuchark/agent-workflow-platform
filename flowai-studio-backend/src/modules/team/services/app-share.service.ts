@@ -25,10 +25,7 @@ export class AppShareService {
     });
 
     if (existingShare) {
-      return {
-        shareLink: existingShare.shareLink,
-        isPublic: existingShare.isPublic,
-      };
+      return this.serializeShare(existingShare);
     }
 
     const shareLink = `share-${crypto.randomBytes(16).toString('hex')}`;
@@ -39,7 +36,6 @@ export class AppShareService {
         isPublic: true,
         applicationId,
       },
-      select: { id: true, shareLink: true, isPublic: true },
     });
 
     // 同时更新 Application.shareLink 以便快速查找
@@ -48,16 +44,27 @@ export class AppShareService {
       data: { shareLink },
     });
 
-    return appShare;
+    return this.serializeShare(appShare);
+  }
+
+  /** 获取应用当前的分享记录。 */
+  async getShareInfo(userId: string, applicationId: string) {
+    await this.assertAppOwner(userId, applicationId);
+    const appShare = await this.prisma.appShare.findUnique({
+      where: { applicationId },
+    });
+    if (!appShare) throw new NotFoundException('该应用尚未生成分享链接');
+    return this.serializeShare(appShare);
   }
 
   /**
    * 通过分享链接获取应用（公开访问，无需认证）
    */
-  async getSharedApp(shareLink: string) {
+  async getSharedApp(shareLink: string, embedded = false) {
     const appShare = await this.prisma.appShare.findUnique({
       where: { shareLink },
       select: {
+        id: true,
         isPublic: true,
         embedConfig: true,
         application: {
@@ -76,11 +83,21 @@ export class AppShareService {
       throw new NotFoundException('分享的应用不存在或已关闭分享');
     }
 
+    const embedConfig = this.parseEmbedConfig(appShare.embedConfig);
+    if (embedded && !embedConfig.enabled) {
+      throw new ForbiddenException('此应用未开启嵌入');
+    }
+
+    await this.prisma.appShare.update({
+      where: { id: appShare.id },
+      data: { accessCount: { increment: 1 } },
+    });
+
     return {
       ...appShare.application,
       isPublic: appShare.isPublic,
       shareLink,
-      embedConfig: appShare.embedConfig,
+      embedConfig,
     };
   }
 
@@ -92,7 +109,13 @@ export class AppShareService {
     applicationId: string,
     settings: {
       isPublic?: boolean;
-      embedConfig?: { allowedOrigins?: string[]; theme?: string };
+      embedConfig?: {
+        enabled?: boolean;
+        width?: string;
+        height?: string;
+        theme?: 'light' | 'dark' | 'auto';
+        showHeader?: boolean;
+      };
     },
   ) {
     await this.assertAppOwner(userId, applicationId);
@@ -105,20 +128,15 @@ export class AppShareService {
       throw new NotFoundException('请先生成分享链接');
     }
 
-    const data: any = {};
+    const data: { isPublic?: boolean; embedConfig?: string } = {};
     if (settings.isPublic !== undefined) data.isPublic = settings.isPublic;
     if (settings.embedConfig) data.embedConfig = JSON.stringify(settings.embedConfig);
 
-    return this.prisma.appShare.update({
+    const updated = await this.prisma.appShare.update({
       where: { applicationId },
       data,
-      select: {
-        id: true,
-        shareLink: true,
-        isPublic: true,
-        embedConfig: true,
-      },
     });
+    return this.serializeShare(updated);
   }
 
   /**
@@ -155,17 +173,35 @@ export class AppShareService {
       throw new ForbiddenException('请先生成分享链接');
     }
 
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    const shareUrl = `${baseUrl}/share/${appShare.shareLink}`;
+    const baseUrl = new URL(process.env.FRONTEND_URL || 'http://localhost:5173');
+    const embedConfig = this.parseEmbedConfig(appShare.embedConfig);
+    if (!embedConfig.enabled) {
+      throw new ForbiddenException('此应用未开启嵌入');
+    }
+    const shareUrl = new URL(`/share/${appShare.shareLink}`, baseUrl);
+    shareUrl.searchParams.set('embedded', '1');
+    shareUrl.searchParams.set('theme', embedConfig.theme);
+    shareUrl.searchParams.set('showHeader', String(embedConfig.showHeader));
 
-    const embedConfig = appShare.embedConfig ? JSON.parse(appShare.embedConfig as string) : {};
-    const theme = embedConfig.theme || 'light';
+    const url = shareUrl.toString();
+    const title = `${app.name} - FlowAI Studio`;
+    const iframeCode = `<iframe src="${this.escapeHtmlAttribute(url)}" title="${this.escapeHtmlAttribute(title)}" loading="lazy" style="width:${embedConfig.width};height:${embedConfig.height};border:0;border-radius:8px" referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+    const scriptPayload = {
+      url,
+      title,
+      width: embedConfig.width,
+      height: embedConfig.height,
+    };
+    const serializedPayload = JSON.stringify(scriptPayload).replace(/</g, '\\u003c');
+    const scriptCode = `<script>(function(c,s){var f=document.createElement('iframe');f.src=c.url;f.title=c.title;f.loading='lazy';f.referrerPolicy='strict-origin-when-cross-origin';f.style.width=c.width;f.style.height=c.height;f.style.border='0';f.style.borderRadius='8px';s.parentNode.insertBefore(f,s);})(${serializedPayload},document.currentScript);</script>`;
 
     return {
-      shareUrl,
-      iframeCode: `<iframe src="${shareUrl}" width="100%" height="600" frameborder="0" style="border-radius: 8px;"></iframe>`,
-      scriptTag: `<script src="${baseUrl}/embed.js" data-app="${appShare.shareLink}" data-theme="${theme}"></script>`,
-      embedConfig: embedConfig,
+      shareUrl: url,
+      iframeCode,
+      scriptCode,
+      // Keep the former key for one release so existing API consumers do not break.
+      scriptTag: scriptCode,
+      embedConfig,
     };
   }
 
@@ -173,13 +209,66 @@ export class AppShareService {
    * 断言应用所有权
    */
   private async assertAppOwner(userId: string, applicationId: string) {
-    const app = await this.prisma.application.findUnique({
-      where: { id: applicationId },
+    const app = await this.prisma.application.findFirst({
+      where: { id: applicationId, userId },
     });
 
     if (!app) throw new NotFoundException('应用不存在');
-    if (app.userId !== userId) throw new ForbiddenException('只有应用所有者才能管理分享设置');
 
     return app;
+  }
+
+  private serializeShare(appShare: {
+    id: string;
+    applicationId: string;
+    shareLink: string;
+    isPublic: boolean;
+    accessCount: number;
+    embedConfig: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }) {
+    return {
+      ...appShare,
+      embedConfig: this.parseEmbedConfig(appShare.embedConfig),
+    };
+  }
+
+  private parseEmbedConfig(value: string | null) {
+    let config: Record<string, unknown> = {};
+    if (value) {
+      try {
+        const parsed = JSON.parse(value) as unknown;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          config = parsed as Record<string, unknown>;
+        }
+      } catch {
+        // Invalid legacy values fall back to safe defaults.
+      }
+    }
+
+    return {
+      enabled: config.enabled !== false,
+      width: this.normalizeDimension(config.width, '100%'),
+      height: this.normalizeDimension(config.height, '600px'),
+      theme: ['light', 'dark', 'auto'].includes(String(config.theme))
+        ? config.theme as 'light' | 'dark' | 'auto'
+        : 'auto',
+      showHeader: config.showHeader !== false,
+    };
+  }
+
+  private normalizeDimension(value: unknown, fallback: string): string {
+    return typeof value === 'string' && /^\d+(?:\.\d+)?(?:px|%|vh|vw|rem|em)$/.test(value)
+      ? value
+      : fallback;
+  }
+
+  private escapeHtmlAttribute(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
   }
 }

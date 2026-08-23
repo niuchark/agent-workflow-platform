@@ -469,6 +469,10 @@
   .auth-switch a { @apply font-semibold text-brand-600 hover:text-brand-700 hover:underline; }
   .shared-app-page, .shared-app-loading, .shared-app-error { @apply min-h-dvh bg-brand-50/50; }
   .shared-app-page { @apply flex flex-col; }
+  .shared-app-page--dark { @apply bg-slate-950; }
+  .shared-app-page--dark .shared-app-header { @apply border-slate-800 bg-slate-950/80; }
+  .shared-app-page--dark .shared-app-card { @apply border-slate-700 bg-slate-900; }
+  .shared-app-page--dark .shared-app-chat-container { @apply border-slate-700 bg-slate-950/60; }
   .shared-app-header { @apply flex items-center justify-between border-b border-white/70 bg-white/80 px-5 py-4 backdrop-blur-lg sm:px-8; }
   .shared-app-logo { @apply flex items-center gap-2.5 text-xl text-brand-600; }
   .shared-app-logo-text { @apply font-display text-base font-semibold text-ink; }

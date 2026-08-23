@@ -153,6 +153,9 @@ export class UserService {
         user: {
           id: user.id,
           username: user.username,
+          avatar: user.avatar,
+          createdAt: user.createdAt,
+          globalRole: user.globalRole,
         },
         token,
       };
@@ -174,6 +177,7 @@ export class UserService {
           username: true,
           avatar: true,
           createdAt: true,
+          globalRole: true,
         },
       });
 
@@ -200,6 +204,8 @@ export class UserService {
           id: true,
           username: true,
           avatar: true,
+          createdAt: true,
+          globalRole: true,
         },
       });
     } catch (error) {

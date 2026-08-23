@@ -120,5 +120,7 @@ export const getEmbedCode = (appId: string) =>
   request.get(`/apps/${appId}/embed`) as Promise<{ data: EmbedCodeResponse }>
 
 /** 获取公开分享的应用（无需认证） */
-export const getSharedApp = (shareLink: string) =>
-  request.get(`/share/${shareLink}`) as Promise<{ data: any }>
+export const getSharedApp = (shareLink: string, embedded = false) =>
+  request.get(`/share/${shareLink}`, {
+    params: embedded ? { embedded: '1' } : undefined,
+  }) as Promise<{ data: any }>

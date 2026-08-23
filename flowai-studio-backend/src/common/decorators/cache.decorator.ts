@@ -14,8 +14,6 @@
  * - Spring Cache: @Cacheable/@CacheEvict 注解
  * - 本设计: 多级缓存装饰器 + 互斥锁 + TTL 策略
  */
-import { SetMetadata } from '@nestjs/common';
-
 /**
  * 缓存装饰器元数据键
  */

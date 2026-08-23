@@ -15,7 +15,7 @@ import { Request } from 'express';
 
 interface JwtPayload {
   userId: string;
-  email: string;
+  username: string;
 }
 
 /** JWT 认证守卫：负责登录态校验 */

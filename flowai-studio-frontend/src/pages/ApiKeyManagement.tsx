@@ -7,21 +7,21 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   Button, Modal, Form, Input, Select, Table, Tag, Space, message,
-  Popconfirm, Empty, Spin, Switch, Typography, Alert, InputNumber,
+  Popconfirm, Empty, Spin, Switch, Typography, Alert,
 } from 'antd'
 import {
   PlusOutlined, KeyOutlined, DeleteOutlined, CopyOutlined,
-  StopOutlined, CheckCircleOutlined, ExclamationCircleOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons'
 import { useStore } from '../store'
 import { ApiKey, CreateApiKeyForm, API_KEY_SCOPE_OPTIONS } from '../types'
 
-const { Text, Paragraph } = Typography
+const { Text } = Typography
 
 /** API 密钥管理页面组件 */
 const ApiKeyManagement: React.FC = () => {
   const {
-    apiKeys, createdKey, isLoading,
+    apiKeys, createdKey, apiKeyLoading,
     fetchApiKeys, createApiKey, deleteApiKey, toggleApiKey, setCreatedKey,
     apps, fetchApps,
   } = useStore()
@@ -37,7 +37,7 @@ const ApiKeyManagement: React.FC = () => {
     initDone.current = true
     fetchApiKeys()
     fetchApps()
-  }, [])
+  }, [fetchApiKeys, fetchApps])
 
   // 创建成功后显示完整密钥弹窗
   useEffect(() => {
@@ -201,7 +201,7 @@ const ApiKeyManagement: React.FC = () => {
         />
       </div>
 
-      {isLoading ? (
+      {apiKeyLoading ? (
         <div className="apikey-loading">
           <Spin size="large" />
         </div>
@@ -254,7 +254,7 @@ const ApiKeyManagement: React.FC = () => {
           </Form.Item>
           <div className="modal-footer">
             <Button onClick={() => setIsCreateModalOpen(false)}>取消</Button>
-            <Button type="primary" htmlType="submit" loading={isLoading} icon={<KeyOutlined />}>
+            <Button type="primary" htmlType="submit" loading={apiKeyLoading} icon={<KeyOutlined />}>
               创建密钥
             </Button>
           </div>
@@ -274,6 +274,7 @@ const ApiKeyManagement: React.FC = () => {
         width={560}
         closable={false}
         maskClosable={false}
+        keyboard={false}
       >
         <Alert
           message="请立即保存此密钥！关闭此窗口后将无法再次查看完整密钥。"
