@@ -101,7 +101,12 @@ export class OpenAIProvider extends BaseLLMProvider {
       const response = await axios.post(
         `${this.baseUrl}/chat/completions`,
         body,
-        { headers, timeout: this.config.timeout || 60000, maxRedirects: 0 },
+        {
+          headers,
+          timeout: this.config.timeout || 60000,
+          maxRedirects: 0,
+          signal: params.signal,
+        },
       );
 
       const choice = response.data.choices[0];

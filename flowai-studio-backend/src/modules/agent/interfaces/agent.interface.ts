@@ -253,4 +253,6 @@ export interface AgentRunOptions {
   sseSubject?: any;
   /** 最大迭代轮数覆盖 */
   maxIterations?: number;
+  /** 取消信号：中止 Agent 内部的 LLM/工具调用 */
+  signal?: AbortSignal;
 }

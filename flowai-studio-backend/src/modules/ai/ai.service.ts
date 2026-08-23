@@ -273,6 +273,7 @@ export class AiService {
     temperature = 0.7,
     maxTokens = 2048,
     explicitProvider?: string,
+    signal?: AbortSignal,
   ): Promise<{ content: string; usage: { promptTokens: number; completionTokens: number; totalTokens: number } }> {
     const messages = [];
     if (systemPrompt) {
@@ -284,7 +285,7 @@ export class AiService {
     try {
       const providerType = this.providerFactory.inferUserProvider(model, explicitProvider);
       const provider = await this.providerFactory.createForUser(userId, providerType);
-      const response = await provider.chat({ messages, model, temperature, maxTokens });
+      const response = await provider.chat({ messages, model, temperature, maxTokens, signal });
       const usage = response.usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
 
       return {

@@ -100,6 +100,7 @@ export class QwenProvider extends BaseLLMProvider {
           },
           timeout: this.config.timeout || 60000,
           maxRedirects: 0,
+          signal: params.signal,
         },
       );
 

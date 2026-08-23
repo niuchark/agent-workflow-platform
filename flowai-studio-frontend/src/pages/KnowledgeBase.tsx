@@ -27,13 +27,33 @@ import {
   InfoCircleOutlined,
 } from '@ant-design/icons'
 import { useStore } from '../store'
-import { DocumentChunk, EmbeddingProviderType, VectorStoreType, RerankerProviderType, EMBEDDING_MODELS, VECTOR_STORE_OPTIONS, RETRIEVAL_MODE_OPTIONS, OLLAMA_RERANK_MODELS } from '../types'
+import { Document as KnowledgeDocument, DocumentChunk, EmbeddingProviderType, VectorStoreType, RerankerProviderType, EMBEDDING_MODELS, VECTOR_STORE_OPTIONS, RETRIEVAL_MODE_OPTIONS, OLLAMA_RERANK_MODELS } from '../types'
 import { useNavigate } from 'react-router-dom'
 import { useModelCatalog } from '../utils/useModelCatalog'
 
 const { Text } = Typography
 const { TextArea } = Input
 const { Dragger } = Upload
+
+const DOCUMENT_STATUS: Record<string, { label: string; tone: string }> = {
+  processing: { label: '处理中', tone: 'processing' },
+  completed: { label: '已完成', tone: 'completed' },
+  failed: { label: '失败', tone: 'failed' },
+}
+
+/** 文件大小格式化：保持短小，避免窄屏列被长数字撑开 */
+const formatFileSize = (size?: number) => {
+  if (size == null || Number.isNaN(size)) return '—'
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / 1024 / 1024).toFixed(1)} MB`
+}
+
+/** 文档状态同时使用文字与语义色，避免只靠颜色表达 */
+const renderDocumentStatus = (status?: string) => {
+  const value = DOCUMENT_STATUS[status || ''] || DOCUMENT_STATUS.completed
+  return <span className={`doc-status doc-status--${value.tone}`}>{value.label}</span>
+}
 
 /** 知识库页面组件 */
 const KnowledgeBase: React.FC = () => {
@@ -188,6 +208,43 @@ const KnowledgeBase: React.FC = () => {
     catch { message.error('获取分块失败') }
     finally { setChunksLoading(false) }
   }
+
+  /** 文档表格列：桌面端固定列宽，文件名在稳定宽度内省略并可查看全文 */
+  const documentColumns = [
+    {
+      title: '文件名', dataIndex: 'name', key: 'name', width: 260,
+      render: (name: string) => (
+        <div className="doc-file-cell">
+          <FileTextOutlined aria-hidden="true" />
+          <Tooltip title={name}>
+            <span className="doc-file-name" tabIndex={0}>{name}</span>
+          </Tooltip>
+        </div>
+      ),
+    },
+    { title: '大小', dataIndex: 'size', key: 'size', width: 92, render: formatFileSize },
+    { title: '状态', dataIndex: 'status', key: 'status', width: 88, render: renderDocumentStatus },
+    { title: '上传时间', dataIndex: 'createdAt', key: 'createdAt', width: 168, render: (time: string) => new Date(time).toLocaleString('zh-CN') },
+    {
+      title: '操作', key: 'action', width: 132,
+      render: (_: unknown, record: KnowledgeDocument & { status?: string }) => (
+        <Space size="small" className="doc-table-actions">
+          <Button
+            icon={<BlockOutlined />}
+            size="small"
+            type="text"
+            disabled={record.status === 'processing'}
+            title={record.status === 'processing' ? '文档处理完成后可查看分块' : undefined}
+            onClick={() => handleViewChunks(record)}
+            className="action-btn"
+          >
+            分块
+          </Button>
+          <Button aria-label={`删除文档 ${record.name}`} icon={<DeleteOutlined />} size="small" danger type="text" onClick={() => handleDeleteDocument(record.id)} loading={isLoading} className="action-btn" />
+        </Space>
+      ),
+    },
+  ]
 
   /** 知识库表格列定义 */
   const kbColumns = [
@@ -499,16 +556,47 @@ const KnowledgeBase: React.FC = () => {
             {documents.length === 0 ? (
               <Empty description="上传第一份文档后将在这里显示" image={Empty.PRESENTED_IMAGE_SIMPLE} />
             ) : (
-              <Table
-                columns={[
-                  { title: '文件名', dataIndex: 'name', key: 'name', render: (name: string) => (<Space><FileTextOutlined style={{ color: 'var(--c-accent)' }} /><Text>{name}</Text></Space>) },
-                  { title: '大小', dataIndex: 'size', key: 'size', width: 100, render: (size: number) => { if (size == null || isNaN(size)) return '-'; if (size < 1024) return `${size} B`; if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`; return `${(size / 1024 / 1024).toFixed(1)} MB` } },
-                  { title: '状态', dataIndex: 'status', key: 'status', width: 90, render: (status: string) => { const statusMap: Record<string, { label: string; color: string }> = { processing: { label: '处理中', color: '#faad14' }, completed: { label: '已完成', color: '#52c41a' }, failed: { label: '失败', color: '#ff4d4f' } }; const s = statusMap[status] || statusMap.completed; return <span style={{ color: s.color }}>{s.label}</span> } },
-                  { title: '上传时间', dataIndex: 'createdAt', key: 'createdAt', width: 170, render: (time: string) => new Date(time).toLocaleString('zh-CN') },
-                  { title: '操作', key: 'action', width: 140, render: (_: any, record: any) => (<Space size="small"><Button icon={<BlockOutlined />} size="small" type="text" onClick={() => handleViewChunks(record)} className="action-btn">分块</Button><Button icon={<DeleteOutlined />} size="small" danger type="text" onClick={() => handleDeleteDocument(record.id)} loading={isLoading} className="action-btn" /></Space>) },
-                ]}
-                dataSource={documents} rowKey="id" pagination={false} size="small"
-              />
+              <>
+                <div className="doc-table-view">
+                  <Table
+                    columns={documentColumns}
+                    dataSource={documents}
+                    rowKey="id"
+                    pagination={false}
+                    size="small"
+                    tableLayout="fixed"
+                    scroll={{ x: 740 }}
+                  />
+                </div>
+                <div className="doc-mobile-list">
+                  {documents.map((document) => (
+                    <article className="doc-mobile-card" key={document.id}>
+                      <div className="doc-file-cell">
+                        <FileTextOutlined aria-hidden="true" />
+                        <Tooltip title={document.name}>
+                          <span className="doc-file-name" tabIndex={0}>{document.name}</span>
+                        </Tooltip>
+                      </div>
+                      <dl className="doc-mobile-meta">
+                        <div><dt>大小</dt><dd>{formatFileSize(document.size)}</dd></div>
+                        <div><dt>状态</dt><dd>{renderDocumentStatus(document.status)}</dd></div>
+                        <div className="doc-mobile-date"><dt>上传时间</dt><dd>{new Date(document.createdAt).toLocaleString('zh-CN')}</dd></div>
+                      </dl>
+                      <div className="doc-mobile-actions">
+                        <Button
+                          icon={<BlockOutlined />}
+                          disabled={document.status === 'processing'}
+                          title={document.status === 'processing' ? '文档处理完成后可查看分块' : undefined}
+                          onClick={() => handleViewChunks(document)}
+                        >
+                          查看分块
+                        </Button>
+                        <Button danger icon={<DeleteOutlined />} onClick={() => handleDeleteDocument(document.id)} loading={isLoading}>删除</Button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -516,7 +604,7 @@ const KnowledgeBase: React.FC = () => {
 
       {/* Chunk Preview Modal */}
       <Modal
-        title={<div className="chunk-modal-title"><button className="chunk-back-btn" onClick={() => setChunkModalVisible(false)}><ArrowLeftOutlined /></button><BlockOutlined /><span>文档分块预览</span><span className="chunk-doc-name">{chunkDocName}</span></div>}
+        title={<div className="chunk-modal-title"><button type="button" aria-label="返回文档列表" className="chunk-back-btn" onClick={() => setChunkModalVisible(false)}><ArrowLeftOutlined /></button><BlockOutlined /><span>文档分块预览</span><span className="chunk-doc-name" title={chunkDocName}>{chunkDocName}</span></div>}
         open={chunkModalVisible} onCancel={() => setChunkModalVisible(false)} width={720} footer={null}
       >
         <div className="chunk-modal-body">

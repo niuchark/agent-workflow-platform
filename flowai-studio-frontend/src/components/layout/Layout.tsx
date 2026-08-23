@@ -151,9 +151,9 @@ const Layout: React.FC = () => {
           {!collapsed && (
             <div className="sidebar-footer-card">
               <div className="sidebar-footer-icon"><ThunderboltOutlined /></div>
-              <div>
-                <strong>Agent Flow Platform</strong>
-                <p>用 AI 工作流自动化你的业务流程。</p>
+              <div className="sidebar-footer-copy">
+                <strong title="Agent Flow Platform">Agent Flow Platform</strong>
+                <p title="用 AI 工作流自动化你的业务流程。">用 AI 工作流自动化你的业务流程。</p>
               </div>
             </div>
           )}

@@ -153,25 +153,49 @@ export class TeamService {
   async addMember(userId: string, teamId: string, dto: AddMemberDto) {
     await this.assertTeamAdmin(userId, teamId);
 
+    const identifier = dto.userId.trim();
+    const targetUser = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { id: identifier },
+          { username: identifier },
+        ],
+      },
+      select: { id: true, username: true },
+    });
+
+    if (!targetUser) {
+      throw new NotFoundException('未找到该用户，请检查用户名或用户 ID');
+    }
+
+    // 不能添加自己
+    if (targetUser.id === userId) throw new BadRequestException('不能添加自己');
+
     // 不能添加已存在的成员
     const existing = await this.prisma.teamMember.findUnique({
-      where: { teamId_userId: { teamId, userId: dto.userId } },
+      where: { teamId_userId: { teamId, userId: targetUser.id } },
     });
     if (existing) throw new ConflictException('该用户已是团队成员');
 
-    // 不能添加自己
-    if (dto.userId === userId) throw new BadRequestException('不能添加自己');
-
-    const member = await this.prisma.teamMember.create({
-      data: {
-        teamId,
-        userId: dto.userId,
-        role: dto.role,
-      },
-      include: {
-        user: { select: { id: true, username: true, avatar: true } },
-      },
-    });
+    let member;
+    try {
+      member = await this.prisma.teamMember.create({
+        data: {
+          teamId,
+          userId: targetUser.id,
+          role: dto.role,
+        },
+        include: {
+          user: { select: { id: true, username: true, avatar: true } },
+        },
+      });
+    } catch (error) {
+      // 并发添加同一用户时，预检查之后仍可能命中唯一约束。
+      if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
+        throw new ConflictException('该用户已是团队成员');
+      }
+      throw error;
+    }
 
     return {
       id: member.id,

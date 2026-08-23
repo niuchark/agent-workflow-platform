@@ -44,6 +44,7 @@ import { RerankerFactory, RerankerType } from '../providers/reranker/reranker.fa
 import { CacheTTL, CachePrefix } from '../../../common/decorators/cache.decorator';
 import { ModelCredentialService } from '../../model-credential/model-credential.service';
 import { UserModelProvider } from '../../model-credential/model-credential.types';
+import { normalizeUploadFilename } from '../utils/upload-filename.util';
 import * as fs from 'fs';
 
 @Injectable()
@@ -123,7 +124,7 @@ export class RAGService {
    * - 本设计: L1/L2 双层 + 写时自动失效
    */
   async findKnowledgeBases(userId: string) {
-    return this.cacheService.getOrSet(
+    const knowledgeBases = await this.cacheService.getOrSet(
       `${CachePrefix.KNOWLEDGE_BASE}:list:${userId}`,
       () => this.prisma.knowledgeBase.findMany({
         where: { userId },
@@ -131,6 +132,14 @@ export class RAGService {
       }),
       CacheTTL.KNOWLEDGE_BASES,
     );
+
+    return knowledgeBases.map((knowledgeBase) => ({
+      ...knowledgeBase,
+      documents: knowledgeBase.documents.map((document) => ({
+        ...document,
+        name: normalizeUploadFilename(document.name),
+      })),
+    }));
   }
 
   /**
@@ -159,7 +168,13 @@ export class RAGService {
       throw new BadRequestException('You do not have permission to access this knowledge base');
     }
 
-    return kb;
+    return {
+      ...kb,
+      documents: kb.documents.map((document) => ({
+        ...document,
+        name: normalizeUploadFilename(document.name),
+      })),
+    };
   }
 
   /** 更新知识库：embedding 相关配置变更时先验证新凭证 */
@@ -230,7 +245,7 @@ export class RAGService {
     await this.findKnowledgeBaseById(userId, knowledgeBaseId);
 
     const mimeType = file.mimetype || 'application/octet-stream';
-    const fileName = file.originalname || '';
+    const fileName = normalizeUploadFilename(file.originalname || '');
     const lowerName = fileName.toLowerCase();
     const ext = lowerName.includes('.') ? lowerName.slice(lowerName.lastIndexOf('.')) : '';
 
@@ -277,15 +292,15 @@ export class RAGService {
 
     // 检查同名文件是否已存在
     const existingDoc = await this.prisma.document.findFirst({
-      where: { name: file.originalname, knowledgeBaseId },
+      where: { name: fileName, knowledgeBaseId },
     });
     if (existingDoc) {
-      throw new BadRequestException(`该知识库中已存在同名文件「${file.originalname}」，请重命名后重新上传`);
+      throw new BadRequestException(`该知识库中已存在同名文件「${fileName}」，请重命名后重新上传`);
     }
 
     const document = await this.prisma.document.create({
       data: {
-        name: file.originalname,
+        name: fileName,
         content,
         mimeType,
         size: file.size || contentBuffer.length,
@@ -295,12 +310,20 @@ export class RAGService {
     });
 
     // 异步处理文档分块和向量化
-    this.processAndEmbedDocument(userId, document.id, content, knowledgeBaseId).catch((error) => {
+    this.processAndEmbedDocument(userId, document.id, content, knowledgeBaseId).catch(async (error) => {
       this.logger.error(`Document processing failed for ${document.id}: ${error instanceof Error ? error.message : error}`);
-      this.prisma.document.update({
-        where: { id: document.id },
-        data: { status: 'failed', error: '模型服务调用失败，请检查凭证和模型配置' },
-      }).catch(() => {});
+      try {
+        await this.prisma.document.update({
+          where: { id: document.id },
+          data: { status: 'failed', error: '模型服务调用失败，请检查凭证和模型配置' },
+        });
+        await this.invalidateKBCache(userId, knowledgeBaseId);
+        await this.cacheService.delete(`${CachePrefix.DOCUMENT}:chunks:${document.id}`);
+      } catch (updateError) {
+        this.logger.error(
+          `Failed to persist processing error for ${document.id}: ${updateError instanceof Error ? updateError.message : updateError}`,
+        );
+      }
     });
 
     // 失效知识库详情 + 列表缓存 + 检索缓存
@@ -346,7 +369,11 @@ export class RAGService {
       },
     }));
 
-    await vectorStore.upsert(knowledgeBaseId, documents);
+    // pgvector 与文档分块表共用同一张表，统一由下方批量写入，避免重复插入；
+    // 外部向量库仍先写入各自的集合，再保留一份本地分块用于预览/关键词检索。
+    if (vectorStore.storeType !== 'pgvector') {
+      await vectorStore.upsert(knowledgeBaseId, documents);
+    }
 
     // 4. 同时写入 document_chunks 表（保留兼容，方便 ORM 查询）
     await this.prisma.batchInsertVectorChunks({
@@ -370,6 +397,12 @@ export class RAGService {
       where: { id: documentId },
       data: { status: 'completed' },
     });
+
+    // 服务端处理通常比本地慢；用户可能在处理完成前打开预览并缓存到空数组。
+    // 入库完成后必须清除分块、知识库与检索缓存，下一次查看才能拿到真实数据。
+    await this.cacheService.delete(`${CachePrefix.DOCUMENT}:chunks:${documentId}`);
+    await this.invalidateKBCache(userId, knowledgeBaseId);
+    await this.cacheService.deleteByPrefix(`${CachePrefix.KNOWLEDGE_BASE_RETRIEVAL}:${knowledgeBaseId}`);
 
     this.logger.log(
       `Document ${documentId} processed: ${chunks.length} chunks, ` +
@@ -420,7 +453,7 @@ export class RAGService {
 
     return {
       documentId,
-      documentName: document.name,
+      documentName: normalizeUploadFilename(document.name),
       totalChunks: chunks.length,
       chunks,
     };
@@ -844,7 +877,7 @@ export class RAGService {
         where: { id: { in: documentIds } },
         select: { id: true, name: true },
       });
-      docMap = new Map(documents.map((d) => [d.id, d.name]));
+      docMap = new Map(documents.map((d) => [d.id, normalizeUploadFilename(d.name)]));
     }
 
     return results.map((result) => ({

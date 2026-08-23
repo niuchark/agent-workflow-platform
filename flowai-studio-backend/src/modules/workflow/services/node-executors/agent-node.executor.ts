@@ -25,6 +25,7 @@ export class AgentNodeExecutor implements INodeExecutor {
   async execute(
     node: any,
     context: Record<string, any>,
+    signal?: AbortSignal,
   ): Promise<Record<string, any>> {
     const nodeData = node.data as any;
     const config = this.buildAgentConfig(nodeData);
@@ -32,6 +33,7 @@ export class AgentNodeExecutor implements INodeExecutor {
 
     const options: AgentRunOptions = {
       context,
+      signal,
     };
 
     const result = await this.agentExecutor.execute(config, input, options);

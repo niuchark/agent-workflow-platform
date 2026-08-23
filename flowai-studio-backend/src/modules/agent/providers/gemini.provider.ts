@@ -78,6 +78,7 @@ export class GeminiProvider extends BaseLLMProvider {
       const response = await axios.post(url, body, {
         headers: { 'Content-Type': 'application/json' },
         timeout: this.config.timeout || 60000,
+        signal: params.signal,
       });
 
       return this.parseGeminiResponse(response.data, model);

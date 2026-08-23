@@ -28,8 +28,11 @@ const DEFAULT_CONTROL: Required<ExecutionControlDto> = {
 export class WorkflowExecutorService {
   private readonly logger = new Logger(WorkflowExecutorService.name);
 
-  /** 正在运行的工作流取消标记 */
-  private readonly cancelTokens = new Map<string, { cancelled: boolean }>();
+  /** 正在运行的工作流取消标记（含 AbortController，可中止正在执行的节点） */
+  private readonly cancelTokens = new Map<
+    string,
+    { cancelled: boolean; controller: AbortController }
+  >();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -65,9 +68,12 @@ export class WorkflowExecutorService {
       ...(runDto.control || {}),
     };
 
-    // 注册取消标记
+    // 注册取消标记：controller 用于中止正在执行的节点
     const execId = executionId || `${workflowId}_${Date.now()}`;
-    const cancelToken = { cancelled: false };
+    const cancelToken = {
+      cancelled: false,
+      controller: new AbortController(),
+    };
     this.cancelTokens.set(execId, cancelToken);
 
     const nodes = JSON.parse(workflow.nodes) as any[];
@@ -251,15 +257,25 @@ export class WorkflowExecutorService {
 
           const nodeStartTime = Date.now();
 
-          // 节点执行：超时控制 + 重试
+          // 节点执行：超时控制 + 重试（每次尝试独立信号，取消/超时都会中止底层请求）
           const output = await retryWithBackoff(
-            () =>
-              withTimeout(
-                executor.execute(node, context),
+            () => {
+              // 每次重试新建信号：上一次尝试超时中止不影响下一次重试
+              const attemptController = new AbortController();
+              const onAttemptAbort = () => attemptController.abort();
+              cancelToken.controller.signal.addEventListener('abort', onAttemptAbort, {
+                once: true,
+              });
+              return withTimeout(
+                executor.execute(node, context, attemptController.signal),
                 control.nodeTimeoutMs,
                 'node',
                 nodeId,
-              ),
+                attemptController,
+              ).finally(() => {
+                cancelToken.controller.signal.removeEventListener('abort', onAttemptAbort);
+              });
+            },
             {
               maxRetries: control.maxRetries,
               onRetry: (attempt, error, delayMs) => {
@@ -278,6 +294,7 @@ export class WorkflowExecutorService {
                 });
               },
             },
+            cancelToken.controller.signal,
           );
 
           const nodeDuration = Date.now() - nodeStartTime;
@@ -338,7 +355,7 @@ export class WorkflowExecutorService {
           }
         } catch (error) {
           const isTimeout = error instanceof TimeoutError;
-          const isCancelled = error instanceof CancelledError;
+          const isCancelled = error instanceof CancelledError || cancelToken.cancelled;
 
           failed.add(nodeId);
 
@@ -365,7 +382,9 @@ export class WorkflowExecutorService {
 
           // 取消错误直接抛出，不受 continueOnError 影响
           if (isCancelled) {
-            throw error;
+            throw cancelToken.cancelled
+              ? new CancelledError('Workflow execution was cancelled')
+              : error;
           }
 
           // continueOnError 模式：跳过当前节点的下游分支，继续执行其他分支
@@ -397,7 +416,13 @@ export class WorkflowExecutorService {
 
     try {
       // 工作流整体超时控制
-      await withTimeout(runLoop(), control.workflowTimeoutMs, 'workflow', workflow.name);
+      await withTimeout(
+        runLoop(),
+        control.workflowTimeoutMs,
+        'workflow',
+        workflow.name,
+        cancelToken.controller,
+      );
 
       // 结束 Trace（成功）
       if (this.tracingService && traceId) {
@@ -470,6 +495,7 @@ export class WorkflowExecutorService {
     const token = this.cancelTokens.get(executionId);
     if (token) {
       token.cancelled = true;
+      token.controller.abort();
       this.logger.log(`Workflow execution ${executionId} marked for cancellation`);
       return true;
     }

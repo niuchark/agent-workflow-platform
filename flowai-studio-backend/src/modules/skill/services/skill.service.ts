@@ -97,7 +97,12 @@ export class SkillService {
   // 执行工具
   // userId 可选：从 controller 直接调用时传入做权限校验，工作流内部调用可省略
   /** 执行技能：内置走内置执行器，自定义走 HTTP 调用 */
-  async executeSkill(skillId: string, params: Record<string, any>, userId?: string) {
+  async executeSkill(
+    skillId: string,
+    params: Record<string, any>,
+    userId?: string,
+    signal?: AbortSignal,
+  ) {
     const skill = await this.prisma.skill.findUnique({
       where: { id: skillId },
     });
@@ -118,13 +123,13 @@ export class SkillService {
     if (skill.type === 'builtin') {
       return executeBuiltinSkill(skill.builtinType!, params);
     } else {
-      return this.executeCustomSkill(skill, params);
+      return this.executeCustomSkill(skill, params, signal);
     }
   }
 
   // 执行自定义工具
   /** 执行自定义技能：按配置的 URL/方法/请求头发送 HTTP 请求 */
-  private async executeCustomSkill(skill: any, params: Record<string, any>) {
+  private async executeCustomSkill(skill: any, params: Record<string, any>, signal?: AbortSignal) {
     const config = JSON.parse(skill.config || '{}');
     const { url, method = 'POST', headers = {} } = config;
 
@@ -143,6 +148,7 @@ export class SkillService {
         headers,
         data: params,
         timeout: 15000, // 15 秒超时
+        signal,
       });
 
       return {

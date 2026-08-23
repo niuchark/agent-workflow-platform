@@ -51,7 +51,7 @@ export class UpdateTeamDto {
 /** 添加成员请求体 */
 export class AddMemberDto {
   @IsString()
-  @IsNotEmpty({ message: '用户ID不能为空' })
+  @IsNotEmpty({ message: '用户名或用户ID不能为空' })
   userId: string;
 
   @IsString()

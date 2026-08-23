@@ -14,7 +14,11 @@ export class LLMNodeExecutor implements INodeExecutor {
   ) {}
 
   /** 解析提示词 → 调用模型 → 异步记录用量 → 返回 result */
-  async execute(node: any, context: Record<string, any>): Promise<Record<string, any>> {
+  async execute(
+    node: any,
+    context: Record<string, any>,
+    signal?: AbortSignal,
+  ): Promise<Record<string, any>> {
     const nodeData = node.data as any;
     const { model, provider, systemPrompt, userPrompt, temperature, maxTokens } = nodeData;
 
@@ -33,6 +37,7 @@ export class LLMNodeExecutor implements INodeExecutor {
       temperature,
       maxTokens,
       provider,
+      signal,
     );
 
     // 记录 Token 使用量（异步，非阻塞）

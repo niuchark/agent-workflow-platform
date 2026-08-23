@@ -190,6 +190,7 @@ export class AgentExecutorService {
         temperature: agentConfig.temperature,
         maxTokens: agentConfig.maxTokens,
         tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
+        signal: options?.signal,
       });
       this.recordTokenUsage(llmResponse, agentConfig.provider || this.providerFactory.inferUserProvider(agentConfig.model), agentConfig.model, options);
 
@@ -210,6 +211,7 @@ export class AgentExecutorService {
             toolCall,
             toolMap,
             options?.context,
+            options?.signal,
           );
           state.toolResults.push(toolResult);
 
@@ -639,6 +641,7 @@ export class AgentExecutorService {
         temperature: workerConfig.temperature,
         maxTokens: workerConfig.maxTokens,
         tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
+        signal: options?.signal,
       });
       this.recordTokenUsage(llmResponse, workerConfig.provider || this.providerFactory.inferUserProvider(workerConfig.model), workerConfig.model, options);
 
@@ -656,6 +659,7 @@ export class AgentExecutorService {
             toolCall,
             toolMap,
             options?.context,
+            options?.signal,
           );
           state.toolResults.push(toolResult);
 
@@ -787,6 +791,7 @@ export class AgentExecutorService {
     toolCall: ToolCall,
     toolMap: Map<string, { id: string; name: string }>,
     context?: Record<string, any>,
+    signal?: AbortSignal,
   ): Promise<ToolResult> {
     const toolInfo = toolMap.get(toolCall.name);
 
@@ -807,6 +812,8 @@ export class AgentExecutorService {
       const result = await this.skillService.executeSkill(
         toolInfo.id,
         resolvedArgs,
+        undefined,
+        signal,
       );
 
       return {

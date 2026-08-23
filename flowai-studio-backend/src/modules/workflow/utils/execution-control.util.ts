@@ -44,12 +44,14 @@ export class CancelledError extends Error {
  * @param timeoutMs 超时时间（毫秒），0 或负数表示不限制
  * @param scope 超时范围（node/workflow），用于错误信息
  * @param label 标签（如节点 ID），用于错误信息
+ * @param abortController 超时时中止该控制器，让底层可取消的调用立即中断
  */
 export async function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
   scope: 'node' | 'workflow',
   label?: string,
+  abortController?: AbortController,
 ): Promise<T> {
   if (!timeoutMs || timeoutMs <= 0) {
     return promise;
@@ -67,6 +69,8 @@ export async function withTimeout<T>(
           scope,
         ),
       );
+      // 超时错误先入队，再触发底层中止（避免中止导致的同步 reject 抢走 race 结果）
+      abortController?.abort();
     }, timeoutMs);
   });
 
@@ -118,19 +122,30 @@ export const DEFAULT_RETRY_OPTIONS: RetryOptions = {
  *
  * @param fn 要执行的异步函数
  * @param options 重试选项
+ * @param signal 取消信号：取消后立即停止重试，退避等待也会被打断
  */
 export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   options: Partial<RetryOptions> = {},
+  signal?: AbortSignal,
 ): Promise<T> {
   const opts: RetryOptions = { ...DEFAULT_RETRY_OPTIONS, ...options };
   let lastError: any;
 
   for (let attempt = 0; attempt <= opts.maxRetries; attempt++) {
+    if (signal?.aborted) {
+      throw new CancelledError('Workflow execution was cancelled');
+    }
+
     try {
       return await fn();
     } catch (error) {
       lastError = error;
+
+      // 取消优先：不再重试，直接抛取消错误
+      if (signal?.aborted) {
+        throw new CancelledError('Workflow execution was cancelled');
+      }
 
       // 已达最大重试次数，或错误不可重试
       const isLastAttempt = attempt === opts.maxRetries;
@@ -150,7 +165,7 @@ export async function retryWithBackoff<T>(
         opts.onRetry(attempt + 1, error, delayMs);
       }
 
-      await sleep(delayMs);
+      await sleep(delayMs, signal);
     }
   }
 
@@ -238,7 +253,26 @@ export class HeartbeatManager {
 
 /**
  * 延迟工具
+ *
+ * @param ms 延迟毫秒数
+ * @param signal 取消信号：取消时立即结束延迟
  */
-export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new CancelledError('Workflow execution was cancelled'));
+      return;
+    }
+
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new CancelledError('Workflow execution was cancelled'));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }

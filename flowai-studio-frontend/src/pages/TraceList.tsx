@@ -29,9 +29,16 @@ const STATUS_MAP: Record<string, { color: string; icon: React.ReactNode; label: 
 /** 耗时格式化：ms/s/min 自适应 */
 const formatDuration = (ms: number | null | undefined): string => {
   if (ms == null) return '-'
-  if (ms < 1000) return `${ms}ms`
+  if (ms < 1000) return `${Math.round(ms)}ms`
   if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`
   return `${(ms / 60000).toFixed(1)}min`
+}
+
+/** 成功率统一保留至多一位小数，避免后端浮点精度撑破统计卡片 */
+const formatSuccessRate = (value: string | number | null | undefined): string => {
+  const rate = Number(value)
+  if (!Number.isFinite(rate)) return '—'
+  return `${rate.toFixed(1).replace(/\.0$/, '')}%`
 }
 
 /** 时间格式化：ISO → 本地时间字符串 */
@@ -170,14 +177,14 @@ const TraceList: React.FC = () => {
         <>
           {/* 统计概览 */}
           {stats && (
-            <Row gutter={16} style={{ marginBottom: 24 }}>
-              <Col span={6}>
-                <Card size="small">
+            <Row gutter={[16, 16]} className="trace-stats-row">
+              <Col xs={24} sm={12} xl={6}>
+                <Card size="small" className="trace-stat-card">
                   <Statistic title="总追踪数" value={stats.total} prefix={<NodeIndexOutlined />} />
                 </Card>
               </Col>
-              <Col span={6}>
-                <Card size="small">
+              <Col xs={24} sm={12} xl={6}>
+                <Card size="small" className="trace-stat-card">
                   <Statistic
                     title="成功数"
                     value={stats.success}
@@ -186,8 +193,8 @@ const TraceList: React.FC = () => {
                   />
                 </Card>
               </Col>
-              <Col span={6}>
-                <Card size="small">
+              <Col xs={24} sm={12} xl={6}>
+                <Card size="small" className="trace-stat-card">
                   <Statistic
                     title="失败数"
                     value={stats.failed}
@@ -196,12 +203,12 @@ const TraceList: React.FC = () => {
                   />
                 </Card>
               </Col>
-              <Col span={6}>
-                <Card size="small">
+              <Col xs={24} sm={12} xl={6}>
+                <Card size="small" className="trace-stat-card">
                   <Statistic
                     title="成功率 / 平均耗时"
-                    value={`${stats.successRate}% / ${formatDuration(stats.avgDurationMs)}`}
-                    valueStyle={{ fontSize: 18 }}
+                    value={`${formatSuccessRate(stats.successRate)} / ${formatDuration(stats.avgDurationMs)}`}
+                    className="trace-combined-stat"
                   />
                 </Card>
               </Col>

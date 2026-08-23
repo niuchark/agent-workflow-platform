@@ -21,6 +21,7 @@ import {
   LoadingOutlined,
   MinusCircleOutlined,
   ClearOutlined,
+  StopOutlined,
 } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import { useStore } from '../store'
@@ -81,6 +82,7 @@ const Debug: React.FC = () => {
   const [wfStatus, setWfStatus] = useState<'idle' | 'running' | 'success' | 'failed'>('idle')
   const [wfProgress, setWfProgress] = useState<{ executed: number; total: number; percentage: number } | null>(null)
   const [wfElapsed, setWfElapsed] = useState<number>(0)
+  const [workflowExecutionId, setWorkflowExecutionId] = useState<string | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamingContent, setStreamingContent] = useState('')
   const chatEndRef = useRef<HTMLDivElement>(null)
@@ -297,6 +299,7 @@ const Debug: React.FC = () => {
     setWfStatus('running')
     setWfProgress(null)
     setWfElapsed(0)
+    setWorkflowExecutionId(null)
 
     try {
       const response = await fetch(`/api/workflows/${selectedWorkflowId}/run/stream`, {
@@ -326,6 +329,9 @@ const Debug: React.FC = () => {
               }))
               if (progress) setWfProgress(progress)
             } else if (data.type === 'workflow_start') {
+              if (data.data?.executionId != null) {
+                setWorkflowExecutionId(data.data.executionId)
+              }
               if (data.data?.totalNodes != null) {
                 setWfProgress({ executed: 0, total: data.data.totalNodes, percentage: 0 })
               }
@@ -368,6 +374,22 @@ const Debug: React.FC = () => {
       setWfStatus('failed')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  /** 取消正在执行的工作流（服务端会中止当前节点的底层调用） */
+  const handleCancelWorkflow = async () => {
+    if (!selectedWorkflowId || !workflowExecutionId) return
+    try {
+      await fetch(`/api/workflows/${selectedWorkflowId}/cancel/${workflowExecutionId}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${getStoredToken()}`,
+        },
+      })
+      message.info('正在取消…')
+    } catch {
+      message.error('取消失败，请重试')
     }
   }
 
@@ -653,6 +675,16 @@ const Debug: React.FC = () => {
             >
               执行工作流
             </Button>
+            {wfStatus === 'running' && (
+              <Button
+                danger
+                icon={<StopOutlined />}
+                onClick={handleCancelWorkflow}
+                disabled={!workflowExecutionId}
+              >
+                取消
+              </Button>
+            )}
             {(nodeExecList.length > 0 || workflowResult) && !isLoading && (
               <Button
                 icon={<ClearOutlined />}

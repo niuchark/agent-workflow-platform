@@ -83,6 +83,7 @@ export class OllamaProvider extends BaseLLMProvider {
           headers: { 'Content-Type': 'application/json' },
           timeout: this.config.timeout || 120000, // 本地推理可能更慢
           maxRedirects: 0,
+          signal: params.signal,
         },
       );
 

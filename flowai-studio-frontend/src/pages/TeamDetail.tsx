@@ -8,8 +8,8 @@
  */
 import { useState, useEffect } from 'react'
 import {
-  Button, Modal, Form, Input, Select, Table, Card, Tag, Space, message,
-  Popconfirm, Tabs, Avatar, Tooltip, Typography, Spin,
+  Button, Modal, Form, Input, Select, Table, Tag, message,
+  Popconfirm, Tabs, Avatar, Typography, Spin,
 } from 'antd'
 import {
   TeamOutlined, UserOutlined, DeleteOutlined, CrownOutlined,
@@ -18,7 +18,7 @@ import {
 import { useParams, useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
 import {
-  Team, TeamMember, TeamApplication, TeamRole,
+  TeamMember, TeamApplication, TeamRole,
   TEAM_ROLE_LABELS, TeamAppPermission, TEAM_APP_PERMISSION_LABELS,
   AddMemberForm, AddTeamAppForm,
 } from '../types'
@@ -30,6 +30,15 @@ const formatDate = (value?: string) => {
   if (!value) return '—'
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('zh-CN')
+}
+
+/** 优先展示后端业务错误，让添加成员失败时有明确的恢复方式 */
+const getRequestErrorMessage = (error: unknown, fallback: string) => {
+  const requestError = error as {
+    message?: string
+    response?: { data?: { message?: string } }
+  }
+  return requestError?.response?.data?.message || requestError?.message || fallback
 }
 
 /** 团队详情页面组件 */
@@ -45,6 +54,7 @@ const TeamDetail: React.FC = () => {
   } = useStore()
 
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false)
+  const [isAddingMember, setIsAddingMember] = useState(false)
   const [isAddAppOpen, setIsAddAppOpen] = useState(false)
   const [isEditTeamOpen, setIsEditTeamOpen] = useState(false)
   const [memberForm] = Form.useForm()
@@ -96,13 +106,16 @@ const TeamDetail: React.FC = () => {
   // ===== 成员操作 =====
   /** 添加团队成员 */
   const handleAddMember = async (values: AddMemberForm) => {
+    setIsAddingMember(true)
     try {
-      await addTeamMember(teamId!, values)
+      await addTeamMember(teamId!, { ...values, userId: values.userId.trim() })
       message.success('成员已添加')
       setIsAddMemberOpen(false)
       memberForm.resetFields()
-    } catch {
-      message.error('添加失败')
+    } catch (error) {
+      message.error(getRequestErrorMessage(error, '添加失败，请重试'))
+    } finally {
+      setIsAddingMember(false)
     }
   }
 
@@ -310,6 +323,7 @@ const TeamDetail: React.FC = () => {
             type="text"
             icon={<ArrowLeftOutlined />}
             onClick={() => navigate('/teams')}
+            aria-label="返回团队列表"
           />
           <Avatar
             size={48}
@@ -418,10 +432,11 @@ const TeamDetail: React.FC = () => {
         <Form form={memberForm} onFinish={handleAddMember} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item
             name="userId"
-            label="用户 ID"
-            rules={[{ required: true, message: '请输入用户 ID' }]}
+            label="用户名或用户 ID"
+            extra="输入对方的登录用户名即可，也兼容用户 ID。"
+            rules={[{ required: true, whitespace: true, message: '请输入用户名或用户 ID' }]}
           >
-            <Input placeholder="输入要添加的用户 ID" />
+            <Input placeholder="例如：alice" autoComplete="off" />
           </Form.Item>
           <Form.Item
             name="role"
@@ -436,8 +451,8 @@ const TeamDetail: React.FC = () => {
             />
           </Form.Item>
           <div className="modal-footer">
-            <Button onClick={() => { setIsAddMemberOpen(false); memberForm.resetFields() }}>取消</Button>
-            <Button type="primary" htmlType="submit" icon={<UserOutlined />}>
+            <Button disabled={isAddingMember} onClick={() => { setIsAddMemberOpen(false); memberForm.resetFields() }}>取消</Button>
+            <Button type="primary" htmlType="submit" icon={<UserOutlined />} loading={isAddingMember}>
               添加
             </Button>
           </div>

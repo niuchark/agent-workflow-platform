@@ -100,6 +100,7 @@ export class ClaudeProvider extends BaseLLMProvider {
             'Content-Type': 'application/json',
           },
           timeout: this.config.timeout || 60000,
+          signal: params.signal,
         },
       );
 
