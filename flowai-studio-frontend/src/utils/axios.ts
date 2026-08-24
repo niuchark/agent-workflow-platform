@@ -2,7 +2,7 @@
  * 全局 Axios 实例：统一管理 API 请求的前缀、鉴权与错误处理。
  *
  * - baseURL 为 /api，配合 Vite 代理转发到后端；
- * - 请求拦截器自动附加 Bearer token，并支持 cacheBust 时间戳防缓存；
+ * - 请求拦截器自动附加 Bearer token，并支持通过标准请求头绕过缓存；
  * - 响应拦截器直接返回 data，并把各种 HTTP 错误统一改写为可读的中文提示。
  */
 import axios from 'axios'
@@ -54,14 +54,11 @@ request.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`
     }
 
-    // 仅对显式声明的 GET 请求追加时间戳，避免与后端严格 DTO 校验冲突
+    // 使用标准请求头绕过缓存，不向业务查询参数注入后端 DTO 未声明的字段
     if (config.cacheBust && config.method?.toLowerCase() === 'get') {
-      config.params = {
-        ...config.params,
-        _t: Date.now(),
-      }
+      config.headers['Cache-Control'] = 'no-cache'
     }
-    
+
     return config
   },
   (error) => {
