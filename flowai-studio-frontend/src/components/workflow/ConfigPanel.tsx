@@ -363,6 +363,38 @@ const ConfigPanel: React.FC = () => {
                     <Text type="secondary" style={{ fontSize: 11 }}>温度:</Text>
                     <InputNumber value={worker.temperature} onChange={(v) => updateWorker(index, 'temperature', v)} min={0} max={1} step={0.1} size="small" style={{ width: 60 }} />
                   </Space>
+                  <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                    <Text type="secondary" style={{ fontSize: 11 }}>启用 RAG</Text>
+                    <Switch
+                      checked={!!worker.ragEnabled}
+                      onChange={(checked) => updateWorker(index, 'ragEnabled', checked)}
+                      size="small"
+                    />
+                  </Space>
+                  <Select
+                    mode="multiple"
+                    value={worker.knowledgeBaseIds || []}
+                    onChange={(value: string[]) => updateWorker(index, 'knowledgeBaseIds', value)}
+                    placeholder="关联知识库（多选）"
+                    size="small"
+                    style={{ width: '100%' }}
+                  >
+                    {Array.isArray(knowledgeBases) && knowledgeBases.map(kb => (
+                      <Option key={kb.id} value={kb.id}>{kb.name}</Option>
+                    ))}
+                  </Select>
+                  <Select
+                    mode="multiple"
+                    value={worker.toolIds || []}
+                    onChange={(value: string[]) => updateWorker(index, 'toolIds', value)}
+                    placeholder="可用工具（多选，留空则使用全部内置工具）"
+                    size="small"
+                    style={{ width: '100%' }}
+                  >
+                    {Array.isArray(skills) && skills.map(s => (
+                      <Option key={s.id} value={s.id}>{s.name}</Option>
+                    ))}
+                  </Select>
                 </Space>
               </Card>
             ))}
