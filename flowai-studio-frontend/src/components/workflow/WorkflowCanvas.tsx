@@ -263,8 +263,13 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({ onNodeSelect }) => {
         reconnectRadius={20}
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}
-        onSelectionChange={({ edges: selectedEdges }) => {
+        onSelectionChange={({ nodes: selectedNodes, edges: selectedEdges }) => {
+          const nextSelectedNode = selectedNodes[0] as WorkflowNode | undefined
           setSelectedEdgeId(selectedEdges[0]?.id ?? null)
+          if (useStore.getState().selectedNode?.id !== nextSelectedNode?.id) {
+            setSelectedNode(nextSelectedNode ?? null)
+            if (nextSelectedNode) onNodeSelect?.(nextSelectedNode)
+          }
         }}
         onPaneClick={() => {
           setSelectedNode(null)

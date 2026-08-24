@@ -28,7 +28,7 @@ export class AgentNodeExecutor implements INodeExecutor {
     signal?: AbortSignal,
   ): Promise<Record<string, any>> {
     const nodeData = node.data as any;
-    const config = this.buildAgentConfig(nodeData);
+    const config = this.buildAgentConfig(nodeData, context);
     const input = this.resolveInput(nodeData.userPrompt, context);
 
     const options: AgentRunOptions = {
@@ -54,7 +54,7 @@ export class AgentNodeExecutor implements INodeExecutor {
    * 从节点数据构建 AgentNodeConfig
    */
   /** 从节点数据构建 AgentNodeConfig（single / supervisor 两种模式） */
-  private buildAgentConfig(data: any): AgentNodeConfig {
+  private buildAgentConfig(data: any, context: Record<string, unknown>): AgentNodeConfig {
     const mode = data.agentMode || 'single';
     const maxIterations = data.maxIterations || 10;
     const strategy = data.strategy || 'react';
@@ -72,7 +72,7 @@ export class AgentNodeExecutor implements INodeExecutor {
         id: 'single_agent',
         name: data.label || '智能助手',
         description: data.description || '',
-        systemPrompt: data.systemPrompt || '',
+        systemPrompt: this.resolveInput(data.systemPrompt, context),
         model: data.model || 'qwen-turbo',
         provider: data.provider || this.inferProvider(data.model || 'qwen-turbo'),
         temperature: data.temperature ?? 0.7,
@@ -85,7 +85,7 @@ export class AgentNodeExecutor implements INodeExecutor {
       const workers: any[] = data.workers || [];
 
       config.supervisor = {
-        systemPrompt: data.supervisorPrompt || '',
+        systemPrompt: this.resolveInput(data.supervisorPrompt, context),
         model: data.supervisorModel || data.model || 'qwen-plus',
         provider: data.supervisorProvider || data.provider || this.inferProvider(data.supervisorModel || data.model || 'qwen-plus'),
         temperature: data.temperature ?? 0.3,
@@ -94,7 +94,7 @@ export class AgentNodeExecutor implements INodeExecutor {
           id: w.id || `worker_${i}`,
           name: w.name || `Worker ${i + 1}`,
           description: w.description || '',
-          systemPrompt: w.systemPrompt || '',
+          systemPrompt: this.resolveInput(w.systemPrompt, context),
           model: w.model || data.model || 'qwen-turbo',
           provider: w.provider || data.provider || this.inferProvider(w.model || data.model || 'qwen-turbo'),
           temperature: w.temperature ?? 0.7,
@@ -120,15 +120,15 @@ export class AgentNodeExecutor implements INodeExecutor {
    * 解析输入（支持模板变量）
    */
   /** 解析输入模板中的变量引用 */
-  private resolveInput(template: string, context: Record<string, any>): string {
+  private resolveInput(template: string, context: Record<string, unknown>): string {
     if (!template) return '';
 
     return template.replace(/\{\{(.+?)\}\}/g, (match, p1) => {
       const keys = p1.trim().split('.');
-      let value = context;
+      let value: unknown = context;
       for (const key of keys) {
         if (value && typeof value === 'object' && key in value) {
-          value = value[key];
+          value = (value as Record<string, unknown>)[key];
         } else {
           return match;
         }

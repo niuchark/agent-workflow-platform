@@ -278,13 +278,19 @@ const ConfigPanel: React.FC = () => {
         <Form.Item name="model" label="模型" initialValue="qwen-turbo">
           <ModelSelect models={modelsByProvider[selectedProvider]} style={{ width: '100%' }} />
         </Form.Item>
-        <Form.Item name="systemPrompt" label="系统提示词">
-          <Input.TextArea rows={4} placeholder="定义 Agent 的角色、能力和行为规范" />
+        <Form.Item className="variable-template-form-item" name="systemPrompt" label="系统提示词">
+          <VariableTextArea
+            rows={4}
+            placeholder="定义 Agent 的角色、能力和行为规范"
+            availableVariables={availableVariables}
+            nodes={nodes}
+            variableLabel="插入系统提示词变量"
+          />
         </Form.Item>
         <Form.Item className="variable-template-form-item" name="userPrompt" label={<UserPromptLabel />} rules={[{ required: true }]}>
           <VariableTextArea
             rows={4}
-            placeholder="输入交给智能体的内容；可直接填写，或插入用户输入变量"
+            placeholder="输入交给智能体的内容"
             availableVariables={availableVariables}
             nodes={nodes}
           />
@@ -327,8 +333,14 @@ const ConfigPanel: React.FC = () => {
         {agentMode === 'supervisor' && (
           <>
             <Divider orientation="left" style={{ margin: '12px 0 12px' }}>👑 Supervisor 配置</Divider>
-            <Form.Item name="supervisorPrompt" label="Supervisor 提示词">
-              <Input.TextArea rows={4} placeholder="定义 Supervisor 的协调策略，留空使用默认" />
+            <Form.Item className="variable-template-form-item" name="supervisorPrompt" label="Supervisor 提示词">
+              <VariableTextArea
+                rows={4}
+                placeholder="定义 Supervisor 的协调策略，留空使用默认"
+                availableVariables={availableVariables}
+                nodes={nodes}
+                variableLabel="插入 Supervisor 变量"
+              />
             </Form.Item>
             <Form.Item name="supervisorProvider" label="Supervisor 模型服务" initialValue="qwen">
               <Select loading={modelCatalogLoading} options={providerOptions(supervisorProvider)} />
@@ -352,7 +364,16 @@ const ConfigPanel: React.FC = () => {
               >
                 <Space direction="vertical" style={{ width: '100%' }} size={4}>
                   <Input value={worker.description} onChange={(e) => updateWorker(index, 'description', e.target.value)} placeholder="Worker 职责描述" size="small" />
-                  <Input.TextArea value={worker.systemPrompt} onChange={(e) => updateWorker(index, 'systemPrompt', e.target.value)} placeholder="Worker 系统提示词" rows={2} style={{ fontSize: 12 }} />
+                  <VariableTextArea
+                    value={worker.systemPrompt}
+                    onChange={(e) => updateWorker(index, 'systemPrompt', e.target.value)}
+                    placeholder="Worker 系统提示词"
+                    rows={2}
+                    style={{ fontSize: 12 }}
+                    availableVariables={availableVariables}
+                    nodes={nodes}
+                    variableLabel="插入 Worker 变量"
+                  />
                   <Space>
                     <Select
                       value={worker.provider}
@@ -403,11 +424,19 @@ const ConfigPanel: React.FC = () => {
             <Form.Item name="model" label="模型" initialValue="qwen-turbo">
               <ModelSelect models={modelsByProvider[selectedProvider]} style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item name="systemPrompt" label="系统提示词"><Input.TextArea rows={4} placeholder="定义模型的角色和行为" /></Form.Item>
+            <Form.Item className="variable-template-form-item" name="systemPrompt" label="系统提示词">
+              <VariableTextArea
+                rows={4}
+                placeholder="定义模型的角色和行为"
+                availableVariables={availableVariables}
+                nodes={nodes}
+                variableLabel="插入系统提示词变量"
+              />
+            </Form.Item>
             <Form.Item className="variable-template-form-item" name="userPrompt" label={<UserPromptLabel />} rules={[{ required: true }]}>
               <VariableTextArea
                 rows={6}
-                placeholder="输入发送给大模型的内容；可直接填写，或插入用户输入变量"
+                placeholder="输入发送给大模型的内容"
                 availableVariables={availableVariables}
                 nodes={nodes}
               />
@@ -427,7 +456,7 @@ const ConfigPanel: React.FC = () => {
             </Form.Item>
             <Form.Item className="variable-template-form-item" name="query" label="检索查询" rules={[{ required: true }]}>
               <VariableTextArea
-                placeholder="输入检索内容，或从下方插入上游变量"
+                placeholder="输入检索内容"
                 availableVariables={availableVariables}
                 nodes={nodes}
               />
@@ -557,7 +586,7 @@ const ConfigPanel: React.FC = () => {
             <Form.Item className="variable-template-form-item" name="outputValue" label="输出内容" rules={[{ required: true }]}>
               <VariableTextArea
                 rows={4}
-                placeholder="输入最终返回内容，或从下方插入上游变量"
+                placeholder="输入最终返回内容"
                 availableVariables={availableVariables}
                 nodes={nodes}
                 variableLabel="插入输出变量"

@@ -593,19 +593,15 @@
   .config-panel-empty p { @apply m-0 text-xs leading-5 text-muted; }
   .config-panel-empty-tip { @apply mt-4 rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-muted; }
   .variable-field { @apply grid gap-2; }
+  .variable-field-input-shell { @apply min-w-0; }
   .variable-template-form-item .ant-form-item-explain { @apply hidden; }
   .variable-field-messages { @apply grid gap-1.5; }
   .variable-field-message { @apply flex items-start gap-1.5 text-xs leading-5 text-red-600; overflow-wrap: anywhere; }
   .variable-field-message .anticon { @apply mt-1 shrink-0 text-[11px]; }
-  .variable-field-toolbar { @apply mt-2 grid min-w-0 gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3; }
-  .variable-field-toolbar-heading { @apply flex min-w-0 items-center justify-between gap-3 px-0.5; }
-  .variable-field-toolbar-title { @apply inline-flex min-w-0 items-center gap-1.5 text-xs font-medium text-slate-700; }
-  .variable-field-toolbar-title .anticon { @apply text-brand-600; }
-  .variable-field-picker { @apply w-full min-w-0; }
-  .variable-field-picker .ant-select-selector { @apply !min-h-10 !items-center !rounded-lg !bg-white; }
-  .variable-field-hint, .variable-field-empty-hint { @apply text-[11px] leading-4 text-muted; }
-  .variable-field-hint { @apply shrink-0; }
-  .variable-field-empty-hint { @apply px-0.5 pt-0.5; }
+  .variable-field-toolbar { @apply flex min-w-0 items-center justify-between gap-2; }
+  .variable-field-hint { @apply min-w-0 text-[11px] leading-4 text-muted; }
+  .variable-field-toolbar .ant-btn { @apply shrink-0 !px-1.5 !text-xs; }
+  .variable-field-toolbar .ant-btn:not(:disabled) { @apply !text-brand-700; }
   .field-label-with-help { @apply inline-flex items-center gap-1; }
   .field-help-button { @apply inline-flex size-6 cursor-help items-center justify-center rounded-full border-0 bg-transparent p-0 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600 focus-visible:bg-brand-50 focus-visible:text-brand-700; }
   .field-help-button .anticon { @apply text-xs; }
@@ -630,10 +626,6 @@
   .condition-builder-variable-hint { @apply rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-700; }
   .condition-builder-add { @apply !h-10 !rounded-lg; }
   .condition-builder > .ant-form-item-explain-error { @apply text-xs; }
-  .variable-template-form-item.ant-form-item-has-error .variable-field-picker:not(.ant-select-disabled) .ant-select-selector,
-  .variable-field-toolbar .ant-select-status-error:not(.ant-select-disabled) .ant-select-selector { @apply !border-slate-200 !shadow-none; }
-  .variable-template-form-item.ant-form-item-has-error .variable-field-picker.ant-select-focused:not(.ant-select-disabled) .ant-select-selector,
-  .variable-field-toolbar .ant-select-status-error.ant-select-focused:not(.ant-select-disabled) .ant-select-selector { @apply !border-brand-500 !shadow-focus; }
   .run-section, .run-results { @apply grid gap-2; }
   .run-section-label { @apply text-[11px] font-semibold uppercase tracking-wide text-muted; }
   .run-input-textarea { @apply !rounded-lg !bg-slate-50 !font-mono !text-xs; }
@@ -685,7 +677,7 @@
 .ant-dropdown-menu { border: 1px solid #e2e8f0; box-shadow: var(--c-shadow-md) !important; }
 
 .react-flow__node { border: 1px solid var(--c-border); border-radius: 12px; background: white; box-shadow: var(--c-shadow-sm); transition: border-color 150ms, box-shadow 150ms; }
-.react-flow__node-output { width: auto !important; padding: 0 !important; text-align: initial !important; }
+.react-flow__node.react-flow__node-output { width: auto !important; padding: 0 !important; border: 1px solid var(--c-border); border-radius: 12px; background: white; color: inherit; text-align: initial !important; }
 .react-flow__node:hover { border-color: #bae6fd; box-shadow: var(--c-shadow-sm); }
 .react-flow__node.selected { border-color: var(--c-accent); box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.14); }
 .react-flow__edge-path { stroke: #cbd5e1; stroke-width: 2; }
