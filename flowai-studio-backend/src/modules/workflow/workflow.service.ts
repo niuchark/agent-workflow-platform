@@ -4,12 +4,14 @@
  * 节点/连线/变量在数据库中按 JSON 字符串存储，
  * 接口层统一反序列化；写操作自动失效 L1/L2 缓存。
  */
-import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { CacheService } from '../../common/services/cache.service';
 import { CacheTTL, CachePrefix } from '../../common/decorators/cache.decorator';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { UpdateWorkflowDto } from './dto/update-workflow.dto';
+import { Permission, PERMISSIONS } from '../../common/constants/permissions';
+import { WorkflowAccessService } from './services/workflow-access.service';
 
 /**
  * Workflow Service — 工作流管理服务
@@ -31,6 +33,7 @@ export class WorkflowService {
   constructor(
     private prisma: PrismaService,
     private cacheService: CacheService,
+    private workflowAccess: WorkflowAccessService,
   ) {}
 
   /** 把数据库中的 JSON 字符串字段解析回对象，便于接口返回 */
@@ -68,9 +71,7 @@ export class WorkflowService {
       throw new NotFoundException('Application not found');
     }
 
-    if (app.userId !== userId) {
-      throw new ForbiddenException('You do not have permission to access this application');
-    }
+    await this.workflowAccess.assertPermission(userId, app, PERMISSIONS.WORKFLOW_CREATE);
 
     const workflow = await this.prisma.workflow.create({
       data: {
@@ -116,9 +117,7 @@ export class WorkflowService {
       throw new NotFoundException('Application not found');
     }
 
-    if (app.userId !== userId) {
-      throw new ForbiddenException('You do not have permission to access this application');
-    }
+    await this.workflowAccess.assertPermission(userId, app, PERMISSIONS.WORKFLOW_READ);
 
     return this.cacheService.getOrSet(
       `${CachePrefix.WORKFLOW}:list:${appId}`,
@@ -145,8 +144,12 @@ export class WorkflowService {
    * - L2 TTL: 600s (10 分钟)
    * - 更新/删除时自动失效
    */
-  /** 查询工作流详情（带缓存），非所有者拒绝访问 */
-  async findOne(userId: string, id: string) {
+  /** 查询工作流详情（带缓存），并按调用场景校验所需权限。 */
+  async findOne(
+    userId: string,
+    id: string,
+    requiredPermission: Permission = PERMISSIONS.WORKFLOW_READ,
+  ) {
     const workflow = await this.cacheService.getOrSet(
       `${CachePrefix.WORKFLOW}:detail:${id}`,
       () => this.prisma.workflow.findUnique({
@@ -164,9 +167,11 @@ export class WorkflowService {
       throw new NotFoundException('Workflow not found');
     }
 
-    if (workflow.application.userId !== userId) {
-      throw new ForbiddenException('You do not have permission to access this workflow');
-    }
+    await this.workflowAccess.assertPermission(
+      userId,
+      workflow.application,
+      requiredPermission,
+    );
 
     const workflowData = (({ application: _application, ...rest }) => rest)(workflow);
     return this.serializeWorkflow(workflowData);
@@ -187,9 +192,11 @@ export class WorkflowService {
       throw new NotFoundException('Workflow not found');
     }
 
-    if (existingWorkflow.application.userId !== userId) {
-      throw new ForbiddenException('You do not have permission to update this workflow');
-    }
+    await this.workflowAccess.assertPermission(
+      userId,
+      existingWorkflow.application,
+      PERMISSIONS.WORKFLOW_UPDATE,
+    );
 
     const workflow = await this.prisma.workflow.update({
       where: { id },
@@ -232,9 +239,11 @@ export class WorkflowService {
       throw new NotFoundException('Workflow not found');
     }
 
-    if (workflow.application.userId !== userId) {
-      throw new ForbiddenException('You do not have permission to delete this workflow');
-    }
+    await this.workflowAccess.assertPermission(
+      userId,
+      workflow.application,
+      PERMISSIONS.WORKFLOW_DELETE,
+    );
 
     await this.prisma.workflow.delete({
       where: { id },

@@ -5,7 +5,7 @@
  * - 顶栏展示当前页面标题、折叠按钮与用户菜单（退出登录）；
  * - 内容区通过 Outlet 渲染当前路由页面，编辑器路由使用全宽布局。
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Layout as AntLayout, Menu, Button, Avatar, Dropdown, Typography, Grid } from 'antd'
 import { useLocation, useNavigate, Outlet } from 'react-router-dom'
 import {
@@ -30,6 +30,8 @@ import {
 } from '@ant-design/icons'
 import { useStore } from '../../store'
 import BrandLogo from '../BrandLogo'
+
+const ProfileModal = lazy(() => import('../profile/ProfileModal'))
 
 const { Header, Sider, Content } = AntLayout
 const { Title } = Typography
@@ -60,7 +62,9 @@ const Layout: React.FC = () => {
   const isMobile = screens.lg === false
   const { globalConfig, toggleSidebar, user, logout } = useStore()
   const [collapsed, setCollapsed] = useState(globalConfig.sidebarCollapsed)
+  const [profileOpen, setProfileOpen] = useState(false)
   const mobileMenuTriggerRef = useRef<HTMLElement | null>(null)
+  const profileTriggerRef = useRef<HTMLButtonElement | null>(null)
 
   // 移动端始终折叠侧边栏
   useEffect(() => {
@@ -137,9 +141,16 @@ const Layout: React.FC = () => {
     { key: 'logout', label: '退出登录', icon: <LogoutOutlined />, danger: true },
   ]
 
-  /** 用户菜单点击：退出登录并跳转登录页 */
+  /** 用户菜单点击：打开资料弹窗，或退出登录并跳转登录页。 */
   const handleUserMenuClick = ({ key }: { key: string }) => {
+    if (key === 'profile') setProfileOpen(true)
     if (key === 'logout') { logout(); navigate('/login') }
+  }
+
+  /** 关闭资料弹窗后把键盘焦点还给用户菜单入口。 */
+  const handleProfileClose = () => {
+    setProfileOpen(false)
+    requestAnimationFrame(() => profileTriggerRef.current?.focus())
   }
 
   /** 导航菜单点击：跳转路由，移动端跳转后收起侧边栏 */
@@ -217,8 +228,8 @@ const Layout: React.FC = () => {
           <div className="header-right">
             <div className="header-online-dot"><span className="online-dot" /><span className="online-text">在线</span></div>
             <Dropdown menu={{ items: userMenu, onClick: handleUserMenuClick }} trigger={['click']} placement="bottomRight">
-              <button type="button" className="profile-chip" aria-label="打开用户菜单">
-                <Avatar size={26} icon={<UserOutlined />} className="!shrink-0 !bg-brand-100 !text-brand-700" />
+              <button ref={profileTriggerRef} type="button" className="profile-chip" aria-label="打开用户菜单">
+                <Avatar size={26} src={user?.avatar} icon={<UserOutlined />} className="!shrink-0 !bg-brand-100 !text-brand-700" />
                 <div className="profile-copy"><span className="username">{user?.username || '用户'}</span></div>
                 <CaretDownOutlined className="profile-caret" />
               </button>
@@ -228,6 +239,11 @@ const Layout: React.FC = () => {
         <Content id="main-content" className={`content${isEditorRoute ? ' content--editor' : ''}`} tabIndex={-1}>
           <div className={`content-container${isEditorRoute ? ' content-container--editor' : ''}`}><Outlet /></div>
         </Content>
+        {profileOpen && (
+          <Suspense fallback={null}>
+            <ProfileModal open onClose={handleProfileClose} />
+          </Suspense>
+        )}
       </AntLayout>
     </AntLayout>
   )

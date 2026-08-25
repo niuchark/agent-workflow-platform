@@ -35,6 +35,7 @@ const VariableTextArea: React.FC<VariableTextAreaProps> = ({
   ...textAreaProps
 }) => {
   const textAreaRef = useRef<TextAreaRef>(null)
+  const isDisabled = textAreaProps.disabled === true
   const selectionRef = useRef<{ start: number; end: number } | null>(null)
   const { status: formStatus, errors: formErrors } = Form.Item.useStatus()
   // 失效变量引用：随文本/可用变量变化实时重算
@@ -81,6 +82,7 @@ const VariableTextArea: React.FC<VariableTextAreaProps> = ({
 
   /** 记录当前选区，确保右键菜单或按钮获得焦点后仍能插回原光标位置 */
   const rememberSelection = () => {
+    if (isDisabled) return
     const textArea = textAreaRef.current?.resizableTextArea?.textArea
     if (!textArea) return
     selectionRef.current = {
@@ -91,6 +93,7 @@ const VariableTextArea: React.FC<VariableTextAreaProps> = ({
 
   /** 把选中的变量 token 插入到光标位置，并把光标移到插入内容之后 */
   const insertVariable = (token: string) => {
+    if (isDisabled) return
     const selection = selectionRef.current || { start: value.length, end: value.length }
     const { start, end } = selection
     const nextValue = `${value.slice(0, start)}${token}${value.slice(end)}`
@@ -120,7 +123,7 @@ const VariableTextArea: React.FC<VariableTextAreaProps> = ({
 
   return (
     <div className="variable-field">
-      <Dropdown menu={variableMenu} trigger={['contextMenu']}>
+      <Dropdown menu={variableMenu} trigger={['contextMenu']} disabled={isDisabled}>
         <div className="variable-field-input-shell">
           <Input.TextArea
             {...textAreaProps}
@@ -158,14 +161,18 @@ const VariableTextArea: React.FC<VariableTextAreaProps> = ({
       )}
       <div className="variable-field-toolbar">
         <span className="variable-field-hint">
-          {availableVariables.length > 0 ? '右键可快速插入已连接的上游变量' : '连接并配置上游节点后可插入变量'}
+          {isDisabled
+            ? '当前为仅查看模式'
+            : availableVariables.length > 0
+              ? '右键可快速插入已连接的上游变量'
+              : '连接并配置上游节点后可插入变量'}
         </span>
-        <Dropdown menu={variableMenu} trigger={['click']} placement="bottomRight">
+        <Dropdown menu={variableMenu} trigger={['click']} placement="bottomRight" disabled={isDisabled}>
           <Button
             type="text"
             size="small"
             icon={<FunctionOutlined aria-hidden="true" />}
-            disabled={availableVariables.length === 0}
+            disabled={isDisabled || availableVariables.length === 0}
             onMouseDown={rememberSelection}
           >
             {variableLabel}

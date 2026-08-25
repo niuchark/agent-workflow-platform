@@ -28,6 +28,7 @@ import { RunWorkflowDto } from './dto/run-workflow.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RateLimiterService, CircuitBreakerService, DEFAULT_RATE_LIMITS } from '../../common/services/rate-limit.service';
+import { PERMISSIONS } from '../../common/constants/permissions';
 
 /** 工作流 REST 控制器 */
 @Controller('workflows')
@@ -74,7 +75,7 @@ export class WorkflowController {
   @Post(':id/run')
   async run(@CurrentUser('userId') userId: string, @Param('id') id: string, @Body() runWorkflowDto: RunWorkflowDto) {
     // 在占用执行配额前确认工作流归属，避免越权请求消耗公共资源。
-    await this.workflowService.findOne(userId, id);
+    await this.workflowService.findOne(userId, id, PERMISSIONS.WORKFLOW_EXECUTE);
 
     const workflowConfig = DEFAULT_RATE_LIMITS['workflow:run'];
     const rateLimit = await this.rateLimiterService.checkRateLimit(
@@ -136,7 +137,7 @@ export class WorkflowController {
     @Res() res: Response,
   ) {
     // 与非流式入口使用同一归属校验，且必须早于配额与 SSE 初始化。
-    await this.workflowService.findOne(userId, id);
+    await this.workflowService.findOne(userId, id, PERMISSIONS.WORKFLOW_EXECUTE);
 
     const workflowConfig = DEFAULT_RATE_LIMITS['workflow:run'];
     const rateLimit = await this.rateLimiterService.checkRateLimit(

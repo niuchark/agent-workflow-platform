@@ -141,6 +141,20 @@
   }
 
   .modal-footer { @apply flex items-center justify-end gap-2 pt-2; }
+  .profile-modal-summary { @apply mb-5 flex min-w-0 items-center gap-3 rounded-xl border border-line bg-slate-50 p-4; }
+  .profile-modal-avatar { @apply shrink-0 !bg-brand-100 !text-brand-700; }
+  .profile-modal-copy { @apply min-w-0 flex-1; }
+  .profile-modal-copy strong { @apply block truncate text-sm font-semibold text-ink; }
+  .profile-modal-copy span { @apply mt-0.5 block text-xs text-muted; }
+  .profile-modal-body { @apply py-1; }
+  .profile-detail-list { @apply m-0 overflow-hidden rounded-xl border border-line bg-white; }
+  .profile-detail-row { @apply grid grid-cols-1 gap-1 border-b border-line px-4 py-3 last:border-b-0 sm:grid-cols-[112px_minmax(0,1fr)] sm:gap-3; }
+  .profile-detail-row dt { @apply text-xs font-medium text-muted sm:pt-0.5; }
+  .profile-detail-row dd { @apply m-0 min-w-0 text-sm font-medium text-ink; }
+  .profile-detail-note { @apply mt-1 block text-xs font-normal text-muted; }
+  .profile-id-value { @apply min-w-0; }
+  .profile-id-text { @apply !font-mono !text-xs !text-slate-700; overflow-wrap: anywhere; }
+  .profile-id-text .ant-typography-copy { @apply !ml-1 inline-flex size-7 items-center justify-center rounded-lg !text-brand-600 hover:!bg-brand-50 hover:!text-brand-700; }
   .chat-msg--assistant { @apply mr-auto; }
   .chat-bubble--assistant { @apply bg-slate-50 text-slate-700; }
   .chat-time { @apply text-[11px] text-subtle; }
@@ -539,6 +553,7 @@
   .editor-app-info { @apply gap-2; }
   .editor-app-icon { @apply flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-sm text-brand-600; }
   .editor-app-name { @apply max-w-40 truncate text-sm font-semibold text-ink sm:max-w-64; }
+  .editor-access-badge { @apply inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700; }
   .editor-panel-tabs { @apply hidden items-center gap-4 border-b border-line lg:flex; }
   .editor-panel-tab { @apply flex cursor-pointer items-center gap-1.5 border-0 border-b-2 border-transparent bg-transparent px-1 py-2 text-xs font-medium text-muted transition-colors hover:text-ink; }
   .editor-panel-tab--active { @apply border-brand-500 bg-transparent text-brand-700; }
@@ -587,6 +602,8 @@
   .config-panel-header-description { @apply m-0 mt-1.5 text-xs leading-5 text-muted; }
   .config-panel-body, .run-panel-body { @apply flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4; }
   .config-panel-form { @apply flex min-h-full flex-col; }
+  .config-readonly-alert { @apply mb-4; }
+  .config-panel-fieldset { @apply m-0 min-w-0 border-0 p-0; }
   .config-panel-empty { @apply flex flex-1 flex-col items-center justify-center px-4 text-center; }
   .config-panel-empty-icon { @apply mb-4 flex size-12 items-center justify-center rounded-2xl bg-brand-50 text-xl text-brand-600; }
   .config-panel-empty h4 { @apply m-0 mb-2 text-sm font-semibold text-ink; }

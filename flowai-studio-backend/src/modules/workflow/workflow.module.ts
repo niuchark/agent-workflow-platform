@@ -25,6 +25,7 @@ import { SkillNodeExecutor } from './services/node-executors/skill-node.executor
 import { ConditionNodeExecutor } from './services/node-executors/condition-node.executor';
 import { OutputNodeExecutor } from './services/node-executors/output-node.executor';
 import { AgentNodeExecutor } from './services/node-executors/agent-node.executor';
+import { WorkflowAccessService } from './services/workflow-access.service';
 import { PrismaModule } from '../../common/modules/prisma.module';
 import { RAGModule } from '../rag/rag.module';
 import { SkillModule } from '../skill/skill.module';
@@ -40,6 +41,7 @@ import { RateLimiterService, CircuitBreakerService } from '../../common/services
     RateLimiterService,
     CircuitBreakerService,
     TracingService,
+    WorkflowAccessService,
     WorkflowService,
     WorkflowExecutorService,
     WorkflowVersionService,

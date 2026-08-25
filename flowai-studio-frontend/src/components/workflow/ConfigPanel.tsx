@@ -106,8 +106,12 @@ const UserPromptLabel = () => (
   </span>
 )
 
+interface ConfigPanelProps {
+  readOnly?: boolean
+}
+
 /** 节点配置面板组件 */
-const ConfigPanel: React.FC = () => {
+const ConfigPanel: React.FC<ConfigPanelProps> = ({ readOnly = false }) => {
   const navigate = useNavigate()
   const { availableProviders, modelsByProvider, loading: modelCatalogLoading } = useModelCatalog()
   const { selectedNode, nodes, edges, updateNodeData, knowledgeBases, fetchKnowledgeBases, skills, fetchSkills } = useStore()
@@ -146,7 +150,7 @@ const ConfigPanel: React.FC = () => {
         provider: data.provider || inferLegacyProvider(data.model),
         supervisorProvider: data.supervisorProvider || inferLegacyProvider(data.supervisorModel),
       })
-      if (selectedNode.type === 'condition' && typeof data.conditions === 'string') {
+      if (!readOnly && selectedNode.type === 'condition' && typeof data.conditions === 'string') {
         updateNodeData(selectedNode.id, { ...data, conditions: normalizedConditions })
       }
       if (selectedNode.type === 'agent' && (selectedNode.data as any).workers) {
@@ -156,11 +160,11 @@ const ConfigPanel: React.FC = () => {
         })))
       }
     }
-  }, [selectedNode, form, updateNodeData])
+  }, [selectedNode, form, readOnly, updateNodeData])
 
   /** 表单值变化：实时写回选中节点的数据 */
   const handleValuesChange = (changedValues: Record<string, unknown>) => {
-    if (selectedNode) {
+    if (!readOnly && selectedNode) {
       updateNodeData(selectedNode.id, changedValues)
     }
   }
@@ -193,6 +197,7 @@ const ConfigPanel: React.FC = () => {
 
   /** 添加一个 Worker：默认配置并同步到节点数据 */
   const addWorker = () => {
+    if (readOnly) return
     const newWorker = {
       id: `worker_${Date.now()}`,
       name: `Worker ${workers.length + 1}`,
@@ -215,6 +220,7 @@ const ConfigPanel: React.FC = () => {
 
   /** 删除指定位置的 Worker */
   const removeWorker = (index: number) => {
+    if (readOnly) return
     const updatedWorkers = workers.filter((_, i) => i !== index)
     setWorkers(updatedWorkers)
     if (selectedNode) {
@@ -224,6 +230,7 @@ const ConfigPanel: React.FC = () => {
 
   /** 更新指定 Worker 的多个字段 */
   const updateWorkerFields = (index: number, patch: Record<string, any>) => {
+    if (readOnly) return
     const updatedWorkers = workers.map((w, i) =>
       i === index ? { ...w, ...patch } : w
     )
@@ -281,6 +288,7 @@ const ConfigPanel: React.FC = () => {
         <Form.Item className="variable-template-form-item" name="systemPrompt" label="系统提示词">
           <VariableTextArea
             rows={4}
+            disabled={readOnly}
             placeholder="定义 Agent 的角色、能力和行为规范"
             availableVariables={availableVariables}
             nodes={nodes}
@@ -290,6 +298,7 @@ const ConfigPanel: React.FC = () => {
         <Form.Item className="variable-template-form-item" name="userPrompt" label={<UserPromptLabel />} rules={[{ required: true }]}>
           <VariableTextArea
             rows={4}
+            disabled={readOnly}
             placeholder="输入交给智能体的内容"
             availableVariables={availableVariables}
             nodes={nodes}
@@ -336,6 +345,7 @@ const ConfigPanel: React.FC = () => {
             <Form.Item className="variable-template-form-item" name="supervisorPrompt" label="Supervisor 提示词">
               <VariableTextArea
                 rows={4}
+                disabled={readOnly}
                 placeholder="定义 Supervisor 的协调策略，留空使用默认"
                 availableVariables={availableVariables}
                 nodes={nodes}
@@ -366,6 +376,7 @@ const ConfigPanel: React.FC = () => {
                   <Input value={worker.description} onChange={(e) => updateWorker(index, 'description', e.target.value)} placeholder="Worker 职责描述" size="small" />
                   <VariableTextArea
                     value={worker.systemPrompt}
+                    disabled={readOnly}
                     onChange={(e) => updateWorker(index, 'systemPrompt', e.target.value)}
                     placeholder="Worker 系统提示词"
                     rows={2}
@@ -427,6 +438,7 @@ const ConfigPanel: React.FC = () => {
             <Form.Item className="variable-template-form-item" name="systemPrompt" label="系统提示词">
               <VariableTextArea
                 rows={4}
+                disabled={readOnly}
                 placeholder="定义模型的角色和行为"
                 availableVariables={availableVariables}
                 nodes={nodes}
@@ -436,6 +448,7 @@ const ConfigPanel: React.FC = () => {
             <Form.Item className="variable-template-form-item" name="userPrompt" label={<UserPromptLabel />} rules={[{ required: true }]}>
               <VariableTextArea
                 rows={6}
+                disabled={readOnly}
                 placeholder="输入发送给大模型的内容"
                 availableVariables={availableVariables}
                 nodes={nodes}
@@ -456,6 +469,7 @@ const ConfigPanel: React.FC = () => {
             </Form.Item>
             <Form.Item className="variable-template-form-item" name="query" label="检索查询" rules={[{ required: true }]}>
               <VariableTextArea
+                disabled={readOnly}
                 placeholder="输入检索内容"
                 availableVariables={availableVariables}
                 nodes={nodes}
@@ -586,6 +600,7 @@ const ConfigPanel: React.FC = () => {
             <Form.Item className="variable-template-form-item" name="outputValue" label="输出内容" rules={[{ required: true }]}>
               <VariableTextArea
                 rows={4}
+                disabled={readOnly}
                 placeholder="输入最终返回内容"
                 availableVariables={availableVariables}
                 nodes={nodes}
@@ -619,29 +634,43 @@ const ConfigPanel: React.FC = () => {
           form={form}
           layout="vertical"
           preserve={false}
+          disabled={readOnly}
           onValuesChange={handleValuesChange}
           className="config-panel-form"
         >
-          {selectedNode && availableProviders.length === 0 && !modelCatalogLoading && (
+          {readOnly && (
             <Alert
-              type="warning"
+              type="info"
               showIcon
-              message="没有可用的模型服务"
-              description="已保存的模型会保留显示，但执行前需要先配置并测试对应凭证。"
-              action={<Button size="small" onClick={() => navigate('/model-settings')}>去配置</Button>}
-              style={{ marginBottom: 16 }}
+              message="仅查看模式"
+              description="你可以查看节点和配置，但当前权限不能修改或运行此工作流。"
+              className="config-readonly-alert"
             />
           )}
-          {!selectedNode ? (
-            <div className="config-panel-empty">
-              <div className="config-panel-empty-icon">
-                <SettingOutlined />
+          <fieldset disabled={readOnly} className="config-panel-fieldset">
+            {selectedNode && availableProviders.length === 0 && !modelCatalogLoading && (
+              <Alert
+                type="warning"
+                showIcon
+                message="没有可用的模型服务"
+                description="已保存的模型会保留显示，但执行前需要先配置并测试对应凭证。"
+                action={<Button size="small" onClick={() => navigate('/model-settings')}>去配置</Button>}
+                style={{ marginBottom: 16 }}
+              />
+            )}
+            {!selectedNode ? (
+              <div className="config-panel-empty">
+                <div className="config-panel-empty-icon">
+                  <SettingOutlined />
+                </div>
+                <h4>{readOnly ? '选择一个节点查看配置' : '选择一个节点开始编辑'}</h4>
+                <p>点击画布中的任意节点，这里会显示对应参数、提示词和运行选项。</p>
+                <div className="config-panel-empty-tip">
+                  {readOnly ? '当前权限仅支持查看' : '修改会实时同步到当前工作流'}
+                </div>
               </div>
-              <h4>选择一个节点开始编辑</h4>
-              <p>点击画布中的任意节点，这里会显示对应参数、提示词和运行选项。</p>
-              <div className="config-panel-empty-tip">修改会实时同步到当前工作流</div>
-            </div>
-          ) : renderConfigForm()}
+            ) : renderConfigForm()}
+          </fieldset>
         </Form>
       </div>
     </div>

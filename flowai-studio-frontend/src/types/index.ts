@@ -30,6 +30,9 @@ export interface RegisterForm {
 
 // ============ 应用相关类型 ============
 
+/** 当前用户对应用拥有的访问级别 */
+export type ApplicationAccessType = 'owner' | TeamAppPermission
+
 /** 应用实体：状态为草稿/已发布/已归档 */
 export interface Application {
   id: string
@@ -37,6 +40,7 @@ export interface Application {
   description?: string
   icon?: string
   status: 'draft' | 'published' | 'archived'
+  accessType?: ApplicationAccessType
   shareLink?: string
   createdAt: string
   updatedAt: string

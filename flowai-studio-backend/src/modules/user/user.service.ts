@@ -17,6 +17,7 @@ import { PrismaService } from '../../common/services/prisma.service';
 import { RedisService } from '../../common/services/redis.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 /** 用户服务 */
 @Injectable()
@@ -195,9 +196,9 @@ export class UserService {
   }
 
   /** 更新用户资料 */
-  async updateProfile(userId: string, data: { username?: string; avatar?: string }) {
+  async updateProfile(userId: string, data: UpdateProfileDto) {
     try {
-      return this.prisma.user.update({
+      return await this.prisma.user.update({
         where: { id: userId },
         data,
         select: {

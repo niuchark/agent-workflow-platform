@@ -8,6 +8,7 @@
  */
 import { useState, useEffect, useRef } from 'react'
 import { Button, Modal, Form, Input, Select, Upload, message, Empty, Dropdown, Spin, Alert } from 'antd'
+import type { MenuProps } from 'antd'
 import {
   PlusOutlined,
   EditOutlined,
@@ -232,10 +233,14 @@ const AppList: React.FC = () => {
   // ===== 原有功能 =====
 
   /** 按应用状态生成可用的操作菜单项（发布/下线/归档/取消归档） */
-  const getStatusAction = (app: Application) => {
+  const getStatusAction = (app: Application): MenuProps['items'] => {
+    const canEdit = app.accessType !== 'can_view'
+    const canManage = !app.accessType || app.accessType === 'owner' || app.accessType === 'full_access'
+    let actions: MenuProps['items'] = []
+
     switch (app.status) {
       case 'draft':
-        return [
+        actions = [
           {
             key: 'publish',
             label: '发布',
@@ -264,8 +269,9 @@ const AppList: React.FC = () => {
             },
           },
         ]
+        break
       case 'published':
-        return [
+        actions = [
           {
             key: 'unpublish',
             label: '下线',
@@ -294,8 +300,9 @@ const AppList: React.FC = () => {
             },
           },
         ]
+        break
       case 'archived':
-        return [
+        actions = [
           {
             key: 'unarchive',
             label: '取消归档',
@@ -311,15 +318,26 @@ const AppList: React.FC = () => {
             },
           },
         ]
+        break
       default:
         return []
     }
+
+    return actions.filter((action) => {
+      if (!action || !('key' in action)) return false
+      if (action.key === 'publish' || action.key === 'unpublish') return canEdit
+      return canManage
+    })
   }
 
   /** 生成应用卡片的下拉菜单（编辑 + 状态操作 + 删除） */
-  const getCardMenu = (app: Application) => ({
-    items: [
-      {
+  const getCardMenu = (app: Application): { items: MenuProps['items'] } => {
+    const canEdit = app.accessType !== 'can_view'
+    const canManage = !app.accessType || app.accessType === 'owner' || app.accessType === 'full_access'
+    const items: MenuProps['items'] = []
+
+    if (canEdit) {
+      items.push({
         key: 'edit',
         label: '编辑信息',
         icon: <EditOutlined />,
@@ -327,18 +345,23 @@ const AppList: React.FC = () => {
           e?.domEvent?.stopPropagation?.()
           handleEdit(app)
         },
-      },
-      ...getStatusAction(app),
-      { type: 'divider' as const },
-      {
+      })
+      items.push(...getStatusAction(app))
+    }
+
+    if (canManage) {
+      if (items.length > 0) items.push({ type: 'divider' })
+      items.push({
         key: 'delete',
         label: '删除',
         icon: <DeleteOutlined />,
         danger: true,
         onClick: (e: any) => handleDelete(app.id, e),
-      },
-    ].filter(Boolean),
-  })
+      })
+    }
+
+    return { items }
+  }
 
   /** 应用状态 → 徽标文案与样式类 */
   const statusMap: Record<string, { label: string; cls: string }> = {
@@ -391,13 +414,14 @@ const AppList: React.FC = () => {
 
           {filteredApps.map((app) => {
             const status = statusMap[app.status]
+            const isReadOnly = app.accessType === 'can_view'
             return (
               <div
                 key={app.id}
                 className="app-card"
                 role="link"
                 tabIndex={0}
-                aria-label={`编辑应用：${app.name}`}
+                aria-label={`${isReadOnly ? '查看' : '编辑'}应用：${app.name}`}
                 onClick={() => handleEnterEditor(app.id)}
                 onKeyDown={(event) => handleCardKeyDown(event, app.id)}
               >
@@ -409,21 +433,23 @@ const AppList: React.FC = () => {
                       <AppstoreOutlined />
                     )}
                   </div>
-                  <Dropdown
-                    menu={getCardMenu(app)}
-                    trigger={['click']}
-                    placement="bottomRight"
-                  >
-                    <button
-                      type="button"
-                      className="app-card-menu-btn"
-                      aria-label={`管理应用：${app.name}`}
-                      aria-haspopup="menu"
-                      onClick={(e) => e.stopPropagation()}
+                  {!isReadOnly && (
+                    <Dropdown
+                      menu={getCardMenu(app)}
+                      trigger={['click']}
+                      placement="bottomRight"
                     >
-                      <MoreOutlined />
-                    </button>
-                  </Dropdown>
+                      <button
+                        type="button"
+                        className="app-card-menu-btn"
+                        aria-label={`管理应用：${app.name}`}
+                        aria-haspopup="menu"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreOutlined />
+                      </button>
+                    </Dropdown>
+                  )}
                 </div>
 
                 <div className="app-card-body">
@@ -443,7 +469,7 @@ const AppList: React.FC = () => {
                     {new Date(app.createdAt).toLocaleDateString('zh-CN')}
                   </span>
                   <span className="app-card-enter">
-                    编辑 <ArrowRightOutlined />
+                    {isReadOnly ? '查看' : '编辑'} <ArrowRightOutlined />
                   </span>
                 </div>
               </div>

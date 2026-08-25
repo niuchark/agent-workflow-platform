@@ -1,7 +1,7 @@
 /**
  * 工作流执行器：按拓扑序执行节点，支持超时/重试/取消/SSE 推送。
  */
-import { BadRequestException, ForbiddenException, Injectable, Logger, Optional } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../common/services/prisma.service';
 import { NodeExecutorFactory } from './node-executor.factory';
 import { RunWorkflowDto, ExecutionControlDto } from '../dto/run-workflow.dto';
@@ -14,6 +14,8 @@ import {
   TimeoutError,
   CancelledError,
 } from '../utils/execution-control.util';
+import { PERMISSIONS } from '../../../common/constants/permissions';
+import { WorkflowAccessService } from './workflow-access.service';
 
 /** 执行控制默认值 */
 const DEFAULT_CONTROL: Required<ExecutionControlDto> = {
@@ -42,6 +44,7 @@ export class WorkflowExecutorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly factory: NodeExecutorFactory,
+    private readonly workflowAccess: WorkflowAccessService,
     @Optional() private readonly tracingService?: TracingService,
   ) {}
 
@@ -61,16 +64,18 @@ export class WorkflowExecutorService {
     const workflow = await this.prisma.workflow.findUnique({
       where: { id: workflowId },
       include: {
-        application: { select: { userId: true } },
+        application: { select: { id: true, userId: true } },
       },
     });
 
     if (!workflow) {
       throw new Error('Workflow not found');
     }
-    if (workflow.application.userId !== runDto.userId) {
-      throw new ForbiddenException('You do not have permission to execute this workflow');
-    }
+    await this.workflowAccess.assertPermission(
+      runDto.userId,
+      workflow.application,
+      PERMISSIONS.WORKFLOW_EXECUTE,
+    );
 
     // 合并执行控制配置：调用方参数覆盖默认值
     const control: Required<ExecutionControlDto> = {
