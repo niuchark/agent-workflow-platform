@@ -29,7 +29,7 @@ import { ModelCredentialModule } from './modules/model-credential/model-credenti
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      validate: (config: Record<string, any>) => {
+      validate: (config: Record<string, unknown>) => {
         return envSchema.parse(config);
       },
     }),

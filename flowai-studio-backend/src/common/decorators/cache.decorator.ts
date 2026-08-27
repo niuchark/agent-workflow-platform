@@ -41,13 +41,13 @@ export const CACHE_TTL = 'cache:ttl';
  * - Spring Cache: @Cacheable 注解
  */
 export function Cacheable(key: string, ttlSeconds: number = 300) {
-  return (target: any, propertyKey: string, descriptor: PropertyDescriptor) => {
+  return (target: object, propertyKey: string, descriptor: PropertyDescriptor) => {
     Reflect.defineMetadata(CACHE_KEY, key, descriptor.value);
     Reflect.defineMetadata(CACHE_TTL, ttlSeconds, descriptor.value);
 
     const originalMethod = descriptor.value;
 
-    descriptor.value = async function (...args: any[]) {
+    descriptor.value = async function (...args: unknown[]) {
       // 优先使用 CacheService（多级缓存）
       const cacheService = this.cacheService || this._cacheService;
 
@@ -117,10 +117,10 @@ export function Cacheable(key: string, ttlSeconds: number = 300) {
  * - 使用 SCAN 替代 KEYS（生产安全）
  */
 export function CacheEvict(key: string) {
-  return (target: any, propertyKey: string, descriptor: PropertyDescriptor) => {
+  return (target: object, propertyKey: string, descriptor: PropertyDescriptor) => {
     const originalMethod = descriptor.value;
 
-    descriptor.value = async function (...args: any[]) {
+    descriptor.value = async function (...args: unknown[]) {
       const result = await originalMethod.apply(this, args);
 
       // 优先使用 CacheService

@@ -1,6 +1,6 @@
 /** 权限守卫单元测试 */
 import { Test, TestingModule } from '@nestjs/testing';
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PermissionGuard } from './permission.guard';
 import { PrismaService } from '../services/prisma.service';
@@ -8,7 +8,7 @@ import { PERMISSIONS } from '../constants/permissions';
 
 describe('PermissionGuard', () => {
   let guard: PermissionGuard;
-  let prisma: any;
+  let prisma: typeof mockPrismaService;
   let reflector: Reflector;
 
   const mockPrismaService = {
@@ -31,12 +31,12 @@ describe('PermissionGuard', () => {
     prisma = module.get(PrismaService);
     reflector = module.get(Reflector);
 
-    Object.values(mockPrismaService).forEach((obj: any) =>
-      Object.values(obj).forEach((fn: any) => fn.mockReset()),
+    Object.values(mockPrismaService).forEach(obj =>
+      Object.values(obj).forEach(fn => (fn as jest.Mock).mockReset()),
     );
   });
 
-  const createMockContext = (userId?: string, params?: any) => ({
+  const createMockContext = (userId?: string, params?: Record<string, unknown>) => ({
     switchToHttp: () => ({
       getRequest: () => ({
         user: userId ? { userId } : undefined,
@@ -50,13 +50,13 @@ describe('PermissionGuard', () => {
     it('should allow access if no permissions required', async () => {
       jest.spyOn(reflector, 'get').mockReturnValue(null);
       const context = createMockContext('user-1');
-      expect(await guard.canActivate(context as any)).toBe(true);
+      expect(await guard.canActivate(context as unknown as ExecutionContext)).toBe(true);
     });
 
     it('should throw ForbiddenException if user not identified', async () => {
       jest.spyOn(reflector, 'get').mockReturnValue([PERMISSIONS.APP_READ]);
       const context = createMockContext();
-      await expect(guard.canActivate(context as any)).rejects.toThrow(ForbiddenException);
+      await expect(guard.canActivate(context as unknown as ExecutionContext)).rejects.toThrow(ForbiddenException);
     });
 
     it('should allow access for admin globalRole', async () => {
@@ -64,7 +64,7 @@ describe('PermissionGuard', () => {
       prisma.user.findUnique.mockResolvedValue({ globalRole: 'admin' });
 
       const context = createMockContext('admin-1', { id: 'app-1' });
-      expect(await guard.canActivate(context as any)).toBe(true);
+      expect(await guard.canActivate(context as unknown as ExecutionContext)).toBe(true);
     });
 
     it('should allow access for resource owner', async () => {
@@ -73,7 +73,7 @@ describe('PermissionGuard', () => {
       prisma.application.findUnique.mockResolvedValue({ userId: 'user-1' });
 
       const context = createMockContext('user-1', { id: 'app-1' });
-      expect(await guard.canActivate(context as any)).toBe(true);
+      expect(await guard.canActivate(context as unknown as ExecutionContext)).toBe(true);
     });
 
     it('should allow access via team membership with sufficient role', async () => {
@@ -86,7 +86,7 @@ describe('PermissionGuard', () => {
       });
 
       const context = createMockContext('user-1', { id: 'app-1' });
-      expect(await guard.canActivate(context as any)).toBe(true);
+      expect(await guard.canActivate(context as unknown as ExecutionContext)).toBe(true);
     });
 
     it('should throw ForbiddenException if no access path found', async () => {
@@ -96,7 +96,7 @@ describe('PermissionGuard', () => {
       prisma.teamApplication.findFirst.mockResolvedValue(null);
 
       const context = createMockContext('user-1', { id: 'app-1' });
-      await expect(guard.canActivate(context as any)).rejects.toThrow(ForbiddenException);
+      await expect(guard.canActivate(context as unknown as ExecutionContext)).rejects.toThrow(ForbiddenException);
     });
 
     it('should check teamId for team-level permissions', async () => {
@@ -105,7 +105,7 @@ describe('PermissionGuard', () => {
       prisma.teamMember.findUnique.mockResolvedValue({ role: 'admin' });
 
       const context = createMockContext('user-1', { teamId: 'team-1' });
-      expect(await guard.canActivate(context as any)).toBe(true);
+      expect(await guard.canActivate(context as unknown as ExecutionContext)).toBe(true);
     });
   });
 });
