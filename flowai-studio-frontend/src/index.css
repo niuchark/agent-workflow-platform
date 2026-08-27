@@ -574,7 +574,8 @@
   .editor-inspector-resizer:focus-visible::after { @apply bg-brand-400; }
   .editor-inspector-close { @apply absolute right-3 top-3 z-30 flex size-8 cursor-pointer items-center justify-center rounded-lg border-0 bg-white text-muted transition-colors hover:bg-slate-100 hover:text-ink; }
   .editor-inspector .config-panel-header,
-  .editor-inspector .run-panel-header { @apply pr-12; }
+  .editor-inspector .run-panel-header,
+  .editor-inspector .version-panel-header { @apply pr-12; }
   .editor-share-panel { @apply h-full w-full min-w-0 overflow-y-auto bg-white p-5 pt-12; }
   .editor-node-panel-shell { @apply relative hidden h-full min-h-0 shrink-0 lg:flex; min-width: 120px; max-width: 320px; }
   .editor-node-panel-resizer { @apply absolute inset-y-0 right-0 z-20 w-2 translate-x-1/2 cursor-col-resize touch-none outline-none; }
@@ -586,7 +587,7 @@
   .editor-mobile-toolbar-btn > .anticon { @apply text-base; }
   .editor-mobile-toolbar-btn--active { @apply bg-brand-50 text-brand-700; }
   .node-panel { @apply flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden border-r border-line bg-white; }
-  .config-panel, .run-panel { @apply flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-white; }
+  .config-panel, .run-panel, .version-panel { @apply flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-white; }
   .node-panel-header, .run-panel-header, .config-panel-header { @apply shrink-0 border-b border-slate-100 px-4 py-3.5; }
   .node-panel-header h3, .run-panel-header h3 { @apply m-0 text-xs font-semibold uppercase tracking-wide text-muted; }
   .node-panel-header p { @apply m-0 mt-1 text-[11px] leading-4 text-subtle; }
@@ -659,6 +660,54 @@
   .run-result-output { @apply m-0 mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-white p-2.5 font-mono text-xs leading-5 text-slate-700; overflow-wrap: anywhere; }
   .run-result-error { @apply mt-2 rounded-lg bg-red-50 p-2.5 text-xs text-red-700; }
   .run-empty { @apply flex flex-1 items-center justify-center; }
+  .version-panel-header { @apply flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-4 py-3.5; }
+  .version-panel-header h3 { @apply m-0 text-xs font-semibold uppercase tracking-wide text-muted; }
+  .version-panel-body { @apply flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4; }
+  .version-section { @apply grid gap-2.5; }
+  .version-section-head { @apply flex items-center justify-between gap-2; }
+  .version-section-label { @apply text-[11px] font-semibold uppercase tracking-wide text-muted; }
+  .version-loading { @apply flex justify-center rounded-xl border border-line bg-slate-50 py-8; }
+  .version-error { @apply flex flex-col items-start gap-2 rounded-xl border border-red-100 bg-red-50 p-3 text-xs text-red-700; }
+  .version-list { @apply grid gap-2; }
+  .version-item { @apply rounded-xl border border-line bg-slate-50/70 p-3 transition hover:border-brand-100 hover:bg-brand-50/60; }
+  .version-item-top { @apply flex items-center gap-2; }
+  .version-item-version { @apply text-sm font-semibold text-ink; }
+  .version-item-time { @apply ml-auto text-[11px] text-subtle; }
+  .version-item-label { @apply mt-1.5 text-xs font-medium text-ink; }
+  .version-item-desc { @apply mt-1 text-xs leading-5 text-muted; overflow-wrap: anywhere; }
+  .version-item-actions { @apply mt-2.5 flex items-center gap-1; }
+  .version-item-actions .ant-btn { @apply !flex !size-8 !min-w-8 !items-center !justify-center !rounded-lg; }
+  .version-compare-controls { @apply flex items-center gap-2; }
+  .version-compare-controls .version-compare-select { @apply min-w-0 flex-1; }
+  .version-compare-controls > .anticon { @apply shrink-0 text-muted; }
+  .version-diff { @apply grid gap-2.5 rounded-xl border border-line bg-white p-3; }
+  .version-diff-toolbar { @apply flex items-center justify-between gap-2; }
+  .version-diff-toolbar > span { @apply text-[11px] text-muted; }
+  .version-diff-result { @apply grid gap-3; }
+  .version-diff-summary { @apply flex flex-wrap gap-2; }
+  .version-diff-summary > span { @apply inline-flex items-center gap-1 rounded-md border border-line bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-700; }
+  .version-diff-group { @apply grid gap-1.5; }
+  .version-diff-group-label { @apply text-[11px] font-semibold text-muted; }
+  .version-diff-card { @apply flex items-start gap-2 rounded-lg border px-2.5 py-2 text-xs; }
+  .version-diff-card--added { @apply border-emerald-200 bg-emerald-50 text-emerald-800; }
+  .version-diff-card--removed { @apply border-red-200 bg-red-50 text-red-800; }
+  .version-diff-card-main { @apply grid min-w-0 gap-0.5; }
+  .version-diff-card-type { @apply text-[10px] uppercase tracking-wide opacity-70; }
+  .version-diff-modified { @apply rounded-lg border border-amber-200 bg-amber-50 p-2.5; }
+  .version-diff-modified-head { @apply flex items-center gap-1.5 text-xs font-semibold text-amber-900; }
+  .version-diff-modified-type { @apply ml-auto rounded-md bg-white px-1.5 py-0.5 text-[10px] font-medium text-amber-700; }
+  .version-diff-fields { @apply mt-2 grid gap-2; }
+  .version-diff-field { @apply rounded-md border border-amber-100 bg-white p-2; }
+  .version-diff-field-name { @apply block text-[10px] font-medium uppercase tracking-wide text-amber-700; }
+  .version-diff-field-values { @apply mt-1 flex min-w-0 items-center gap-1.5 text-[11px]; }
+  .version-diff-field-old, .version-diff-field-new { @apply min-w-0 rounded bg-slate-50 px-1.5 py-0.5 text-slate-600; overflow-wrap: anywhere; }
+  .version-diff-field-new { @apply bg-emerald-50 text-emerald-700; }
+  .version-diff-empty { @apply flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 py-4 text-xs text-muted; }
+  .version-detail { @apply grid gap-3; }
+  .version-detail-meta { @apply flex items-center gap-2 text-xs text-muted; }
+  .version-detail-label { @apply text-sm font-semibold text-ink; }
+  .version-detail-desc { @apply text-xs leading-5 text-muted; }
+  .version-detail-json { @apply m-0 max-h-80 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-slate-50 p-3 font-mono text-xs leading-5 text-slate-700; overflow-wrap: anywhere; }
   .workflow-canvas { @apply relative size-full overflow-hidden bg-canvas; }
   .workflow-canvas .react-flow { height: 100% !important; min-height: 0; }
   .workflow-edge-hint { @apply pointer-events-none absolute bottom-4 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-lg border border-brand-100 bg-white/95 px-3 py-2 text-xs font-medium text-brand-700 shadow-sm; }

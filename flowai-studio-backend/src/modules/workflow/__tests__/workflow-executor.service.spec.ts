@@ -18,13 +18,14 @@ describe('WorkflowExecutorService', () => {
   let service: WorkflowExecutorService;
   let mockPrisma: any;
   let mockFactory: any;
+  let mockWorkflowAccess: any;
   let mockExecutor: any;
 
   const buildWorkflow = (nodes: any[], edges: any[]) => ({
     id: 'wf_1',
     name: 'Test Workflow',
     applicationId: 'app_1',
-    application: { userId: 'user_1' },
+    application: { id: 'app_1', userId: 'user_1' },
     nodes: JSON.stringify(nodes),
     edges: JSON.stringify(edges),
   });
@@ -46,7 +47,14 @@ describe('WorkflowExecutorService', () => {
       },
     };
 
-    service = new WorkflowExecutorService(mockPrisma, mockFactory);
+    mockWorkflowAccess = {
+      assertPermission: jest.fn(async (userId: string, application: { userId: string }) => {
+        if (application.userId === userId) return 'owner';
+        throw new Error('You do not have permission to access this workflow');
+      }),
+    };
+
+    service = new WorkflowExecutorService(mockPrisma, mockFactory, mockWorkflowAccess);
   });
 
   // ============================================================

@@ -24,6 +24,7 @@ import {
   DeleteOutlined,
   PlusSquareOutlined,
   LockOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
@@ -33,16 +34,18 @@ import WorkflowCanvas from '../components/workflow/WorkflowCanvas'
 import NodePanel from '../components/workflow/NodePanel'
 import ConfigPanel from '../components/workflow/ConfigPanel'
 import RunPanel from '../components/workflow/RunPanel'
+import VersionPanel from '../components/workflow/VersionPanel'
 import AppShareSettings from '../components/AppShareSettings'
 
-/** 右侧面板类型：配置 / 调试 / 分享 */
-type RightPanel = 'config' | 'debug' | 'share'
+/** 右侧面板类型：配置 / 调试 / 分享 / 版本 */
+type RightPanel = 'config' | 'debug' | 'share' | 'versions'
 
 /** 右侧面板的切换项定义（顶栏与移动端工具栏共用） */
 const RIGHT_PANELS = [
   { key: 'config', label: '配置', icon: SettingOutlined },
   { key: 'debug', label: '调试', icon: BugOutlined },
   { key: 'share', label: '分享', icon: ShareAltOutlined },
+  { key: 'versions', label: '版本', icon: HistoryOutlined },
 ] satisfies Array<{ key: RightPanel; label: string; icon: React.ComponentType }>
 
 /** 工作流运行状态 → 标签颜色与文案 */
@@ -116,6 +119,7 @@ const AppEditor: React.FC = () => {
     key === 'config'
       || (key === 'debug' && canRunWorkflow)
       || (key === 'share' && canManageSharing)
+      || (key === 'versions' && canManageSharing)
   )
 
   // 使用 ref 防止 React StrictMode 下 useEffect 重复执行导致弹两次错误
@@ -152,7 +156,11 @@ const AppEditor: React.FC = () => {
 
   // 权限变化后，把已不可访问的调试/分享面板收回到配置面板。
   useEffect(() => {
-    if ((rightPanel === 'debug' && !canRunWorkflow) || (rightPanel === 'share' && !canManageSharing)) {
+    if (
+      (rightPanel === 'debug' && !canRunWorkflow)
+      || (rightPanel === 'share' && !canManageSharing)
+      || (rightPanel === 'versions' && !canManageSharing)
+    ) {
       setRightPanel('config')
     }
   }, [canManageSharing, canRunWorkflow, rightPanel])
@@ -494,7 +502,15 @@ const AppEditor: React.FC = () => {
               id="editor-inspector"
               className="editor-inspector"
               style={{ width: panelWidth }}
-              aria-label={`${rightPanel === 'config' ? '配置' : rightPanel === 'debug' ? '调试' : '分享'}面板`}
+              aria-label={`${
+                rightPanel === 'config'
+                  ? '配置'
+                  : rightPanel === 'debug'
+                    ? '调试'
+                    : rightPanel === 'share'
+                      ? '分享'
+                      : '版本'
+              }面板`}
             >
               <div
                 className="editor-inspector-resizer"
@@ -521,10 +537,12 @@ const AppEditor: React.FC = () => {
                 </button>
               </Tooltip>
               <div className="editor-inspector-content">
-                {rightPanel === 'config' ? <ConfigPanel readOnly={!canEditWorkflow} /> : rightPanel === 'debug' ? <RunPanel /> : (
+                {rightPanel === 'config' ? <ConfigPanel readOnly={!canEditWorkflow} /> : rightPanel === 'debug' ? <RunPanel /> : rightPanel === 'share' ? (
                   <div className="editor-share-panel">
                     <AppShareSettings appId={appId!} />
                   </div>
+                ) : (
+                  <VersionPanel />
                 )}
               </div>
             </aside>
