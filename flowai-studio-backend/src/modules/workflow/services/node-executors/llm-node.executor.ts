@@ -24,6 +24,7 @@ export class LLMNodeExecutor implements INodeExecutor {
 
     // 替换上下文变量
     const resolvedUserPrompt = this.resolveVariables(userPrompt, context);
+    const resolvedSystemPrompt = this.resolveVariables(systemPrompt || '', context);
 
     // 使用增强版 chatWithLLMAndUsage 获取 usage 信息
     const userId = context._userId as string | undefined;
@@ -31,7 +32,7 @@ export class LLMNodeExecutor implements INodeExecutor {
     const { content, usage } = await this.aiService.chatWithLLMAndUsage(
       userId,
       resolvedUserPrompt,
-      systemPrompt,
+      resolvedSystemPrompt,
       [], // 暂不支持多轮对话历史
       model,
       temperature,

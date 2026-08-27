@@ -15,7 +15,7 @@ export interface TeamSlice {
   currentTeam: Team | null
   teamMembers: TeamMember[]
   teamApps: TeamApplication[]
-  isLoading: boolean
+  teamLoading: boolean
 
   // 团队操作
   setTeams: (teams: Team[]) => void
@@ -44,28 +44,28 @@ export const createTeamSlice: StateCreator<TeamSlice> = (set, get) => ({
   currentTeam: null,
   teamMembers: [],
   teamApps: [],
-  isLoading: false,
+  teamLoading: false,
 
   setTeams: (teams) => set({ teams }),
   setCurrentTeam: (team) => set({ currentTeam: team }),
 
   /** 拉取当前用户加入的团队列表 */
   fetchMyTeams: async () => {
-    set({ isLoading: true })
+    set({ teamLoading: true })
     try {
       const response = await teamApi.fetchMyTeams() as any
       const teams = (Array.isArray(response.data) ? response.data : []) as Team[]
-      set({ teams, isLoading: false })
+      set({ teams, teamLoading: false })
       return teams
     } catch (error) {
-      set({ isLoading: false })
+      set({ teamLoading: false })
       throw error
     }
   },
 
   /** 按 ID 拉取团队详情，并同步成员与应用列表 */
   fetchTeam: async (teamId) => {
-    set({ isLoading: true })
+    set({ teamLoading: true })
     try {
       const response = await teamApi.fetchTeam(teamId) as any
       const team = response.data as Team
@@ -73,33 +73,33 @@ export const createTeamSlice: StateCreator<TeamSlice> = (set, get) => ({
         currentTeam: team,
         teamMembers: team.members || [],
         teamApps: team.applications || [],
-        isLoading: false,
+        teamLoading: false,
       })
       return team
     } catch (error) {
-      set({ isLoading: false })
+      set({ teamLoading: false })
       throw error
     }
   },
 
   /** 创建团队：成功后追加到列表末尾 */
   createTeam: async (data) => {
-    set({ isLoading: true })
+    set({ teamLoading: true })
     try {
       const response = await teamApi.createTeam(data) as any
       const team = response.data as Team
       const currentTeams = Array.isArray(get().teams) ? get().teams : []
-      set({ teams: [...currentTeams, team], isLoading: false })
+      set({ teams: [...currentTeams, team], teamLoading: false })
       return team
     } catch (error) {
-      set({ isLoading: false })
+      set({ teamLoading: false })
       throw error
     }
   },
 
   /** 更新团队信息：同步更新列表与当前团队 */
   updateTeam: async (teamId, data) => {
-    set({ isLoading: true })
+    set({ teamLoading: true })
     try {
       const response = await teamApi.updateTeam(teamId, data) as any
       const updatedTeam = response.data as Team
@@ -107,119 +107,91 @@ export const createTeamSlice: StateCreator<TeamSlice> = (set, get) => ({
       set({
         teams: currentTeams.map((t) => (t.id === teamId ? updatedTeam : t)),
         currentTeam: get().currentTeam?.id === teamId ? updatedTeam : get().currentTeam,
-        isLoading: false,
+        teamLoading: false,
       })
       return updatedTeam
     } catch (error) {
-      set({ isLoading: false })
+      set({ teamLoading: false })
       throw error
     }
   },
 
   /** 删除团队：从列表移除，若删除的是当前团队则清空 */
   deleteTeam: async (teamId) => {
-    set({ isLoading: true })
+    set({ teamLoading: true })
     try {
       await teamApi.deleteTeam(teamId)
       const currentTeams = Array.isArray(get().teams) ? get().teams : []
       set({
         teams: currentTeams.filter((t) => t.id !== teamId),
         currentTeam: get().currentTeam?.id === teamId ? null : get().currentTeam,
-        isLoading: false,
+        teamLoading: false,
       })
     } catch (error) {
-      set({ isLoading: false })
+      set({ teamLoading: false })
       throw error
     }
   },
 
   /** 添加团队成员：成功后追加到成员列表 */
   addTeamMember: async (teamId, data) => {
-    try {
-      const response = await teamApi.addTeamMember(teamId, data) as any
-      const member = response.data as TeamMember
-      set({ teamMembers: [...get().teamMembers, member] })
-      return member
-    } catch (error) {
-      throw error
-    }
+    const response = await teamApi.addTeamMember(teamId, data) as any
+    const member = response.data as TeamMember
+    set({ teamMembers: [...get().teamMembers, member] })
+    return member
   },
 
   /** 修改成员角色：用最新结果替换列表中的对应项 */
   updateMemberRole: async (teamId, memberId, data) => {
-    try {
-      const response = await teamApi.updateMemberRole(teamId, memberId, data) as any
-      const updatedMember = response.data as TeamMember
-      set({
-        teamMembers: get().teamMembers.map((m) =>
-          m.id === memberId ? updatedMember : m
-        ),
-      })
-      return updatedMember
-    } catch (error) {
-      throw error
-    }
+    const response = await teamApi.updateMemberRole(teamId, memberId, data) as any
+    const updatedMember = response.data as TeamMember
+    set({
+      teamMembers: get().teamMembers.map((m) =>
+        m.id === memberId ? updatedMember : m
+      ),
+    })
+    return updatedMember
   },
 
   /** 移除团队成员 */
   removeTeamMember: async (teamId, memberId) => {
-    try {
-      await teamApi.removeTeamMember(teamId, memberId)
-      set({ teamMembers: get().teamMembers.filter((m) => m.id !== memberId) })
-    } catch (error) {
-      throw error
-    }
+    await teamApi.removeTeamMember(teamId, memberId)
+    set({ teamMembers: get().teamMembers.filter((m) => m.id !== memberId) })
   },
 
   /** 退出团队：从列表移除并清空当前团队 */
   leaveTeam: async (teamId) => {
-    try {
-      await teamApi.leaveTeam(teamId)
-      const currentTeams = Array.isArray(get().teams) ? get().teams : []
-      set({
-        teams: currentTeams.filter((t) => t.id !== teamId),
-        currentTeam: null,
-      })
-    } catch (error) {
-      throw error
-    }
+    await teamApi.leaveTeam(teamId)
+    const currentTeams = Array.isArray(get().teams) ? get().teams : []
+    set({
+      teams: currentTeams.filter((t) => t.id !== teamId),
+      currentTeam: null,
+    })
   },
 
   /** 把应用加入团队：成功后追加到应用列表 */
   addTeamApp: async (teamId, data) => {
-    try {
-      const response = await teamApi.addTeamApp(teamId, data) as any
-      const teamApp = response.data as TeamApplication
-      set({ teamApps: [...get().teamApps, teamApp] })
-      return teamApp
-    } catch (error) {
-      throw error
-    }
+    const response = await teamApi.addTeamApp(teamId, data) as any
+    const teamApp = response.data as TeamApplication
+    set({ teamApps: [...get().teamApps, teamApp] })
+    return teamApp
   },
 
   /** 调整团队应用的访问权限 */
   updateTeamAppPermission: async (teamId, teamAppId, data) => {
-    try {
-      const response = await teamApi.updateTeamAppPermission(teamId, teamAppId, data) as any
-      const updatedApp = response.data as TeamApplication
-      set({
-        teamApps: get().teamApps.map((a) =>
-          a.id === teamAppId ? updatedApp : a
-        ),
-      })
-      return updatedApp
-    } catch (error) {
-      throw error
-    }
+    const response = await teamApi.updateTeamAppPermission(teamId, teamAppId, data) as any
+    const updatedApp = response.data as TeamApplication
+    set({
+      teamApps: get().teamApps.map((a) =>
+        a.id === teamAppId ? updatedApp : a
+      ),
+    })
+    return updatedApp
   },
 
   /** 从团队移除应用授权 */
   removeTeamApp: async (teamId, teamAppId) => {
-    try {
-      await teamApi.removeTeamApp(teamId, teamAppId)
-      set({ teamApps: get().teamApps.filter((a) => a.id !== teamAppId) })
-    } catch (error) {
-      throw error
-    }
+    await teamApi.removeTeamApp(teamId, teamAppId)
+    set({ teamApps: get().teamApps.filter((a) => a.id !== teamAppId) })
   },
 })

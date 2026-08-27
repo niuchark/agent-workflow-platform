@@ -46,7 +46,7 @@ const TeamDetail: React.FC = () => {
   const { teamId } = useParams<{ teamId: string }>()
   const navigate = useNavigate()
   const {
-    currentTeam, teamMembers, teamApps, isLoading,
+    currentTeam, teamMembers, teamApps, teamLoading,
     fetchTeam, updateTeam, deleteTeam,
     addTeamMember, updateMemberRole, removeTeamMember,
     addTeamApp, updateTeamAppPermission, removeTeamApp,
@@ -68,7 +68,7 @@ const TeamDetail: React.FC = () => {
       fetchTeam(teamId)
       fetchApps()
     }
-  }, [teamId])
+  }, [fetchApps, fetchTeam, teamId])
 
   /** 打开编辑弹窗：回填团队信息 */
   const handleEditTeam = () => {
@@ -297,7 +297,7 @@ const TeamDetail: React.FC = () => {
     ? apps.filter((app) => !teamApps.some((ta) => ta.applicationId === app.id))
     : []
 
-  if (isLoading && !currentTeam) {
+  if (teamLoading && !currentTeam) {
     return (
       <div className="team-loading">
         <Spin size="large" />
@@ -524,7 +524,7 @@ const TeamDetail: React.FC = () => {
           </Form.Item>
           <div className="modal-footer">
             <Button onClick={() => setIsEditTeamOpen(false)}>取消</Button>
-            <Button type="primary" htmlType="submit" loading={isLoading}>
+            <Button type="primary" htmlType="submit" loading={teamLoading}>
               保存
             </Button>
           </div>

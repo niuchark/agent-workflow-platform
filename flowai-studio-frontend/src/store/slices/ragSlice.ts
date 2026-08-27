@@ -13,15 +13,15 @@ export interface RAGSlice {
   knowledgeBases: KnowledgeBase[]
   currentKnowledgeBase: KnowledgeBase | null
   documents: Document[]
-  isLoading: boolean
-  error: string | null
+  ragLoading: boolean
+  ragError: string | null
   
   // Actions
   setKnowledgeBases: (knowledgeBases: KnowledgeBase[]) => void
   setCurrentKnowledgeBase: (knowledgeBase: KnowledgeBase | null) => void
   setDocuments: (documents: Document[]) => void
-  setIsLoading: (loading: boolean) => void
-  setError: (error: string | null) => void
+  setRagLoading: (loading: boolean) => void
+  setRagError: (error: string | null) => void
   fetchKnowledgeBases: () => Promise<void>
   fetchKnowledgeBaseById: (id: string) => Promise<KnowledgeBase>
   createKnowledgeBase: (data: { name: string; description?: string; embeddingModel?: string; embeddingDimension?: number; chunkSize?: number; chunkOverlap?: number; topK?: number; similarityThreshold?: number; retrievalMode?: string }) => Promise<KnowledgeBase>
@@ -38,8 +38,8 @@ export const createRAGSlice: StateCreator<RAGSlice> = (set, get) => ({
   knowledgeBases: [],
   currentKnowledgeBase: null,
   documents: [],
-  isLoading: false,
-  error: null,
+  ragLoading: false,
+  ragError: null,
 
   setKnowledgeBases: (knowledgeBases) => set({ knowledgeBases }),
   
@@ -47,58 +47,58 @@ export const createRAGSlice: StateCreator<RAGSlice> = (set, get) => ({
   
   setDocuments: (documents) => set({ documents }),
   
-  setIsLoading: (loading) => set({ isLoading: loading }),
+  setRagLoading: (ragLoading) => set({ ragLoading }),
   
-  setError: (error) => set({ error }),
+  setRagError: (ragError) => set({ ragError }),
 
   /** 拉取知识库列表 */
   fetchKnowledgeBases: async () => {
-    set({ isLoading: true, error: null })
+    set({ ragLoading: true, ragError: null })
     try {
       const response = await request.get('/rag/knowledge-bases') as any
       const knowledgeBases = (Array.isArray(response.data) ? response.data : [])
-      set({ knowledgeBases, isLoading: false })
+      set({ knowledgeBases, ragLoading: false })
     } catch (error) {
-      set({ error: 'Failed to fetch knowledge bases', isLoading: false, knowledgeBases: [] })
+      set({ ragError: 'Failed to fetch knowledge bases', ragLoading: false, knowledgeBases: [] })
       throw error
     }
   },
 
   /** 按 ID 拉取知识库详情，并同步其文档列表 */
   fetchKnowledgeBaseById: async (id) => {
-    set({ isLoading: true, error: null })
+    set({ ragLoading: true, ragError: null })
     try {
       const response = await request.get(`/rag/knowledge-bases/${id}`) as any
       const knowledgeBase = response.data
-      set({ currentKnowledgeBase: knowledgeBase, documents: knowledgeBase.documents || [], isLoading: false })
+      set({ currentKnowledgeBase: knowledgeBase, documents: knowledgeBase.documents || [], ragLoading: false })
       return knowledgeBase
     } catch (error) {
-      set({ error: 'Failed to fetch knowledge base', isLoading: false })
+      set({ ragError: 'Failed to fetch knowledge base', ragLoading: false })
       throw error
     }
   },
 
   /** 创建知识库：成功后追加到列表末尾 */
   createKnowledgeBase: async (data) => {
-    set({ isLoading: true, error: null })
+    set({ ragLoading: true, ragError: null })
     try {
       const response = await request.post('/rag/knowledge-bases', data) as any
       const knowledgeBase = response.data
       const currentKBs = Array.isArray(get().knowledgeBases) ? get().knowledgeBases : []
       set({ 
         knowledgeBases: [...currentKBs, knowledgeBase],
-        isLoading: false 
+        ragLoading: false
       })
       return knowledgeBase
     } catch (error) {
-      set({ error: 'Failed to create knowledge base', isLoading: false })
+      set({ ragError: 'Failed to create knowledge base', ragLoading: false })
       throw error
     }
   },
 
   /** 更新知识库配置：同步更新列表与当前知识库 */
   updateKnowledgeBase: async (id, data) => {
-    set({ isLoading: true, error: null })
+    set({ ragLoading: true, ragError: null })
     try {
       const response = await request.patch(`/rag/knowledge-bases/${id}`, data) as any
       const updatedKnowledgeBase = response.data
@@ -106,34 +106,34 @@ export const createRAGSlice: StateCreator<RAGSlice> = (set, get) => ({
       set({
         knowledgeBases: currentKBs.map(kb => kb.id === id ? updatedKnowledgeBase : kb),
         currentKnowledgeBase: get().currentKnowledgeBase?.id === id ? updatedKnowledgeBase : get().currentKnowledgeBase,
-        isLoading: false,
+        ragLoading: false,
       })
       return updatedKnowledgeBase
     } catch (error) {
-      set({ error: 'Failed to update knowledge base', isLoading: false })
+      set({ ragError: 'Failed to update knowledge base', ragLoading: false })
       throw error
     }
   },
 
   /** 删除知识库：从列表移除，若删除的是当前知识库则清空 */
   deleteKnowledgeBase: async (id) => {
-    set({ isLoading: true, error: null })
+    set({ ragLoading: true, ragError: null })
     try {
       await request.delete(`/rag/knowledge-bases/${id}`)
       set({
         knowledgeBases: get().knowledgeBases.filter(kb => kb.id !== id),
         currentKnowledgeBase: get().currentKnowledgeBase?.id === id ? null : get().currentKnowledgeBase,
-        isLoading: false,
+        ragLoading: false,
       })
     } catch (error) {
-      set({ error: 'Failed to delete knowledge base', isLoading: false })
+      set({ ragError: 'Failed to delete knowledge base', ragLoading: false })
       throw error
     }
   },
 
   /** 上传文档：以 multipart/form-data 提交，成功后刷新列表与当前知识库 */
   uploadDocument: async (knowledgeBaseId, file) => {
-    set({ isLoading: true, error: null })
+    set({ ragLoading: true, ragError: null })
     try {
       const formData = new FormData()
       formData.append('file', file)
@@ -155,21 +155,21 @@ export const createRAGSlice: StateCreator<RAGSlice> = (set, get) => ({
         await get().fetchKnowledgeBaseById(knowledgeBaseId)
       }
 
-      set({ isLoading: false, error: null })
+      set({ ragLoading: false, ragError: null })
       return document
     } catch (error: any) {
       const message =
         error?.response?.data?.message ||
         error?.message ||
         '文档上传失败'
-      set({ error: message, isLoading: false })
+      set({ ragError: message, ragLoading: false })
       throw error
     }
   },
 
   /** 删除文档：成功后刷新知识库列表与当前知识库的文档列表 */
   deleteDocument: async (documentId) => {
-    set({ isLoading: true, error: null })
+    set({ ragLoading: true, ragError: null })
     try {
       await request.delete(`/rag/documents/${documentId}`)
       
@@ -181,39 +181,39 @@ export const createRAGSlice: StateCreator<RAGSlice> = (set, get) => ({
         await get().fetchKnowledgeBaseById(get().currentKnowledgeBase.id)
       }
 
-      set({ isLoading: false })
+      set({ ragLoading: false })
     } catch (error) {
-      set({ error: 'Failed to delete document', isLoading: false })
+      set({ ragError: 'Failed to delete document', ragLoading: false })
       throw error
     }
   },
 
   /** 拉取指定文档的分块结果（用于查看切分效果） */
   fetchDocumentChunks: async (documentId) => {
-    set({ isLoading: true, error: null })
+    set({ ragLoading: true, ragError: null })
     try {
       const response = await request.get(`/rag/documents/${documentId}/chunks`) as any
-      set({ isLoading: false })
+      set({ ragLoading: false })
       return response.data
     } catch (error) {
-      set({ error: 'Failed to fetch document chunks', isLoading: false })
+      set({ ragError: 'Failed to fetch document chunks', ragLoading: false })
       throw error
     }
   },
 
   /** 向量检索：按 query 在指定知识库中召回 topK 条相关片段 */
   retrieve: async (query, knowledgeBaseId, topK = 5) => {
-    set({ isLoading: true, error: null })
+    set({ ragLoading: true, ragError: null })
     try {
       const response = await request.post('/rag/retrieve', {
         query,
         knowledgeBaseId,
         topK,
       }) as any
-      set({ isLoading: false })
+      set({ ragLoading: false })
       return response.data
     } catch (error) {
-      set({ error: 'Failed to retrieve documents', isLoading: false })
+      set({ ragError: 'Failed to retrieve documents', ragLoading: false })
       throw error
     }
   },

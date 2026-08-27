@@ -33,9 +33,7 @@ import { EmbeddingFactory } from '../factories/embedding.factory';
 import { VectorStoreFactory } from '../factories/vector-store.factory';
 import { EmbeddingProvider } from '../interfaces/embedding-provider.interface';
 import { VectorStore } from '../interfaces/vector-store.interface';
-import { VectorSearchFilter } from '../interfaces/vector-store.interface';
 import {
-  RetrievalRequest,
   RetrievalResult,
 } from '../interfaces/retrieval-strategy.interface';
 import { BM25KeywordService } from './bm25-keyword.service';
@@ -534,6 +532,10 @@ export class RAGService {
     vectorWeightOverride?: number,
     rrfKOverride?: number,
   ): Promise<any[]> {
+    if (typeof query !== 'string' || !query.trim()) {
+      throw new BadRequestException('Query must not be empty');
+    }
+
     // 1. 获取知识库配置
     const kb = await this.prisma.knowledgeBase.findUnique({ where: { id: knowledgeBaseId } });
     if (!kb) {
@@ -543,11 +545,25 @@ export class RAGService {
       throw new ForbiddenException('Access denied');
     }
 
-    const effectiveTopK = topK || kb.topK || 5;
+    const effectiveTopK = topK ?? kb.topK ?? 5;
+    if (!Number.isSafeInteger(effectiveTopK) || effectiveTopK < 1 || effectiveTopK > 20) {
+      throw new BadRequestException('topK must be an integer between 1 and 20');
+    }
+
     // 运行时参数优先于知识库配置
     const retrievalMode = retrievalModeOverride || (kb as any).retrievalMode || 'vector';
     const vectorWeight = vectorWeightOverride ?? (kb as any).vectorWeight ?? 0.7;
     const rrfK = rrfKOverride ?? (kb as any).rrfK ?? 60;
+
+    if (!['vector', 'keyword', 'hybrid'].includes(retrievalMode)) {
+      throw new BadRequestException('Invalid retrieval mode');
+    }
+    if (typeof vectorWeight !== 'number' || !Number.isFinite(vectorWeight) || vectorWeight < 0 || vectorWeight > 1) {
+      throw new BadRequestException('vectorWeight must be between 0 and 1');
+    }
+    if (!Number.isSafeInteger(rrfK) || rrfK < 1 || rrfK > 200) {
+      throw new BadRequestException('rrfK must be an integer between 1 and 200');
+    }
 
     // 2. 构建检索缓存键
     const cacheKey = `${CachePrefix.KNOWLEDGE_BASE_RETRIEVAL}:${knowledgeBaseId}:${this.hashQuery(query)}:${retrievalMode}:${effectiveTopK}`;

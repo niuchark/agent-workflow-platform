@@ -56,9 +56,6 @@ COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/package*.json ./
 COPY --from=builder --chown=nestjs:nodejs /app/prisma ./prisma
 
-# 创建上传目录
-RUN mkdir -p /app/uploads && chown nestjs:nodejs /app/uploads
-
 # 切换到非 root 用户
 USER nestjs
 

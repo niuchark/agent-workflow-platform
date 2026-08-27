@@ -8,14 +8,14 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { createUserSlice } from './slices/userSlice'
-import { AppSlice, createAppSlice } from './slices/appSlice'
-import { WorkflowSlice, createWorkflowSlice } from './slices/workflowSlice'
-import { GlobalSlice, createGlobalSlice } from './slices/globalSlice'
-import { RAGSlice, createRAGSlice } from './slices/ragSlice'
-import { SkillSlice, createSkillSlice } from './slices/skillSlice'
-import { TemplateSlice, createTemplateSlice } from './slices/templateSlice'
-import { TeamSlice, createTeamSlice } from './slices/teamSlice'
-import { ApiKeySlice, createApiKeySlice } from './slices/apiKeySlice'
+import { createAppSlice } from './slices/appSlice'
+import { createWorkflowSlice } from './slices/workflowSlice'
+import { createGlobalSlice } from './slices/globalSlice'
+import { createRAGSlice } from './slices/ragSlice'
+import { createSkillSlice } from './slices/skillSlice'
+import { createTemplateSlice } from './slices/templateSlice'
+import { createTeamSlice } from './slices/teamSlice'
+import { createApiKeySlice } from './slices/apiKeySlice'
 
 /** 全局 store 的完整类型：所有业务切片状态的交叉类型 */
 type StoreState = ReturnType<typeof createUserSlice> &

@@ -8,7 +8,6 @@ import {
   BadGatewayException,
   Injectable,
   Logger,
-  NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import axios, { AxiosError } from 'axios';

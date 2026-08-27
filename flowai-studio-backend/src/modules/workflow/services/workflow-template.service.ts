@@ -243,7 +243,7 @@ export class WorkflowTemplateService {
    * 更新模板信息
    */
   async updateTemplate(userId: string, templateId: string, dto: UpdateTemplateDto) {
-    const template = await this.assertOwnership(userId, templateId);
+    await this.assertOwnership(userId, templateId);
 
     const updated = await this.prisma.workflowTemplate.update({
       where: { id: templateId },

@@ -12,6 +12,7 @@ import {
 import { UserService } from './user.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -44,7 +45,7 @@ export class UserController {
   @UseGuards(JwtAuthGuard)
   async updateProfile(
     @CurrentUser('userId') userId: string,
-    @Body() data: { username?: string; avatar?: string },
+    @Body() data: UpdateProfileDto,
   ) {
     return this.userService.updateProfile(userId, data);
   }

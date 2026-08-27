@@ -31,23 +31,21 @@ describe('TeamService', () => {
     application: {
       findUnique: jest.fn(),
     },
+    user: {
+      findFirst: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        TeamService,
-        { provide: PrismaService, useValue: mockPrismaService },
-      ],
+      providers: [TeamService, { provide: PrismaService, useValue: mockPrismaService }],
     }).compile();
 
     service = module.get<TeamService>(TeamService);
     prisma = module.get(PrismaService);
 
     // Reset all mocks
-    Object.values(mockPrismaService).forEach((obj) =>
-      Object.values(obj).forEach((fn) => fn.mockReset()),
-    );
+    Object.values(mockPrismaService).forEach((obj) => Object.values(obj).forEach((fn) => fn.mockReset()));
   });
 
   // ============================================================
@@ -62,7 +60,14 @@ describe('TeamService', () => {
         ...dto,
         avatar: null,
         ownerId: 'user-1',
-        members: [{ id: 'member-1', userId: 'user-1', role: 'owner', joinedAt: new Date() }],
+        members: [
+          {
+            id: 'member-1',
+            userId: 'user-1',
+            role: 'owner',
+            joinedAt: new Date(),
+          },
+        ],
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -130,7 +135,14 @@ describe('TeamService', () => {
         description: 'desc',
         avatar: null,
         ownerId: 'owner-1',
-        members: [{ userId: 'user-1', role: 'editor', joinedAt: new Date(), user: { id: 'user-1', username: 'test', avatar: null } }],
+        members: [
+          {
+            userId: 'user-1',
+            role: 'editor',
+            joinedAt: new Date(),
+            user: { id: 'user-1', username: 'test', avatar: null },
+          },
+        ],
         teamApplications: [],
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -144,17 +156,25 @@ describe('TeamService', () => {
 
   describe('delete', () => {
     it('should throw ForbiddenException if not owner', async () => {
-      prisma.team.findUnique.mockResolvedValue({ id: 'team-1', ownerId: 'owner-1' });
+      prisma.team.findUnique.mockResolvedValue({
+        id: 'team-1',
+        ownerId: 'owner-1',
+      });
       await expect(service.delete('user-1', 'team-1')).rejects.toThrow(ForbiddenException);
     });
 
     it('should delete team if owner', async () => {
-      prisma.team.findUnique.mockResolvedValue({ id: 'team-1', ownerId: 'owner-1' });
+      prisma.team.findUnique.mockResolvedValue({
+        id: 'team-1',
+        ownerId: 'owner-1',
+      });
       prisma.team.delete.mockResolvedValue({ id: 'team-1' });
 
       const result = await service.delete('owner-1', 'team-1');
       expect(result.success).toBe(true);
-      expect(prisma.team.delete).toHaveBeenCalledWith({ where: { id: 'team-1' } });
+      expect(prisma.team.delete).toHaveBeenCalledWith({
+        where: { id: 'team-1' },
+      });
     });
   });
 
@@ -164,26 +184,56 @@ describe('TeamService', () => {
 
   describe('addMember', () => {
     it('should throw ConflictException if user is already a member', async () => {
-      prisma.team.findUnique.mockResolvedValue({ id: 'team-1', ownerId: 'admin-1' });
+      prisma.team.findUnique.mockResolvedValue({
+        id: 'team-1',
+        ownerId: 'admin-1',
+      });
+      prisma.user.findFirst.mockResolvedValue({
+        id: 'user-2',
+        username: 'user-2',
+      });
       prisma.teamMember.findUnique.mockResolvedValue({ id: 'member-1' });
-      await expect(service.addMember('admin-1', 'team-1', { userId: 'user-2', role: 'editor' })).rejects.toThrow(ConflictException);
+      await expect(
+        service.addMember('admin-1', 'team-1', {
+          userId: 'user-2',
+          role: 'editor',
+        }),
+      ).rejects.toThrow(ConflictException);
     });
 
     it('should throw BadRequestException if adding self', async () => {
-      prisma.team.findUnique.mockResolvedValue({ id: 'team-1', ownerId: 'user-1' });
+      prisma.team.findUnique.mockResolvedValue({
+        id: 'team-1',
+        ownerId: 'user-1',
+      });
+      prisma.user.findFirst.mockResolvedValue({
+        id: 'user-1',
+        username: 'user-1',
+      });
       prisma.teamMember.findUnique.mockResolvedValue(null);
-      await expect(service.addMember('user-1', 'team-1', { userId: 'user-1', role: 'editor' })).rejects.toThrow(BadRequestException);
+      await expect(
+        service.addMember('user-1', 'team-1', {
+          userId: 'user-1',
+          role: 'editor',
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
   describe('leaveTeam', () => {
     it('should throw BadRequestException if owner tries to leave', async () => {
-      prisma.team.findUnique.mockResolvedValue({ id: 'team-1', ownerId: 'owner-1' });
+      prisma.team.findUnique.mockResolvedValue({
+        id: 'team-1',
+        ownerId: 'owner-1',
+      });
       await expect(service.leaveTeam('owner-1', 'team-1')).rejects.toThrow(BadRequestException);
     });
 
     it('should allow member to leave', async () => {
-      prisma.team.findUnique.mockResolvedValue({ id: 'team-1', ownerId: 'owner-1' });
+      prisma.team.findUnique.mockResolvedValue({
+        id: 'team-1',
+        ownerId: 'owner-1',
+      });
       prisma.teamMember.deleteMany.mockResolvedValue({ count: 1 });
 
       const result = await service.leaveTeam('member-1', 'team-1');
@@ -197,22 +247,52 @@ describe('TeamService', () => {
 
   describe('addApp', () => {
     it('should throw NotFoundException if app does not exist', async () => {
-      prisma.team.findUnique.mockResolvedValue({ id: 'team-1', ownerId: 'admin-1' });
+      prisma.team.findUnique.mockResolvedValue({
+        id: 'team-1',
+        ownerId: 'admin-1',
+      });
       prisma.application.findUnique.mockResolvedValue(null);
-      await expect(service.addApp('admin-1', 'team-1', { applicationId: 'non-existent', permission: 'can_view' })).rejects.toThrow(NotFoundException);
+      await expect(
+        service.addApp('admin-1', 'team-1', {
+          applicationId: 'non-existent',
+          permission: 'can_view',
+        }),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ForbiddenException if user is not app owner', async () => {
-      prisma.team.findUnique.mockResolvedValue({ id: 'team-1', ownerId: 'admin-1' });
-      prisma.application.findUnique.mockResolvedValue({ id: 'app-1', userId: 'other-user' });
-      await expect(service.addApp('admin-1', 'team-1', { applicationId: 'app-1', permission: 'can_view' })).rejects.toThrow(ForbiddenException);
+      prisma.team.findUnique.mockResolvedValue({
+        id: 'team-1',
+        ownerId: 'admin-1',
+      });
+      prisma.application.findUnique.mockResolvedValue({
+        id: 'app-1',
+        userId: 'other-user',
+      });
+      await expect(
+        service.addApp('admin-1', 'team-1', {
+          applicationId: 'app-1',
+          permission: 'can_view',
+        }),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should throw ConflictException if app already shared to team', async () => {
-      prisma.team.findUnique.mockResolvedValue({ id: 'team-1', ownerId: 'admin-1' });
-      prisma.application.findUnique.mockResolvedValue({ id: 'app-1', userId: 'admin-1' });
+      prisma.team.findUnique.mockResolvedValue({
+        id: 'team-1',
+        ownerId: 'admin-1',
+      });
+      prisma.application.findUnique.mockResolvedValue({
+        id: 'app-1',
+        userId: 'admin-1',
+      });
       prisma.teamApplication.findUnique.mockResolvedValue({ id: 'ta-1' });
-      await expect(service.addApp('admin-1', 'team-1', { applicationId: 'app-1', permission: 'can_view' })).rejects.toThrow(ConflictException);
+      await expect(
+        service.addApp('admin-1', 'team-1', {
+          applicationId: 'app-1',
+          permission: 'can_view',
+        }),
+      ).rejects.toThrow(ConflictException);
     });
   });
 });

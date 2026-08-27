@@ -1,19 +1,6 @@
-/**
- * 限流 + 熔断模块
- *
- * 竞品对比:
- * - Dify: Redis Rate Limiting + 每租户并发限制
- * - Coze: 多级限流 (API级/用户级/租户级)
- * - n8n: ThrottlerModule + Redis 存储
- * - 本设计: Redis 令牌桶 + 并发工作流控制 + CircuitBreaker + RateLimitGuard
- */
-import {
-  Injectable,
-  NestMiddleware,
-  Logger,
-} from '@nestjs/common';
-import { Request, Response, NextFunction } from 'express';
-import { RedisService } from '../services/redis.service';
+/** 工作流限流与熔断服务。 */
+import { Injectable, Logger } from '@nestjs/common';
+import { RedisService } from './redis.service';
 
 // ============================================================
 // 限流配置
@@ -28,18 +15,9 @@ export interface RateLimitConfig {
   maxConcurrent?: number;
 }
 
-/** 默认限流配置 */
+/** 当前真正应用于工作流执行入口的限流配置。 */
 export const DEFAULT_RATE_LIMITS: Record<string, RateLimitConfig> = {
-  // API 全局限流
-  'api:global': { windowSeconds: 60, maxRequests: 300 },
-  // 每用户 API 限流
-  'api:user': { windowSeconds: 60, maxRequests: 60 },
-  // 工作流执行限流
   'workflow:run': { windowSeconds: 60, maxRequests: 20, maxConcurrent: 5 },
-  // AI 模型调用限流
-  'ai:call': { windowSeconds: 60, maxRequests: 30 },
-  // 知识库操作限流
-  'kb:operation': { windowSeconds: 60, maxRequests: 30 },
 };
 
 // ============================================================
@@ -49,13 +27,12 @@ export const DEFAULT_RATE_LIMITS: Record<string, RateLimitConfig> = {
 @Injectable()
 export class RateLimiterService {
   private readonly logger = new Logger(RateLimiterService.name);
-  private readonly concurrentMap = new Map<string, number>();
 
   constructor(private readonly redisService: RedisService) {}
 
   /**
-   * 令牌桶限流检查
-   * Redis Lua 脚本保证原子性
+   * 滑动窗口限流检查
+   * Redis 事务保证窗口更新与计数按顺序执行
    *
    * @param key 限流键 (如 rate_limit:workflow:run:userId)
    * @param config 限流配置
@@ -313,107 +290,8 @@ export class CircuitBreakerService {
   }
 
   /** 读取熔断器配置（当前使用默认配置，可扩展为配置中心） */
-  private async getConfig(name: string): Promise<CircuitBreakerConfig> {
+  private async getConfig(_name: string): Promise<CircuitBreakerConfig> {
     // 可扩展: 从数据库/配置中心读取每个熔断器的配置
     return DEFAULT_CIRCUIT_CONFIG;
-  }
-}
-
-// ============================================================
-// 限流中间件
-// ============================================================
-
-@Injectable()
-export class RateLimitMiddleware implements NestMiddleware {
-  private readonly logger = new Logger(RateLimitMiddleware.name);
-
-  constructor(
-    private readonly rateLimiterService: RateLimiterService,
-    private readonly circuitBreakerService: CircuitBreakerService,
-  ) {}
-
-  /** 限流中间件：按全局限流 → 用户限流 → 分场景限流逐级检查 */
-  async use(req: Request, res: Response, next: NextFunction) {
-    // 从 JWT 中获取用户 ID（未登录按匿名处理）
-    const userId = (req as any).user?.userId || 'anonymous';
-    const path = req.path;
-
-    // 1. 全局限流
-    const globalResult = await this.rateLimiterService.checkRateLimit(
-      'rate_limit:api:global',
-      DEFAULT_RATE_LIMITS['api:global'],
-    );
-    if (!globalResult.allowed) {
-      res.status(429).json({
-        statusCode: 429,
-        message: '请求过于频繁，请稍后再试',
-        retryAfter: globalResult.retryAfter,
-      });
-      return;
-    }
-
-    // 2. 用户级限流
-    const userResult = await this.rateLimiterService.checkRateLimit(
-      `rate_limit:api:user:${userId}`,
-      DEFAULT_RATE_LIMITS['api:user'],
-    );
-    if (!userResult.allowed) {
-      res.status(429).json({
-        statusCode: 429,
-        message: '您的请求过于频繁，请稍后再试',
-        retryAfter: userResult.retryAfter,
-      });
-      return;
-    }
-
-    // 3. 设置限流响应头
-    res.setHeader('X-RateLimit-Remaining', userResult.remaining.toString());
-
-    // 4. 工作流执行特殊限流 + 熔断
-    if (path.includes('/workflows/') && path.includes('/run')) {
-      const workflowConfig = DEFAULT_RATE_LIMITS['workflow:run'];
-
-      // 限流检查
-      const workflowResult = await this.rateLimiterService.checkRateLimit(
-        `rate_limit:workflow:run:${userId}`,
-        workflowConfig,
-      );
-      if (!workflowResult.allowed) {
-        res.status(429).json({
-          statusCode: 429,
-          message: '工作流执行请求过于频繁，请稍后再试',
-          retryAfter: workflowResult.retryAfter,
-        });
-        return;
-      }
-
-      // 熔断检查
-      const circuitAllowed = await this.circuitBreakerService.isAllowed('workflow');
-      if (!circuitAllowed) {
-        res.status(503).json({
-          statusCode: 503,
-          message: '服务暂时不可用，工作流执行已被熔断保护',
-        });
-        return;
-      }
-    }
-
-    // 5. AI 模型调用限流
-    if (path.includes('/ai/') || path.includes('/chat')) {
-      const aiResult = await this.rateLimiterService.checkRateLimit(
-        `rate_limit:ai:call:${userId}`,
-        DEFAULT_RATE_LIMITS['ai:call'],
-      );
-      if (!aiResult.allowed) {
-        res.status(429).json({
-          statusCode: 429,
-          message: 'AI 模型调用过于频繁，请稍后再试',
-          retryAfter: aiResult.retryAfter,
-        });
-        return;
-      }
-    }
-
-    next();
   }
 }

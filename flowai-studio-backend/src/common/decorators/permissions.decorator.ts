@@ -2,7 +2,7 @@
  * 权限装饰器：标记接口所需的 RBAC 权限。
  */
 import { SetMetadata } from '@nestjs/common';
-import { PERMISSIONS, Permission } from '../constants/permissions';
+import { Permission } from '../constants/permissions';
 
 /** 权限元数据的键名（与 PermissionGuard 约定一致） */
 export const PERMISSIONS_KEY = 'permissions';

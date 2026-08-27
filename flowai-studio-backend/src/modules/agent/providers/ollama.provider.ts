@@ -178,7 +178,6 @@ export class OllamaProvider extends BaseLLMProvider {
 
       // 合并预定义和动态发现的模型
       const existingIds = new Set(models.map((m) => m.id));
-      const predefined = OLLAMA_MODELS.filter((m) => !existingIds.has(m.id));
       this.cachedModels = [...OLLAMA_MODELS.map((m) => existingIds.has(m.id) ? models.find((d) => d.id === m.id) || m : m), ...models.filter((m) => !OLLAMA_MODELS.some((p) => p.id === m.id))];
 
       return this.cachedModels;

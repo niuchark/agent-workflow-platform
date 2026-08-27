@@ -8,6 +8,9 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { PrismaService } from '../../common/services/prisma.service';
 import { CreateAppDto } from './dto/create-app.dto';
 import { UpdateAppDto } from './dto/update-app.dto';
+import { TeamAppPermission } from '../../common/constants/permissions';
+
+type AppAccessType = 'owner' | TeamAppPermission;
 
 /** 应用服务 */
 @Injectable()
@@ -17,7 +20,7 @@ export class AppService {
   /**
    * 检查用户是否有权访问应用 (owner 或团队成员)
    */
-  private async assertAppAccess(userId: string, appId: string): Promise<void> {
+  private async assertAppAccess(userId: string, appId: string): Promise<AppAccessType> {
     const app = await this.prisma.application.findUnique({
       where: { id: appId },
       include: {
@@ -39,7 +42,7 @@ export class AppService {
 
     // 应用所有者有完全访问权
     if (app.userId === userId) {
-      return;
+      return 'owner';
     }
 
     // 检查团队成员权限
@@ -50,6 +53,8 @@ export class AppService {
     if (!teamApp) {
       throw new ForbiddenException('You do not have permission to access this application');
     }
+
+    return teamApp.permission as TeamAppPermission;
   }
 
   /**
@@ -161,7 +166,7 @@ export class AppService {
 
   /** 获取应用详情（含工作流列表） */
   async findOne(userId: string, id: string) {
-    await this.assertAppAccess(userId, id);
+    const accessType = await this.assertAppAccess(userId, id);
 
     const app = await this.prisma.application.findUnique({
       where: { id },
@@ -178,7 +183,7 @@ export class AppService {
       },
     });
 
-    return app;
+    return app ? { ...app, accessType } : app;
   }
 
   /** 更新应用：非所有者需要 can_edit 权限 */

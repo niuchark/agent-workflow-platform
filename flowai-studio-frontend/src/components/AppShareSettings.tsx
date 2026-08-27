@@ -5,19 +5,20 @@
  * - 配置 iframe/script 嵌入的尺寸、主题与标题栏；
  * - 生成并复制嵌入代码片段。
  */
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { isAxiosError } from 'axios'
 import {
   Button, Card, Switch, Form, Input, Select, Space, message,
-  Typography, Spin, Popconfirm, Tabs, Alert,
+  Typography, Spin, Popconfirm, Tabs,
 } from 'antd'
 import {
   ShareAltOutlined, CopyOutlined, LinkOutlined,
   CodeOutlined, DeleteOutlined, GlobalOutlined,
 } from '@ant-design/icons'
 import * as shareApi from '../utils/teamApi'
-import { AppShare, EmbedConfig, UpdateShareSettingsForm } from '../types'
+import { AppShare, EmbedConfig } from '../types'
 
-const { Text, Paragraph, Title } = Typography
+const { Text, Title } = Typography
 
 /** 分享设置组件 props */
 interface AppShareSettingsProps {
@@ -31,29 +32,32 @@ const AppShareSettings: React.FC<AppShareSettingsProps> = ({ appId }) => {
   const [embedCode, setEmbedCode] = useState<{ iframeCode: string; scriptCode: string } | null>(null)
 
   // 打开时加载当前分享信息
-  useEffect(() => {
-    loadShareInfo()
-  }, [appId])
-
   /** 加载分享信息（应用可能尚未生成分享，按空处理） */
-  const loadShareInfo = async () => {
+  const loadShareInfo = useCallback(async () => {
     setIsLoading(true)
     try {
-      const response = await shareApi.getShareInfo(appId) as any
+      const response = await shareApi.getShareInfo(appId)
       setShareInfo(response.data || null)
-    } catch {
-      // 应用可能还没有分享信息
-      setShareInfo(null)
+    } catch (error: unknown) {
+      if (isAxiosError(error) && error.response?.status === 404) {
+        setShareInfo(null)
+      } else {
+        message.error('加载分享设置失败')
+      }
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [appId])
+
+  useEffect(() => {
+    void loadShareInfo()
+  }, [loadShareInfo])
 
   /** 生成分享链接 */
   const handleGenerateShareLink = async () => {
     setIsLoading(true)
     try {
-      const response = await shareApi.generateShareLink(appId) as any
+      const response = await shareApi.generateShareLink(appId)
       setShareInfo(response.data)
       message.success('分享链接已生成')
     } catch {
@@ -78,7 +82,7 @@ const AppShareSettings: React.FC<AppShareSettingsProps> = ({ appId }) => {
   /** 切换公开访问开关 */
   const handleTogglePublic = async (isPublic: boolean) => {
     try {
-      const response = await shareApi.updateShareSettings(appId, { isPublic }) as any
+      const response = await shareApi.updateShareSettings(appId, { isPublic })
       setShareInfo(response.data)
       message.success(isPublic ? '已开启公开访问' : '已关闭公开访问')
     } catch {
@@ -96,7 +100,7 @@ const AppShareSettings: React.FC<AppShareSettingsProps> = ({ appId }) => {
         theme: (values.theme as 'light' | 'dark' | 'auto') || 'auto',
         showHeader: values.showHeader ?? true,
       }
-      const response = await shareApi.updateShareSettings(appId, { embedConfig }) as any
+      const response = await shareApi.updateShareSettings(appId, { embedConfig })
       setShareInfo(response.data)
       message.success('嵌入设置已更新')
     } catch {
@@ -107,7 +111,7 @@ const AppShareSettings: React.FC<AppShareSettingsProps> = ({ appId }) => {
   /** 生成嵌入代码 */
   const handleGetEmbedCode = async () => {
     try {
-      const response = await shareApi.getEmbedCode(appId) as any
+      const response = await shareApi.getEmbedCode(appId)
       setEmbedCode(response.data)
     } catch {
       message.error('获取嵌入代码失败')
@@ -211,6 +215,7 @@ const AppShareSettings: React.FC<AppShareSettingsProps> = ({ appId }) => {
                   label: '嵌入设置',
                   children: (
                     <Form
+                      key={JSON.stringify(shareInfo.embedConfig ?? {})}
                       layout="vertical"
                       onFinish={handleUpdateEmbed}
                       initialValues={{

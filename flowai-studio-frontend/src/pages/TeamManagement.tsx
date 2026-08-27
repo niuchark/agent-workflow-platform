@@ -5,25 +5,22 @@
  */
 import { useState, useEffect, useRef } from 'react'
 import {
-  Button, Modal, Form, Input, Select, Table, Card, Tag, Space, message,
-  Popconfirm, Empty, Spin, Avatar, Tooltip, Typography, Dropdown,
+  Button, Modal, Form, Input, Table, Tag, Space, message,
+  Popconfirm, Empty, Spin, Avatar,
 } from 'antd'
 import {
   PlusOutlined, TeamOutlined, UserOutlined, DeleteOutlined,
-  EditOutlined, ExportOutlined, CrownOutlined, MoreOutlined,
-  SearchOutlined, AppstoreOutlined,
+  ExportOutlined, SearchOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
-import { Team, TeamMember, CreateTeamForm, TEAM_ROLE_LABELS, TeamRole, TEAM_APP_PERMISSION_LABELS, TeamAppPermission } from '../types'
-
-const { Title, Text } = Typography
+import { Team, TeamMember, CreateTeamForm } from '../types'
 
 /** 团队管理列表页组件 */
 const TeamManagement: React.FC = () => {
   const navigate = useNavigate()
   const {
-    teams, isLoading, fetchMyTeams, createTeam, deleteTeam, leaveTeam,
+    teams, teamLoading, fetchMyTeams, createTeam, deleteTeam, leaveTeam,
   } = useStore()
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -36,7 +33,7 @@ const TeamManagement: React.FC = () => {
     if (initDone.current) return
     initDone.current = true
     fetchMyTeams()
-  }, [])
+  }, [fetchMyTeams])
 
   /** 打开创建团队弹窗 */
   const handleCreate = () => {
@@ -184,7 +181,7 @@ const TeamManagement: React.FC = () => {
         </div>
       </div>
 
-      {isLoading ? (
+      {teamLoading ? (
         <div className="team-loading">
           <Spin size="large" />
         </div>
@@ -222,7 +219,7 @@ const TeamManagement: React.FC = () => {
           </Form.Item>
           <div className="modal-footer">
             <Button onClick={() => setIsCreateModalOpen(false)}>取消</Button>
-            <Button type="primary" htmlType="submit" loading={isLoading} icon={<TeamOutlined />}>
+            <Button type="primary" htmlType="submit" loading={teamLoading} icon={<TeamOutlined />}>
               创建团队
             </Button>
           </div>

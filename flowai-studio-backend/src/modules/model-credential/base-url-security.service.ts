@@ -10,61 +10,99 @@ import { Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { lookup } from 'dns/promises';
 import { isIP } from 'net';
+import ipaddr = require('ipaddr.js');
 
 /** Base URL 安全校验服务 */
 @Injectable()
 export class BaseUrlSecurityService {
-  private readonly privateAllowlist: Set<string>;
+  private readonly modelPrivateAllowlist: Set<string>;
+  private readonly outboundPrivateAllowlist: Set<string>;
 
   constructor(private readonly configService: ConfigService) {
-    const raw = this.configService.get<string>('MODEL_PRIVATE_BASE_URL_ALLOWLIST', '');
-    this.privateAllowlist = new Set(
-      raw.split(',').map((value) => value.trim()).filter(Boolean).map((value) => {
-        try { return new URL(value).origin; } catch { return ''; }
-      }).filter(Boolean),
+    this.modelPrivateAllowlist = this.parseAllowlist(
+      this.configService.get<string>('MODEL_PRIVATE_BASE_URL_ALLOWLIST', ''),
+    );
+    this.outboundPrivateAllowlist = this.parseAllowlist(
+      this.configService.get<string>('OUTBOUND_PRIVATE_URL_ALLOWLIST', ''),
     );
   }
 
   /** 校验并规范化 Base URL：非法地址直接拒绝 */
   async assertAllowed(rawUrl: string): Promise<string> {
+    const url = await this.assertUrlAllowed(rawUrl, {
+      allowQuery: false,
+      codePrefix: 'MODEL_BASE_URL',
+      label: 'Base URL',
+      privateAllowlist: this.modelPrivateAllowlist,
+    });
+    const pathname = url.pathname.replace(/\/+$/, '');
+    return `${url.origin}${pathname === '/' ? '' : pathname}`;
+  }
+
+  /**
+   * 校验一次完整的出站 HTTP 请求 URL。
+   *
+   * 与模型 Base URL 不同，请求 URL 可以包含查询参数；认证信息、片段、
+   * 云元数据地址和未授权私网仍会被拒绝。调用方还应关闭自动重定向，
+   * 避免公开地址通过 30x 跳转到内网。
+   */
+  async assertRequestUrlAllowed(rawUrl: string): Promise<string> {
+    const url = await this.assertUrlAllowed(rawUrl, {
+      allowQuery: true,
+      codePrefix: 'OUTBOUND_URL',
+      label: '请求 URL',
+      privateAllowlist: this.outboundPrivateAllowlist,
+    });
+    return url.toString();
+  }
+
+  /** 解析、校验协议和 DNS 解析结果，供 Base URL 与完整请求 URL 复用 */
+  private async assertUrlAllowed(
+    rawUrl: string,
+    options: {
+      allowQuery: boolean;
+      codePrefix: string;
+      label: string;
+      privateAllowlist: Set<string>;
+    },
+  ): Promise<URL> {
     let url: URL;
     try {
       url = new URL(rawUrl);
     } catch {
-      this.reject('MODEL_BASE_URL_INVALID', 'Base URL 格式无效');
+      this.reject(`${options.codePrefix}_INVALID`, `${options.label} 格式无效`);
     }
 
     if (!['http:', 'https:'].includes(url!.protocol)) {
-      this.reject('MODEL_BASE_URL_FORBIDDEN', 'Base URL 仅支持 HTTP 或 HTTPS');
+      this.reject(`${options.codePrefix}_FORBIDDEN`, `${options.label} 仅支持 HTTP 或 HTTPS`);
     }
-    if (url!.username || url!.password || url!.hash || url!.search) {
-      this.reject('MODEL_BASE_URL_FORBIDDEN', 'Base URL 不能包含认证信息、查询参数或片段');
+    if (url!.username || url!.password || url!.hash || (!options.allowQuery && url!.search)) {
+      const suffix = options.allowQuery ? '认证信息或片段' : '认证信息、查询参数或片段';
+      this.reject(`${options.codePrefix}_FORBIDDEN`, `${options.label} 不能包含${suffix}`);
     }
 
-    const allowlisted = this.privateAllowlist.has(url!.origin);
+    const allowlisted = options.privateAllowlist.has(url!.origin);
     if (url!.protocol !== 'https:' && !allowlisted) {
-      this.reject('MODEL_BASE_URL_FORBIDDEN', '公网模型服务必须使用 HTTPS');
+      this.reject(`${options.codePrefix}_FORBIDDEN`, `公网${options.label}必须使用 HTTPS`);
     }
 
-    const addresses = await this.resolve(url!.hostname);
+    const addresses = await this.resolve(url!.hostname, options.codePrefix);
     for (const address of addresses) {
       if (this.isMetadataOrLinkLocal(address)) {
-        this.reject('MODEL_BASE_URL_FORBIDDEN', '禁止访问云元数据或链路本地地址');
+        this.reject(`${options.codePrefix}_FORBIDDEN`, '禁止访问云元数据或链路本地地址');
       }
       if (this.isPrivate(address) && !allowlisted) {
         if (this.isProxyFakeIp(address) && this.isTrustedPublicProviderHost(url!.hostname)) {
           continue;
         }
-        this.reject('MODEL_BASE_URL_FORBIDDEN', '私网模型地址未加入管理员白名单');
+        this.reject(`${options.codePrefix}_FORBIDDEN`, '私网地址未加入管理员白名单');
       }
     }
-
-    const pathname = url!.pathname.replace(/\/+$/, '');
-    return `${url!.origin}${pathname === '/' ? '' : pathname}`;
+    return url!;
   }
 
   /** 解析主机名到 IP 列表（直接传 IP 时原样返回） */
-  private async resolve(hostname: string): Promise<string[]> {
+  private async resolve(hostname: string, codePrefix: string): Promise<string[]> {
     const normalizedHostname = hostname.startsWith('[') && hostname.endsWith(']')
       ? hostname.slice(1, -1)
       : hostname;
@@ -74,12 +112,32 @@ export class BaseUrlSecurityService {
       if (records.length === 0) throw new Error('empty DNS result');
       return records.map((record) => record.address);
     } catch {
-      this.reject('MODEL_BASE_URL_UNRESOLVED', '无法解析模型服务地址');
+      this.reject(`${codePrefix}_UNRESOLVED`, '无法解析服务地址');
     }
+  }
+
+  private parseAllowlist(raw: string): Set<string> {
+    return new Set(
+      raw
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .map((value) => {
+          try {
+            return new URL(value).origin;
+          } catch {
+            return '';
+          }
+        })
+        .filter(Boolean),
+    );
   }
 
   /** 判断是否为私网/环回/保留地址 */
   private isPrivate(address: string): boolean {
+    const mappedIpv4 = this.mappedIpv4(address);
+    if (mappedIpv4) return this.isPrivate(mappedIpv4);
+
     if (isIP(address) === 4) {
       const [a, b, c] = address.split('.').map(Number);
       return a === 10 || a === 127 || a === 0 ||
@@ -97,11 +155,13 @@ export class BaseUrlSecurityService {
     if (normalized === '::1' || normalized === '::' || normalized.startsWith('fc') || normalized.startsWith('fd')) {
       return true;
     }
-    const mapped = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)?.[1];
-    return mapped ? this.isPrivate(mapped) || this.isMetadataOrLinkLocal(mapped) : false;
+    return false;
   }
 
   private isMetadataOrLinkLocal(address: string): boolean {
+    const mappedIpv4 = this.mappedIpv4(address);
+    if (mappedIpv4) return this.isMetadataOrLinkLocal(mappedIpv4);
+
     if (isIP(address) === 4) {
       const [a, b] = address.split('.').map(Number);
       return (a === 169 && b === 254) || address === '100.100.100.200';
@@ -110,6 +170,17 @@ export class BaseUrlSecurityService {
       address.toLowerCase().startsWith('fe9') ||
       address.toLowerCase().startsWith('fea') ||
       address.toLowerCase().startsWith('feb');
+  }
+
+  private mappedIpv4(address: string): string | null {
+    try {
+      const parsed = ipaddr.parse(address);
+      return parsed instanceof ipaddr.IPv6 && parsed.isIPv4MappedAddress()
+        ? parsed.toIPv4Address().toString()
+        : null;
+    } catch {
+      return null;
+    }
   }
 
   private isProxyFakeIp(address: string): boolean {

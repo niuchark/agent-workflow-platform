@@ -4,7 +4,7 @@
  * 顶部为成功/失败/成功率统计卡片，下方为可筛选的追踪表格，
  * 点击 Trace ID 或"详情"跳转到追踪详情页。
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Spin, Table, Tag, Button, Input, Card, Statistic, Row, Col, message,
 } from 'antd'
@@ -12,7 +12,7 @@ import {
   ReloadOutlined, SearchOutlined, NodeIndexOutlined,
   CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined,
 } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   getSlowTraces, getTraceStats,
   SlowTrace, TraceStats,
@@ -49,7 +49,6 @@ const formatTime = (iso: string | null | undefined): string => {
 
 /** 追踪列表页面组件 */
 const TraceList: React.FC = () => {
-  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [slowTraces, setSlowTraces] = useState<SlowTrace[]>([])
   const [stats, setStats] = useState<TraceStats | null>(null)
@@ -57,12 +56,12 @@ const TraceList: React.FC = () => {
   const safeSlowTraces = Array.isArray(slowTraces) ? slowTraces : []
 
   /** 并行加载慢追踪列表与统计概览 */
-  const loadData = async () => {
+  const loadData = useCallback(async (workflowId?: string) => {
     setLoading(true)
     try {
       const [tracesData, statsData] = await Promise.all([
-        getSlowTraces(workflowIdFilter || undefined, 50),
-        getTraceStats(workflowIdFilter || undefined),
+        getSlowTraces(workflowId || undefined, 50),
+        getTraceStats(workflowId || undefined),
       ])
       setSlowTraces(tracesData)
       setStats(statsData)
@@ -72,12 +71,12 @@ const TraceList: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   // 进入页面时加载一次
   useEffect(() => {
     loadData()
-  }, [])
+  }, [loadData])
 
   /** 表格列定义：Trace ID、状态、耗时、时间与详情跳转 */
   const columns = [
@@ -87,9 +86,9 @@ const TraceList: React.FC = () => {
       key: 'traceId',
       width: 220,
       render: (text: string) => (
-        <a onClick={() => navigate(`/trace-detail?traceId=${text}`)} style={{ fontFamily: 'monospace', fontSize: 12 }}>
+        <Link to={`/trace-detail?traceId=${encodeURIComponent(text)}`} style={{ fontFamily: 'monospace', fontSize: 12 }}>
           {text}
-        </a>
+        </Link>
       ),
     },
     {
@@ -146,7 +145,7 @@ const TraceList: React.FC = () => {
       key: 'action',
       width: 80,
       render: (_: any, record: SlowTrace) => (
-        <a onClick={() => navigate(`/trace-detail?traceId=${record.traceId}`)}>详情</a>
+        <Link to={`/trace-detail?traceId=${encodeURIComponent(record.traceId)}`}>详情</Link>
       ),
     },
   ]
@@ -161,11 +160,11 @@ const TraceList: React.FC = () => {
             prefix={<SearchOutlined />}
             value={workflowIdFilter}
             onChange={(e) => setWorkflowIdFilter(e.target.value)}
-            onPressEnter={loadData}
+            onPressEnter={() => loadData(workflowIdFilter)}
             style={{ width: 240 }}
             allowClear
           />
-          <Button icon={<ReloadOutlined />} onClick={loadData} loading={loading}>
+          <Button icon={<ReloadOutlined />} onClick={() => loadData(workflowIdFilter)} loading={loading}>
             刷新
           </Button>
         </div>

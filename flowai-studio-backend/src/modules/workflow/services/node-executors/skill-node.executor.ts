@@ -15,8 +15,12 @@ export class SkillNodeExecutor implements INodeExecutor {
     const { skillId, parameters } = nodeData;
 
     const resolvedParams = this.resolveParameters(parameters, context);
+    const userId = context._userId;
+    if (typeof userId !== 'string' || !userId) {
+      throw new Error('SKILL_EXECUTION_USER_REQUIRED: workflow user is missing');
+    }
 
-    const result = await this.skillService.executeSkill(skillId, resolvedParams);
+    const result = await this.skillService.executeSkill(skillId, resolvedParams, userId);
 
     return { result };
   }
@@ -25,7 +29,7 @@ export class SkillNodeExecutor implements INodeExecutor {
   private resolveParameters(params: Record<string, any>, context: Record<string, any>): Record<string, any> {
     const resolvedParams: Record<string, any> = {};
     if (!params) return resolvedParams;
-    
+
     for (const key in params) {
       const value = params[key];
       if (typeof value === 'string') {

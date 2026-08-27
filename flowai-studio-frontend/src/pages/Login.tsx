@@ -13,7 +13,7 @@ import { PASSWORD_RULES, USERNAME_PLACEHOLDER, USERNAME_RULES } from '../utils/a
 
 const Login: React.FC = () => {
   const navigate = useNavigate()
-  const { login, isLoading, authError, clearError } = useStore()
+  const { login, userLoading, authError, clearError } = useStore()
   const [form] = Form.useForm()
 
   /** 按错误类型映射 Alert 级别 */
@@ -93,7 +93,7 @@ const Login: React.FC = () => {
           <Input
             prefix={<UserOutlined />}
             placeholder={USERNAME_PLACEHOLDER}
-            disabled={isLoading}
+            disabled={userLoading}
             size="large"
             autoComplete="username"
           />
@@ -109,7 +109,7 @@ const Login: React.FC = () => {
           <Input.Password
             prefix={<LockOutlined />}
             placeholder="请输入密码"
-            disabled={isLoading}
+            disabled={userLoading}
             size="large"
             autoComplete="current-password"
           />
@@ -120,12 +120,12 @@ const Login: React.FC = () => {
             type="primary"
             htmlType="submit"
             className="auth-submit-btn"
-            loading={isLoading}
-            disabled={isLoading}
+            loading={userLoading}
+            disabled={userLoading}
             block
             size="large"
           >
-            {isLoading ? '登录中…' : '登  录'}
+            {userLoading ? '登录中…' : '登  录'}
           </Button>
         </Form.Item>
       </Form>

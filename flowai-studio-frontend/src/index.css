@@ -141,6 +141,20 @@
   }
 
   .modal-footer { @apply flex items-center justify-end gap-2 pt-2; }
+  .profile-modal-summary { @apply mb-5 flex min-w-0 items-center gap-3 rounded-xl border border-line bg-slate-50 p-4; }
+  .profile-modal-avatar { @apply shrink-0 !bg-brand-100 !text-brand-700; }
+  .profile-modal-copy { @apply min-w-0 flex-1; }
+  .profile-modal-copy strong { @apply block truncate text-sm font-semibold text-ink; }
+  .profile-modal-copy span { @apply mt-0.5 block text-xs text-muted; }
+  .profile-modal-body { @apply py-1; }
+  .profile-detail-list { @apply m-0 overflow-hidden rounded-xl border border-line bg-white; }
+  .profile-detail-row { @apply grid grid-cols-1 gap-1 border-b border-line px-4 py-3 last:border-b-0 sm:grid-cols-[112px_minmax(0,1fr)] sm:gap-3; }
+  .profile-detail-row dt { @apply text-xs font-medium text-muted sm:pt-0.5; }
+  .profile-detail-row dd { @apply m-0 min-w-0 text-sm font-medium text-ink; }
+  .profile-detail-note { @apply mt-1 block text-xs font-normal text-muted; }
+  .profile-id-value { @apply min-w-0; }
+  .profile-id-text { @apply !font-mono !text-xs !text-slate-700; overflow-wrap: anywhere; }
+  .profile-id-text .ant-typography-copy { @apply !ml-1 inline-flex size-7 items-center justify-center rounded-lg !text-brand-600 hover:!bg-brand-50 hover:!text-brand-700; }
   .chat-msg--assistant { @apply mr-auto; }
   .chat-bubble--assistant { @apply bg-slate-50 text-slate-700; }
   .chat-time { @apply text-[11px] text-subtle; }
@@ -469,6 +483,10 @@
   .auth-switch a { @apply font-semibold text-brand-600 hover:text-brand-700 hover:underline; }
   .shared-app-page, .shared-app-loading, .shared-app-error { @apply min-h-dvh bg-brand-50/50; }
   .shared-app-page { @apply flex flex-col; }
+  .shared-app-page--dark { @apply bg-slate-950; }
+  .shared-app-page--dark .shared-app-header { @apply border-slate-800 bg-slate-950/80; }
+  .shared-app-page--dark .shared-app-card { @apply border-slate-700 bg-slate-900; }
+  .shared-app-page--dark .shared-app-chat-container { @apply border-slate-700 bg-slate-950/60; }
   .shared-app-header { @apply flex items-center justify-between border-b border-white/70 bg-white/80 px-5 py-4 backdrop-blur-lg sm:px-8; }
   .shared-app-logo { @apply flex items-center gap-2.5 text-xl text-brand-600; }
   .shared-app-logo-text { @apply font-display text-base font-semibold text-ink; }
@@ -535,6 +553,7 @@
   .editor-app-info { @apply gap-2; }
   .editor-app-icon { @apply flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-sm text-brand-600; }
   .editor-app-name { @apply max-w-40 truncate text-sm font-semibold text-ink sm:max-w-64; }
+  .editor-access-badge { @apply inline-flex shrink-0 items-center gap-1 rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700; }
   .editor-panel-tabs { @apply hidden items-center gap-4 border-b border-line lg:flex; }
   .editor-panel-tab { @apply flex cursor-pointer items-center gap-1.5 border-0 border-b-2 border-transparent bg-transparent px-1 py-2 text-xs font-medium text-muted transition-colors hover:text-ink; }
   .editor-panel-tab--active { @apply border-brand-500 bg-transparent text-brand-700; }
@@ -583,25 +602,23 @@
   .config-panel-header-description { @apply m-0 mt-1.5 text-xs leading-5 text-muted; }
   .config-panel-body, .run-panel-body { @apply flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4; }
   .config-panel-form { @apply flex min-h-full flex-col; }
+  .config-readonly-alert { @apply mb-4; }
+  .config-panel-fieldset { @apply m-0 min-w-0 border-0 p-0; }
   .config-panel-empty { @apply flex flex-1 flex-col items-center justify-center px-4 text-center; }
   .config-panel-empty-icon { @apply mb-4 flex size-12 items-center justify-center rounded-2xl bg-brand-50 text-xl text-brand-600; }
   .config-panel-empty h4 { @apply m-0 mb-2 text-sm font-semibold text-ink; }
   .config-panel-empty p { @apply m-0 text-xs leading-5 text-muted; }
   .config-panel-empty-tip { @apply mt-4 rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-muted; }
   .variable-field { @apply grid gap-2; }
+  .variable-field-input-shell { @apply min-w-0; }
   .variable-template-form-item .ant-form-item-explain { @apply hidden; }
   .variable-field-messages { @apply grid gap-1.5; }
   .variable-field-message { @apply flex items-start gap-1.5 text-xs leading-5 text-red-600; overflow-wrap: anywhere; }
   .variable-field-message .anticon { @apply mt-1 shrink-0 text-[11px]; }
-  .variable-field-toolbar { @apply mt-2 grid min-w-0 gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3; }
-  .variable-field-toolbar-heading { @apply flex min-w-0 items-center justify-between gap-3 px-0.5; }
-  .variable-field-toolbar-title { @apply inline-flex min-w-0 items-center gap-1.5 text-xs font-medium text-slate-700; }
-  .variable-field-toolbar-title .anticon { @apply text-brand-600; }
-  .variable-field-picker { @apply w-full min-w-0; }
-  .variable-field-picker .ant-select-selector { @apply !min-h-10 !items-center !rounded-lg !bg-white; }
-  .variable-field-hint, .variable-field-empty-hint { @apply text-[11px] leading-4 text-muted; }
-  .variable-field-hint { @apply shrink-0; }
-  .variable-field-empty-hint { @apply px-0.5 pt-0.5; }
+  .variable-field-toolbar { @apply flex min-w-0 items-center justify-between gap-2; }
+  .variable-field-hint { @apply min-w-0 text-[11px] leading-4 text-muted; }
+  .variable-field-toolbar .ant-btn { @apply shrink-0 !px-1.5 !text-xs; }
+  .variable-field-toolbar .ant-btn:not(:disabled) { @apply !text-brand-700; }
   .field-label-with-help { @apply inline-flex items-center gap-1; }
   .field-help-button { @apply inline-flex size-6 cursor-help items-center justify-center rounded-full border-0 bg-transparent p-0 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600 focus-visible:bg-brand-50 focus-visible:text-brand-700; }
   .field-help-button .anticon { @apply text-xs; }
@@ -626,10 +643,6 @@
   .condition-builder-variable-hint { @apply rounded-lg bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-700; }
   .condition-builder-add { @apply !h-10 !rounded-lg; }
   .condition-builder > .ant-form-item-explain-error { @apply text-xs; }
-  .variable-template-form-item.ant-form-item-has-error .variable-field-picker:not(.ant-select-disabled) .ant-select-selector,
-  .variable-field-toolbar .ant-select-status-error:not(.ant-select-disabled) .ant-select-selector { @apply !border-slate-200 !shadow-none; }
-  .variable-template-form-item.ant-form-item-has-error .variable-field-picker.ant-select-focused:not(.ant-select-disabled) .ant-select-selector,
-  .variable-field-toolbar .ant-select-status-error.ant-select-focused:not(.ant-select-disabled) .ant-select-selector { @apply !border-brand-500 !shadow-focus; }
   .run-section, .run-results { @apply grid gap-2; }
   .run-section-label { @apply text-[11px] font-semibold uppercase tracking-wide text-muted; }
   .run-input-textarea { @apply !rounded-lg !bg-slate-50 !font-mono !text-xs; }
@@ -681,7 +694,7 @@
 .ant-dropdown-menu { border: 1px solid #e2e8f0; box-shadow: var(--c-shadow-md) !important; }
 
 .react-flow__node { border: 1px solid var(--c-border); border-radius: 12px; background: white; box-shadow: var(--c-shadow-sm); transition: border-color 150ms, box-shadow 150ms; }
-.react-flow__node-output { width: auto !important; padding: 0 !important; text-align: initial !important; }
+.react-flow__node.react-flow__node-output { width: auto !important; padding: 0 !important; border: 1px solid var(--c-border); border-radius: 12px; background: white; color: inherit; text-align: initial !important; }
 .react-flow__node:hover { border-color: #bae6fd; box-shadow: var(--c-shadow-sm); }
 .react-flow__node.selected { border-color: var(--c-accent); box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.14); }
 .react-flow__edge-path { stroke: #cbd5e1; stroke-width: 2; }

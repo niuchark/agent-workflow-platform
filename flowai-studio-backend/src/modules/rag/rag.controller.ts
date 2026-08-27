@@ -15,12 +15,12 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFile,
-  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { RAGService } from './services/rag.service';
 import { CreateKnowledgeBaseDto } from './dto/create-kb.dto';
 import { UpdateKnowledgeBaseDto } from './dto/update-kb.dto';
+import { RetrieveDto } from './dto/retrieve.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -120,21 +120,16 @@ export class RAGController {
   @Post('retrieve')
   retrieve(
     @CurrentUser('userId') userId: string,
-    @Body('query') query: string,
-    @Body('knowledgeBaseId') knowledgeBaseId: string,
-    @Body('topK') topK?: number,
-    @Body('retrievalMode') retrievalMode?: 'vector' | 'keyword' | 'hybrid',
-    @Body('vectorWeight') vectorWeight?: number,
-    @Body('rrfK') rrfK?: number,
+    @Body() dto: RetrieveDto,
   ) {
     return this.ragService.retrieve(
       userId,
-      query,
-      knowledgeBaseId,
-      topK,
-      retrievalMode,
-      vectorWeight,
-      rrfK,
+      dto.query,
+      dto.knowledgeBaseId,
+      dto.topK,
+      dto.retrievalMode,
+      dto.vectorWeight,
+      dto.rrfK,
     );
   }
 }

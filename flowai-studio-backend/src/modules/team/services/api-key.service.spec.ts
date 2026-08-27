@@ -9,6 +9,9 @@ describe('ApiKeyService', () => {
   let prisma: any;
 
   const mockPrismaService = {
+    application: {
+      findFirst: jest.fn(),
+    },
     apiKey: {
       create: jest.fn(),
       findMany: jest.fn(),
@@ -30,6 +33,7 @@ describe('ApiKeyService', () => {
     prisma = module.get(PrismaService);
 
     Object.values(mockPrismaService.apiKey).forEach((fn) => fn.mockReset());
+    mockPrismaService.application.findFirst.mockReset();
   });
 
   describe('createApiKey', () => {
@@ -63,6 +67,19 @@ describe('ApiKeyService', () => {
           }),
         }),
       );
+    });
+
+    it('should reject an application owned by another user', async () => {
+      prisma.application.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.createApiKey('user-1', {
+          name: 'Foreign App Key',
+          applicationId: 'app-2',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(prisma.apiKey.create).not.toHaveBeenCalled();
     });
   });
 

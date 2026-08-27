@@ -98,7 +98,7 @@ const CostStatistics: React.FC = () => {
     if (initDone.current) return
     initDone.current = true
     fetchApps()
-  }, [])
+  }, [fetchApps])
 
   // 筛选条件变化时重新加载数据
   useEffect(() => {

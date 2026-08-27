@@ -5,7 +5,17 @@
   "scripts": {
     "prepare": "husky",
     "commitlint": "commitlint --edit",
-    "setup:hooks": "./scripts/setup-git-hooks.sh"
+    "setup:hooks": "husky",
+    "typecheck": "npm --prefix flowai-studio-backend run typecheck && npm --prefix flowai-studio-frontend run typecheck",
+    "lint": "npm --prefix flowai-studio-backend run lint && npm --prefix flowai-studio-frontend run lint:ci",
+    "test": "npm --prefix flowai-studio-backend run test:ci && npm --prefix flowai-studio-backend run test:e2e -- --runInBand",
+    "build": "npm --prefix flowai-studio-backend run build && npm --prefix flowai-studio-frontend run build",
+    "compose:validate": "POSTGRES_PASSWORD=compose-validation JWT_SECRET=compose-validation-secret MODEL_CREDENTIAL_ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000 docker compose --env-file .env.example config --quiet",
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run build && npm run compose:validate"
+  },
+  "engines": {
+    "node": ">=20",
+    "npm": ">=10"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.0",

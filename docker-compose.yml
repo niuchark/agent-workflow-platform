@@ -2,8 +2,8 @@
 # Agent Flow Platform - Docker Compose 一键部署
 # ============================================================
 # 用法:
-#   开发环境: docker-compose up -d
-#   生产环境: docker-compose -f docker-compose.yml up -d
+#   验证配置: docker compose config --quiet
+#   启动服务: docker compose up -d --build
 #
 # 竞品对标:
 # - Dify: docker-compose (PG + Redis + Weaviate + API + Worker + Web + Nginx)
@@ -25,7 +25,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: flowai_studio
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -72,20 +72,18 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/flowai_studio?schema=public
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/flowai_studio?schema=public
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       JWT_EXPIRES_IN: 7d
       MODEL_CREDENTIAL_ENCRYPTION_KEY: ${MODEL_CREDENTIAL_ENCRYPTION_KEY:?MODEL_CREDENTIAL_ENCRYPTION_KEY is required}
       MODEL_PRIVATE_BASE_URL_ALLOWLIST: ${MODEL_PRIVATE_BASE_URL_ALLOWLIST:-http://ollama:11434}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - uploads_data:/app/uploads
 
   # ============================================================
   # Frontend — Nginx 静态资源服务
@@ -99,7 +97,8 @@ services:
     ports:
       - "127.0.0.1:8080:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 # ============================================================
 # 持久化卷
@@ -108,6 +107,4 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
-    driver: local
-  uploads_data:
     driver: local

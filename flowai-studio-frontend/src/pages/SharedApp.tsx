@@ -4,9 +4,9 @@
  * 无需登录即可访问；根据后端返回展示应用名称、描述与交互界面。
  * 当前交互界面为占位实现，后续接入真实应用运行器。
  */
-import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { Spin, Result, Button, Typography, Card } from 'antd'
+import { useState, useEffect, useCallback } from 'react'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { Spin, Result, Button, Typography, Card, ConfigProvider, theme as antdTheme } from 'antd'
 import * as shareApi from '../utils/teamApi'
 import BrandLogo from '../components/BrandLogo'
 
@@ -16,24 +16,23 @@ const { Title, Text, Paragraph } = Typography
 const SharedApp: React.FC = () => {
   const { shareLink } = useParams<{ shareLink: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   /** 分享应用的数据 */
   const [appData, setAppData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  // 分享链接变化时重新加载
-  useEffect(() => {
-    if (shareLink) {
-      loadSharedApp()
-    }
-  }, [shareLink])
+  const embedded = searchParams.get('embedded') === '1'
+  const requestedTheme = searchParams.get('theme')
+  const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
+  const darkTheme = requestedTheme === 'dark' || (requestedTheme === 'auto' && prefersDark)
+  const showHeader = !embedded || searchParams.get('showHeader') !== 'false'
 
   /** 加载分享应用：按 404/403 区分错误提示 */
-  const loadSharedApp = async () => {
+  const loadSharedApp = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     try {
-      const response = await shareApi.getSharedApp(shareLink!) as any
+      const response = await shareApi.getSharedApp(shareLink!, embedded) as any
       setAppData(response.data)
     } catch (err: any) {
       if (err?.response?.status === 404) {
@@ -46,7 +45,14 @@ const SharedApp: React.FC = () => {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [embedded, shareLink])
+
+  // 分享链接变化时重新加载
+  useEffect(() => {
+    if (shareLink) {
+      loadSharedApp()
+    }
+  }, [loadSharedApp, shareLink])
 
   if (isLoading) {
     return (
@@ -75,15 +81,18 @@ const SharedApp: React.FC = () => {
   }
 
   return (
-    <div className="shared-app-page">
-      <div className="shared-app-header">
-        <div className="shared-app-logo">
-          <BrandLogo title="Agent Flow Platform" />
-          <span className="shared-app-logo-text">Agent Flow Platform</span>
-        </div>
-      </div>
-      <div className="shared-app-content">
-        <Card className="shared-app-card">
+    <ConfigProvider theme={darkTheme ? { algorithm: antdTheme.darkAlgorithm } : undefined}>
+      <div className={`shared-app-page${darkTheme ? ' shared-app-page--dark' : ''}`}>
+        {showHeader && (
+          <div className="shared-app-header">
+            <div className="shared-app-logo">
+              <BrandLogo title="Agent Flow Platform" />
+              <span className="shared-app-logo-text">Agent Flow Platform</span>
+            </div>
+          </div>
+        )}
+        <div className="shared-app-content">
+          <Card className="shared-app-card">
           <div className="shared-app-icon">
             {appData?.icon ? (
               <img src={appData.icon} alt="" style={{ width: 48, height: 48 }} />
@@ -114,9 +123,10 @@ const SharedApp: React.FC = () => {
               Powered by Agent Flow Platform
             </Text>
           </div>
-        </Card>
+          </Card>
+        </div>
       </div>
-    </div>
+    </ConfigProvider>
   )
 }
 
