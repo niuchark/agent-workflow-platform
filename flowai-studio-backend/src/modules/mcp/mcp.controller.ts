@@ -14,6 +14,11 @@ import {
 import { McpService } from './mcp.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import {
+  CallMcpToolDto,
+  CreateMcpServerDto,
+  UpdateMcpServerDto,
+} from './dto/mcp.dto';
 
 /** MCP REST 控制器 */
 @Controller('mcp')
@@ -27,15 +32,7 @@ export class McpController {
   @Post('servers')
   create(
     @CurrentUser('userId') userId: string,
-    @Body() body: {
-      name: string;
-      description?: string;
-      transportType?: 'stdio' | 'sse';
-      command?: string;
-      args?: string[];
-      env?: Record<string, string>;
-      url?: string;
-    },
+    @Body() body: CreateMcpServerDto,
   ) {
     return this.mcpService.create(userId, body);
   }
@@ -60,16 +57,7 @@ export class McpController {
   update(
     @CurrentUser('userId') userId: string,
     @Param('id') id: string,
-    @Body() body: {
-      name?: string;
-      description?: string;
-      transportType?: 'stdio' | 'sse';
-      command?: string;
-      args?: string[];
-      env?: Record<string, string>;
-      url?: string;
-      isActive?: boolean;
-    },
+    @Body() body: UpdateMcpServerDto,
   ) {
     return this.mcpService.update(userId, id, body);
   }
@@ -119,7 +107,7 @@ export class McpController {
   callTool(
     @CurrentUser('userId') userId: string,
     @Param('id') id: string,
-    @Body() body: { toolName: string; args?: Record<string, any> },
+    @Body() body: CallMcpToolDto,
   ) {
     return this.mcpService.callTool(userId, id, body.toolName, body.args || {});
   }

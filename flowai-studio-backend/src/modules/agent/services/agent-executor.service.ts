@@ -21,7 +21,6 @@ import { LLMProviderFactory } from '../providers/llm-provider.factory';
 import {
   AgentNodeConfig,
   AgentState,
-  AgentMessage,
   WorkerAgentConfig,
   ToolCall,
   ToolResult,
@@ -30,7 +29,6 @@ import {
   AgentRunOptions,
   ToolDefinition,
 } from '../interfaces/agent.interface';
-import { LLMChatParams } from '../interfaces/llm-provider.interface';
 import { TokenUsageService } from './token-usage.service';
 
 @Injectable()
@@ -50,11 +48,7 @@ export class AgentExecutorService {
    *
    * 根据 AgentNodeConfig 中的 mode 选择执行模式
    */
-  async execute(
-    config: AgentNodeConfig,
-    input: string,
-    options?: AgentRunOptions,
-  ): Promise<AgentExecutionResult> {
+  async execute(config: AgentNodeConfig, input: string, options?: AgentRunOptions): Promise<AgentExecutionResult> {
     const startTime = Date.now();
 
     try {
@@ -74,9 +68,7 @@ export class AgentExecutorService {
       result.duration = Date.now() - startTime;
       return result;
     } catch (error) {
-      this.logger.error(
-        `Agent execution failed: ${error instanceof Error ? error.message : error}`,
-      );
+      this.logger.error(`Agent execution failed: ${error instanceof Error ? error.message : error}`);
       return {
         result: '',
         messages: [],
@@ -144,7 +136,7 @@ export class AgentExecutorService {
     };
 
     // 加载可用工具
-    const tools = await this.loadTools(agentConfig.toolIds);
+    const tools = await this.loadTools(agentConfig.toolIds, this.requireUserId(options));
     const toolMap = this.buildToolMap(tools);
     const toolDefinitions = this.buildToolDefinitions(tools);
 
@@ -192,7 +184,12 @@ export class AgentExecutorService {
         tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
         signal: options?.signal,
       });
-      this.recordTokenUsage(llmResponse, agentConfig.provider || this.providerFactory.inferUserProvider(agentConfig.model), agentConfig.model, options);
+      this.recordTokenUsage(
+        llmResponse,
+        agentConfig.provider || this.providerFactory.inferUserProvider(agentConfig.model),
+        agentConfig.model,
+        options,
+      );
 
       // 如果有工具调用 → 执行工具
       if (llmResponse.toolCalls && llmResponse.toolCalls.length > 0) {
@@ -207,12 +204,7 @@ export class AgentExecutorService {
 
         // 逐个执行工具
         for (const toolCall of llmResponse.toolCalls) {
-          const toolResult = await this.executeToolCall(
-            toolCall,
-            toolMap,
-            options?.context,
-            options?.signal,
-          );
+          const toolResult = await this.executeToolCall(toolCall, toolMap, options?.context, options?.signal);
           state.toolResults.push(toolResult);
 
           // 将工具结果添加到消息历史
@@ -283,9 +275,9 @@ export class AgentExecutorService {
 
     // 达到最大迭代次数但未完成
     if (!state.finished) {
-      state.output = state.messages
-        .filter((m) => m.role === 'assistant' && m.content)
-        .pop()?.content || 'Agent 达到最大迭代次数，未能完成任务。';
+      state.output =
+        state.messages.filter((m) => m.role === 'assistant' && m.content).pop()?.content ||
+        'Agent 达到最大迭代次数，未能完成任务。';
 
       this.pushTrace(state, {
         type: 'error',
@@ -353,14 +345,17 @@ export class AgentExecutorService {
     };
 
     // 预加载所有 Worker 的工具
-    const workerToolMaps = new Map<string, {
-      tools: ToolDefinition[];
-      toolMap: Map<string, { id: string; name: string }>;
-      config: WorkerAgentConfig;
-    }>();
+    const workerToolMaps = new Map<
+      string,
+      {
+        tools: ToolDefinition[];
+        toolMap: Map<string, { id: string; name: string }>;
+        config: WorkerAgentConfig;
+      }
+    >();
 
     for (const worker of supervisorConfig.workers) {
-      const tools = await this.loadTools(worker.toolIds);
+      const tools = await this.loadTools(worker.toolIds, this.requireUserId(options));
       const toolMap = this.buildToolMap(tools);
       const toolDefinitions = this.buildToolDefinitions(tools);
       workerToolMaps.set(worker.id, {
@@ -372,22 +367,20 @@ export class AgentExecutorService {
 
     // 构建 Supervisor 可用的"委派工具"
     // 每个 Worker 都是一个可调用的"工具"
-    const delegateTools: ToolDefinition[] = supervisorConfig.workers.map(
-      (worker) => ({
-        name: `delegate_to_${worker.id.replace(/[^a-zA-Z0-9_]/g, '_')}`,
-        description: `委派任务给 ${worker.name}: ${worker.description}`,
-        parameters: {
-          type: 'object',
-          properties: {
-            task: {
-              type: 'string',
-              description: `分配给 ${worker.name} 的任务描述`,
-            },
+    const delegateTools: ToolDefinition[] = supervisorConfig.workers.map((worker) => ({
+      name: `delegate_to_${worker.id.replace(/[^a-zA-Z0-9_]/g, '_')}`,
+      description: `委派任务给 ${worker.name}: ${worker.description}`,
+      parameters: {
+        type: 'object',
+        properties: {
+          task: {
+            type: 'string',
+            description: `分配给 ${worker.name} 的任务描述`,
           },
-          required: ['task'],
         },
-      }),
-    );
+        required: ['task'],
+      },
+    }));
 
     // 添加 "finish" 工具
     delegateTools.push({
@@ -439,12 +432,14 @@ export class AgentExecutorService {
         temperature: supervisorConfig.temperature,
         tools: delegateTools,
       });
-      this.recordTokenUsage(supervisorResponse, supervisorConfig.provider || this.providerFactory.inferUserProvider(supervisorConfig.model), supervisorConfig.model, options);
+      this.recordTokenUsage(
+        supervisorResponse,
+        supervisorConfig.provider || this.providerFactory.inferUserProvider(supervisorConfig.model),
+        supervisorConfig.model,
+        options,
+      );
 
-      if (
-        supervisorResponse.toolCalls &&
-        supervisorResponse.toolCalls.length > 0
-      ) {
+      if (supervisorResponse.toolCalls && supervisorResponse.toolCalls.length > 0) {
         const toolCall = supervisorResponse.toolCalls[0]; // 每次只处理一个委派
 
         // 记录 Supervisor 的决策
@@ -556,9 +551,7 @@ export class AgentExecutorService {
 
     // 达到最大迭代次数
     if (!state.finished) {
-      const lastAssistantMsg = state.messages
-        .filter((m) => m.role === 'supervisor' && m.content)
-        .pop();
+      const lastAssistantMsg = state.messages.filter((m) => m.role === 'supervisor' && m.content).pop();
       state.output = lastAssistantMsg?.content || 'Supervisor 达到最大迭代次数，未能完成任务。';
 
       this.pushTrace(state, {
@@ -600,7 +593,9 @@ export class AgentExecutorService {
       messages: [
         {
           role: 'system',
-          content: workerConfig.systemPrompt || `你是一个专业助手，负责完成特定类型的任务。请根据任务描述，使用可用工具完成任务，并返回结果。`,
+          content:
+            workerConfig.systemPrompt ||
+            `你是一个专业助手，负责完成特定类型的任务。请根据任务描述，使用可用工具完成任务，并返回结果。`,
           agentId: workerConfig.id,
           timestamp: Date.now(),
         },
@@ -643,7 +638,12 @@ export class AgentExecutorService {
         tools: toolDefinitions.length > 0 ? toolDefinitions : undefined,
         signal: options?.signal,
       });
-      this.recordTokenUsage(llmResponse, workerConfig.provider || this.providerFactory.inferUserProvider(workerConfig.model), workerConfig.model, options);
+      this.recordTokenUsage(
+        llmResponse,
+        workerConfig.provider || this.providerFactory.inferUserProvider(workerConfig.model),
+        workerConfig.model,
+        options,
+      );
 
       if (llmResponse.toolCalls && llmResponse.toolCalls.length > 0) {
         state.messages.push({
@@ -655,12 +655,7 @@ export class AgentExecutorService {
         });
 
         for (const toolCall of llmResponse.toolCalls) {
-          const toolResult = await this.executeToolCall(
-            toolCall,
-            toolMap,
-            options?.context,
-            options?.signal,
-          );
+          const toolResult = await this.executeToolCall(toolCall, toolMap, options?.context, options?.signal);
           state.toolResults.push(toolResult);
 
           state.messages.push({
@@ -685,9 +680,7 @@ export class AgentExecutorService {
 
     if (!state.finished) {
       state.output =
-        state.messages
-          .filter((m) => m.role === 'assistant' && m.content)
-          .pop()?.content || 'Worker 未能完成任务。';
+        state.messages.filter((m) => m.role === 'assistant' && m.content).pop()?.content || 'Worker 未能完成任务。';
     }
 
     return {
@@ -711,6 +704,7 @@ export class AgentExecutorService {
    */
   private async loadTools(
     toolIds: string[],
+    userId: string,
   ): Promise<Array<{ id: string; name: string; description: string; inputSchema: any }>> {
     if (!toolIds || toolIds.length === 0) {
       // 如果没有指定工具，加载所有内置工具
@@ -732,9 +726,8 @@ export class AgentExecutorService {
 
     for (const toolId of toolIds) {
       try {
-        // 使用 PrismaService 直接查询（跳过 userId 权限校验）
-        const skill = await this.prisma.skill.findUnique({
-          where: { id: toolId },
+        const skill = await this.prisma.skill.findFirst({
+          where: { id: toolId, userId },
         });
 
         if (skill) {
@@ -760,13 +753,14 @@ export class AgentExecutorService {
   /**
    * 构建工具名称到 ID 的映射
    */
-  private buildToolMap(
-    tools: Array<{ id: string; name: string }>,
-  ): Map<string, { id: string; name: string }> {
+  private buildToolMap(tools: Array<{ id: string; name: string }>): Map<string, { id: string; name: string }> {
     const map = new Map<string, { id: string; name: string }>();
     for (const tool of tools) {
       // 使用处理后的名称作为 key（去除特殊字符）
-      const sanitizedName = tool.name.replace(/[^a-zA-Z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+      const sanitizedName = tool.name
+        .replace(/[^a-zA-Z0-9_]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
       map.set(sanitizedName, { id: tool.id, name: tool.name });
     }
     return map;
@@ -776,7 +770,12 @@ export class AgentExecutorService {
    * 构建工具定义（通过 Provider）
    */
   private buildToolDefinitions(
-    tools: Array<{ id: string; name: string; description: string; inputSchema: any }>,
+    tools: Array<{
+      id: string;
+      name: string;
+      description: string;
+      inputSchema: any;
+    }>,
   ): ToolDefinition[] {
     // 使用 Qwen Provider 的 buildToolDefinitions 作为默认（OpenAI 兼容格式）
     // 因为所有 Provider 都兼容此格式或内部转换
@@ -808,13 +807,12 @@ export class AgentExecutorService {
     try {
       // 替换参数中的上下文变量
       const resolvedArgs = this.resolveVariables(toolCall.arguments, context || {});
+      const userId = context?._userId;
+      if (typeof userId !== 'string' || !userId) {
+        throw new Error('SKILL_EXECUTION_USER_REQUIRED: agent user is missing');
+      }
 
-      const result = await this.skillService.executeSkill(
-        toolInfo.id,
-        resolvedArgs,
-        undefined,
-        signal,
-      );
+      const result = await this.skillService.executeSkill(toolInfo.id, resolvedArgs, userId, signal);
 
       return {
         toolCallId: toolCall.id,
@@ -826,7 +824,9 @@ export class AgentExecutorService {
       return {
         toolCallId: toolCall.id,
         toolName: toolCall.name,
-        result: { error: error instanceof Error ? error.message : 'Unknown error' },
+        result: {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
@@ -862,9 +862,7 @@ export class AgentExecutorService {
 
         // 将 RAG 结果注入系统消息
         if (documents.length > 0) {
-          const ragContext = documents
-            .map((d) => d.content)
-            .join('\n\n');
+          const ragContext = documents.map((d) => d.content).join('\n\n');
 
           // 更新系统提示词
           const systemMsg = state.messages.find((m) => m.role === 'system');
@@ -879,9 +877,7 @@ export class AgentExecutorService {
           timestamp: Date.now(),
         });
       } catch (error) {
-        this.logger.warn(
-          `RAG retrieval failed for KB ${kbId}: ${error instanceof Error ? error.message : error}`,
-        );
+        this.logger.warn(`RAG retrieval failed for KB ${kbId}: ${error instanceof Error ? error.message : error}`);
       }
     }
   }
@@ -895,7 +891,13 @@ export class AgentExecutorService {
 
   /** 记录一次 Agent 调用的 Token 用量 */
   private recordTokenUsage(
-    response: { usage?: { promptTokens: number; completionTokens: number; totalTokens: number } },
+    response: {
+      usage?: {
+        promptTokens: number;
+        completionTokens: number;
+        totalTokens: number;
+      };
+    },
     provider: string,
     model: string,
     options?: AgentRunOptions,
@@ -921,14 +923,9 @@ export class AgentExecutorService {
   /**
    * 构建 Supervisor 系统提示词
    */
-  private buildSupervisorSystemPrompt(
-    config: { systemPrompt: string; workers: WorkerAgentConfig[] },
-  ): string {
+  private buildSupervisorSystemPrompt(config: { systemPrompt: string; workers: WorkerAgentConfig[] }): string {
     const workerDescriptions = config.workers
-      .map(
-        (w) =>
-          `- ${w.name} (delegate_to_${w.id.replace(/[^a-zA-Z0-9_]/g, '_')}): ${w.description}`,
-      )
+      .map((w) => `- ${w.name} (delegate_to_${w.id.replace(/[^a-zA-Z0-9_]/g, '_')}): ${w.description}`)
       .join('\n');
 
     return (
@@ -955,10 +952,7 @@ ${workerDescriptions}
   /**
    * 从工具名称中提取 Worker ID
    */
-  private extractWorkerId(
-    toolName: string,
-    workers: WorkerAgentConfig[],
-  ): string {
+  private extractWorkerId(toolName: string, workers: WorkerAgentConfig[]): string {
     // delegate_to_xxx → 查找对应的 worker
     for (const worker of workers) {
       const sanitizedName = worker.id.replace(/[^a-zA-Z0-9_]/g, '_');
@@ -974,10 +968,7 @@ ${workerDescriptions}
   /**
    * 变量替换（同 LLMNodeExecutor）
    */
-  private resolveVariables(
-    obj: Record<string, any>,
-    context: Record<string, any>,
-  ): Record<string, any> {
+  private resolveVariables(obj: Record<string, any>, context: Record<string, any>): Record<string, any> {
     const resolved: Record<string, any> = {};
     for (const [key, value] of Object.entries(obj)) {
       if (typeof value === 'string') {

@@ -1,8 +1,15 @@
 /**
  * 技能服务：内置/自定义工具的 CRUD 与执行。
  */
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  BadGatewayException,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import type { Skill } from '@prisma/client';
 import { PrismaService } from '../../../common/services/prisma.service';
+import { BaseUrlSecurityService } from '../../model-credential/base-url-security.service';
 import { CreateSkillDto } from '../dto/create-skill.dto';
 import { UpdateSkillDto } from '../dto/update-skill.dto';
 import { executeBuiltinSkill } from '../utils/builtin-skills';
@@ -11,11 +18,15 @@ import axios from 'axios';
 /** 技能服务 */
 @Injectable()
 export class SkillService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly baseUrlSecurity: BaseUrlSecurityService,
+  ) {}
 
   // 创建工具
   /** 创建技能：内置技能直接保存，自定义技能校验配置 */
   async createSkill(userId: string, createSkillDto: CreateSkillDto) {
+    await this.validateCustomConfig(createSkillDto.type, createSkillDto.config);
     // 检查工具名称是否已存在
     const existingSkill = await this.prisma.skill.findFirst({
       where: { name: createSkillDto.name, userId },
@@ -51,16 +62,12 @@ export class SkillService {
   // 获取工具详情
   /** 获取技能详情（校验归属权） */
   async findSkillById(userId: string, id: string) {
-    const skill = await this.prisma.skill.findUnique({
-      where: { id },
+    const skill = await this.prisma.skill.findFirst({
+      where: { id, userId },
     });
 
     if (!skill) {
       throw new NotFoundException('Skill not found');
-    }
-
-    if (skill.userId !== userId) {
-      throw new BadRequestException('You do not have permission to access this skill');
     }
 
     return skill;
@@ -70,6 +77,9 @@ export class SkillService {
   /** 更新技能（校验归属权） */
   async updateSkill(userId: string, id: string, updateSkillDto: UpdateSkillDto) {
     const skill = await this.findSkillById(userId, id);
+    const effectiveType = updateSkillDto.type || skill.type;
+    const effectiveConfig = updateSkillDto.config ?? this.parseConfig(skill.config);
+    await this.validateCustomConfig(effectiveType, effectiveConfig);
 
     return this.prisma.skill.update({
       where: { id },
@@ -89,31 +99,26 @@ export class SkillService {
   // 删除工具
   /** 删除技能（校验归属权） */
   async deleteSkill(userId: string, id: string) {
-    const skill = await this.findSkillById(userId, id);
+    await this.findSkillById(userId, id);
 
     return this.prisma.skill.delete({ where: { id } });
   }
 
   // 执行工具
-  // userId 可选：从 controller 直接调用时传入做权限校验，工作流内部调用可省略
+  // userId 必填：控制器与工作流内部调用都必须绑定当前用户。
   /** 执行技能：内置走内置执行器，自定义走 HTTP 调用 */
   async executeSkill(
     skillId: string,
-    params: Record<string, any>,
-    userId?: string,
+    params: Record<string, unknown>,
+    userId: string,
     signal?: AbortSignal,
   ) {
-    const skill = await this.prisma.skill.findUnique({
-      where: { id: skillId },
+    const skill = await this.prisma.skill.findFirst({
+      where: { id: skillId, userId },
     });
 
     if (!skill) {
       throw new NotFoundException('Skill not found');
-    }
-
-    // 如果传入了 userId，做归属校验
-    if (userId && skill.userId !== userId) {
-      throw new BadRequestException('You do not have permission to execute this skill');
     }
 
     if (!skill.isActive) {
@@ -121,7 +126,11 @@ export class SkillService {
     }
 
     if (skill.type === 'builtin') {
-      return executeBuiltinSkill(skill.builtinType!, params);
+      return executeBuiltinSkill(
+        skill.builtinType!,
+        params,
+        (url) => this.baseUrlSecurity.assertRequestUrlAllowed(url),
+      );
     } else {
       return this.executeCustomSkill(skill, params, signal);
     }
@@ -129,8 +138,12 @@ export class SkillService {
 
   // 执行自定义工具
   /** 执行自定义技能：按配置的 URL/方法/请求头发送 HTTP 请求 */
-  private async executeCustomSkill(skill: any, params: Record<string, any>, signal?: AbortSignal) {
-    const config = JSON.parse(skill.config || '{}');
+  private async executeCustomSkill(
+    skill: Skill,
+    params: Record<string, unknown>,
+    signal?: AbortSignal,
+  ) {
+    const config = this.parseConfig(skill.config);
     const { url, method = 'POST', headers = {} } = config;
 
     if (!url) {
@@ -141,14 +154,18 @@ export class SkillService {
       };
     }
 
+    const safeUrl = await this.baseUrlSecurity.assertRequestUrlAllowed(String(url));
     try {
       const response = await axios({
-        url,
-        method,
-        headers,
+        url: safeUrl,
+        method: typeof method === 'string' ? method : 'POST',
+        headers: typeof headers === 'object' && headers !== null ? headers : {},
         data: params,
         timeout: 15000, // 15 秒超时
         signal,
+        maxRedirects: 0,
+        maxContentLength: 2 * 1024 * 1024,
+        maxBodyLength: 2 * 1024 * 1024,
       });
 
       return {
@@ -156,7 +173,9 @@ export class SkillService {
         data: response.data,
       };
     } catch (error) {
-      throw new Error(`Custom skill execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new BadGatewayException(
+        `Custom skill execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
   }
 
@@ -230,19 +249,31 @@ export class SkillService {
           result: 'number',
         },
       },
-      {
-        type: 'code',
-        name: '代码执行',
-        description: '在安全沙箱中执行 JavaScript 代码',
-        inputSchema: {
-          code: 'string',
-          language: 'string',
-        },
-        outputSchema: {
-          result: 'any',
-          logs: 'array',
-        },
-      },
     ];
+  }
+
+  /** 自定义 HTTP 技能在保存与执行时都做出站地址校验 */
+  private async validateCustomConfig(
+    type: string,
+    config?: Record<string, unknown>,
+  ): Promise<void> {
+    if (type !== 'custom' || !config?.url) return;
+    if (typeof config.url !== 'string') {
+      throw new BadRequestException('Custom skill URL must be a string');
+    }
+    await this.baseUrlSecurity.assertRequestUrlAllowed(config.url);
+  }
+
+  /** 数据库中的 JSON 配置解析失败时按无配置处理，不让损坏记录拖垮进程 */
+  private parseConfig(value: string | null): Record<string, unknown> {
+    if (!value) return {};
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+        ? parsed as Record<string, unknown>
+        : {};
+    } catch {
+      return {};
+    }
   }
 }

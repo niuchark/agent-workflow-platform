@@ -14,36 +14,36 @@ describe('BM25KeywordService', () => {
 
   beforeEach(() => {
     mockPrisma = {
-      $queryRawUnsafe: jest.fn(),
-      $executeRawUnsafe: jest.fn(),
+      $queryRaw: jest.fn(),
+      $executeRaw: jest.fn(),
     };
     service = new BM25KeywordService(mockPrisma);
   });
 
   describe('detectTextSearchConfig', () => {
     it('should detect zhparser if available', async () => {
-      mockPrisma.$queryRawUnsafe.mockResolvedValue([{ cfgname: 'zhparser' }]);
+      mockPrisma.$queryRaw.mockResolvedValue([{ cfgname: 'zhparser' }]);
 
       const config = await service.detectTextSearchConfig();
       expect(config).toBe('zhparser');
     });
 
     it('should fall back to english if zhparser not available', async () => {
-      mockPrisma.$queryRawUnsafe.mockResolvedValue([{ cfgname: 'english' }]);
+      mockPrisma.$queryRaw.mockResolvedValue([{ cfgname: 'english' }]);
 
       const config = await service.detectTextSearchConfig();
       expect(config).toBe('english');
     });
 
     it('should fall back to simple if no known config', async () => {
-      mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+      mockPrisma.$queryRaw.mockResolvedValue([]);
 
       const config = await service.detectTextSearchConfig();
       expect(config).toBe('simple');
     });
 
     it('should fall back to simple on error', async () => {
-      mockPrisma.$queryRawUnsafe.mockRejectedValue(new Error('Connection error'));
+      mockPrisma.$queryRaw.mockRejectedValue(new Error('Connection error'));
 
       const config = await service.detectTextSearchConfig();
       expect(config).toBe('simple');
@@ -66,20 +66,59 @@ describe('BM25KeywordService', () => {
       });
       expect(results).toEqual([]);
     });
+
+    it('binds query and metadata filters instead of interpolating them', async () => {
+      const query = `needle'; DROP TABLE document_chunks; --`;
+      const knowledgeBaseId = `kb' OR '1'='1`;
+      const filterKey = `source' || content || '`;
+      const filterValue = `manual' OR TRUE --`;
+      mockPrisma.$queryRaw.mockResolvedValueOnce([{ cfgname: 'english' }]).mockResolvedValueOnce([]);
+
+      await service.search({
+        query,
+        knowledgeBaseId,
+        filter: { [filterKey]: filterValue },
+      });
+
+      const statement = mockPrisma.$queryRaw.mock.calls[1][0];
+      const sqlText = statement.strings.join('');
+      expect(sqlText).not.toContain(query);
+      expect(sqlText).not.toContain(knowledgeBaseId);
+      expect(sqlText).not.toContain(filterKey);
+      expect(sqlText).not.toContain(filterValue);
+      expect(statement.values).toEqual(expect.arrayContaining([query, knowledgeBaseId, filterKey, filterValue]));
+    });
+
+    it('keeps fallback LIKE search values parameterized', async () => {
+      const query = `needle';DROP_TABLE`;
+      const knowledgeBaseId = `kb' OR TRUE --`;
+      mockPrisma.$queryRaw
+        .mockResolvedValueOnce([{ cfgname: 'english' }])
+        .mockRejectedValueOnce(new Error('full-text unavailable'))
+        .mockResolvedValueOnce([]);
+
+      await service.search({ query, knowledgeBaseId });
+
+      const statement = mockPrisma.$queryRaw.mock.calls[2][0];
+      const sqlText = statement.strings.join('');
+      expect(sqlText).not.toContain(query);
+      expect(sqlText).not.toContain(knowledgeBaseId);
+      expect(statement.values).toEqual(expect.arrayContaining([`%${query}%`, knowledgeBaseId]));
+    });
   });
 
   describe('ensureFullTextIndex', () => {
     it('should create GIN index for full-text search', async () => {
-      mockPrisma.$queryRawUnsafe.mockResolvedValue([{ cfgname: 'english' }]);
-      mockPrisma.$executeRawUnsafe.mockResolvedValue(undefined);
+      mockPrisma.$queryRaw.mockResolvedValue([{ cfgname: 'english' }]);
+      mockPrisma.$executeRaw.mockResolvedValue(undefined);
 
       await service.ensureFullTextIndex();
-      expect(mockPrisma.$executeRawUnsafe).toHaveBeenCalled();
+      expect(mockPrisma.$executeRaw).toHaveBeenCalled();
     });
 
     it('should handle index creation failure gracefully', async () => {
-      mockPrisma.$queryRawUnsafe.mockResolvedValue([{ cfgname: 'simple' }]);
-      mockPrisma.$executeRawUnsafe.mockRejectedValue(new Error('Index creation failed'));
+      mockPrisma.$queryRaw.mockResolvedValue([{ cfgname: 'simple' }]);
+      mockPrisma.$executeRaw.mockRejectedValue(new Error('Index creation failed'));
 
       // Should not throw
       await expect(service.ensureFullTextIndex()).resolves.toBeUndefined();

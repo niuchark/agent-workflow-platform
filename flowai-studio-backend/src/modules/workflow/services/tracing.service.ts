@@ -9,7 +9,6 @@
  */
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../common/services/prisma.service';
-import { randomUUID } from 'crypto';
 
 export interface StartTraceParams {
   workflowId: string;
@@ -162,9 +161,9 @@ export class TracingService {
   /**
    * 查询 Trace 详情
    */
-  async getTrace(traceId: string) {
-    const trace = await this.prisma.workflowTrace.findUnique({
-      where: { traceId },
+  async getTrace(userId: string, traceId: string) {
+    const trace = await this.prisma.workflowTrace.findFirst({
+      where: { traceId, userId },
       include: {
         spans: { orderBy: { startTime: 'asc' } },
       },
@@ -187,11 +186,11 @@ export class TracingService {
   /**
    * 查询工作流的 Trace 列表
    */
-  async getWorkflowTraces(workflowId: string, limit: number = 20) {
+  async getWorkflowTraces(userId: string, workflowId: string, limit: number = 20) {
     const traces = await this.prisma.workflowTrace.findMany({
-      where: { workflowId },
+      where: { workflowId, userId },
       orderBy: { createdAt: 'desc' },
-      take: limit,
+      take: this.normalizeLimit(limit, 20, 100),
       include: {
         _count: { select: { spans: true } },
       },
@@ -207,26 +206,37 @@ export class TracingService {
   /**
    * 查询慢 Trace（按耗时排序）
    */
-  async getSlowTraces(workflowId?: string, limit: number = 10) {
-    const where = workflowId ? { workflowId, totalMs: { not: null } } : { totalMs: { not: null } };
+  async getSlowTraces(userId: string, workflowId?: string, limit: number = 10) {
+    const where = {
+      userId,
+      ...(workflowId ? { workflowId } : {}),
+      totalMs: { not: null },
+    };
 
     return this.prisma.workflowTrace.findMany({
       where,
       orderBy: { totalMs: 'desc' },
-      take: limit,
+      take: this.normalizeLimit(limit, 10, 50),
     });
   }
 
   /**
    * 获取 Trace 统计
    */
-  async getTraceStats(workflowId?: string) {
-    const where = workflowId ? { workflowId } : {};
+  async getTraceStats(userId: string, workflowId?: string) {
+    const where = {
+      userId,
+      ...(workflowId ? { workflowId } : {}),
+    };
 
     const [total, success, failed, avgDuration] = await Promise.all([
       this.prisma.workflowTrace.count({ where }),
-      this.prisma.workflowTrace.count({ where: { ...where, status: 'success' } }),
-      this.prisma.workflowTrace.count({ where: { ...where, status: 'failed' } }),
+      this.prisma.workflowTrace.count({
+        where: { ...where, status: 'success' },
+      }),
+      this.prisma.workflowTrace.count({
+        where: { ...where, status: 'failed' },
+      }),
       this.prisma.workflowTrace.aggregate({
         where: { ...where, totalMs: { not: null } },
         _avg: { totalMs: true },
@@ -237,8 +247,14 @@ export class TracingService {
       total,
       success,
       failed,
-      successRate: total > 0 ? (success / total * 100).toFixed(1) : '0',
+      successRate: total > 0 ? ((success / total) * 100).toFixed(1) : '0',
       avgDurationMs: avgDuration._avg.totalMs || 0,
     };
+  }
+
+  /** 对查询上限做服务端兜底，阻止 NaN、负数和超大值穿透到数据库。 */
+  private normalizeLimit(limit: number, fallback: number, maximum: number): number {
+    if (!Number.isFinite(limit) || limit <= 0) return fallback;
+    return Math.min(Math.floor(limit), maximum);
   }
 }

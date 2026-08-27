@@ -12,7 +12,7 @@ import request, { getResponseData } from '../../utils/axios'
 export interface AppSlice {
   apps: Application[]
   currentApp: Application | null
-  isLoading: boolean
+  appLoading: boolean
   
   // Actions
   setApps: (apps: Application[]) => void
@@ -38,7 +38,7 @@ export const createAppSlice: StateCreator<AppSlice> = (set, get) => {
     id: string,
     action: 'publish' | 'unpublish' | 'archive' | 'unarchive',
   ) => {
-    set({ isLoading: true })
+    set({ appLoading: true })
     try {
       const partial = getResponseData<Partial<Application>>(
         await request.patch(`/apps/${id}/${action}`),
@@ -49,14 +49,14 @@ export const createAppSlice: StateCreator<AppSlice> = (set, get) => {
         currentApp: get().currentApp?.id === id ? { ...get().currentApp!, ...partial } : get().currentApp,
       })
     } finally {
-      set({ isLoading: false })
+      set({ appLoading: false })
     }
   }
 
   return {
     apps: [],
     currentApp: null,
-    isLoading: false,
+    appLoading: false,
 
     /** 整体替换应用列表 */
     setApps: (apps) => set({ apps }),
@@ -66,48 +66,48 @@ export const createAppSlice: StateCreator<AppSlice> = (set, get) => {
 
     /** 拉取应用列表；失败时清空列表并继续抛错 */
     fetchApps: async () => {
-      set({ isLoading: true })
+      set({ appLoading: true })
       try {
         const data = getResponseData<Application[]>(await request.get('/apps'))
         const apps = Array.isArray(data) ? data : []
-        set({ apps, isLoading: false })
+        set({ apps, appLoading: false })
         return apps
       } catch (error) {
-        set({ apps: [], isLoading: false })
+        set({ apps: [], appLoading: false })
         throw error
       }
     },
 
     /** 按 ID 拉取应用详情并设为当前应用 */
     fetchAppById: async (id) => {
-      set({ isLoading: true })
+      set({ appLoading: true })
       try {
         const app = getResponseData<Application>(await request.get(`/apps/${id}`))
-        set({ currentApp: app, isLoading: false })
+        set({ currentApp: app, appLoading: false })
         return app
       } catch (error) {
-        set({ isLoading: false })
+        set({ appLoading: false })
         throw error
       }
     },
 
     /** 创建应用：成功后追加到列表末尾 */
     createApp: async (data) => {
-      set({ isLoading: true })
+      set({ appLoading: true })
       try {
         const app = getResponseData<Application>(await request.post('/apps', data))
         const currentApps = Array.isArray(get().apps) ? get().apps : []
-        set({ apps: [...currentApps, app], isLoading: false })
+        set({ apps: [...currentApps, app], appLoading: false })
         return app
       } catch (error) {
-        set({ isLoading: false })
+        set({ appLoading: false })
         throw error
       }
     },
 
     /** 更新应用：同步更新列表与当前应用 */
     updateApp: async (id, data) => {
-      set({ isLoading: true })
+      set({ appLoading: true })
       try {
         const updatedApp = getResponseData<Application>(await request.patch(`/apps/${id}`, data))
         const currentApps = Array.isArray(get().apps) ? get().apps : []
@@ -115,29 +115,29 @@ export const createAppSlice: StateCreator<AppSlice> = (set, get) => {
         set({
           apps: currentApps.map((app) => app.id === id ? updatedApp : app),
           currentApp: get().currentApp?.id === id ? updatedApp : get().currentApp,
-          isLoading: false,
+          appLoading: false,
         })
 
         return updatedApp
       } catch (error) {
-        set({ isLoading: false })
+        set({ appLoading: false })
         throw error
       }
     },
 
     /** 删除应用：从列表移除，若删除的是当前应用则清空 */
     deleteApp: async (id) => {
-      set({ isLoading: true })
+      set({ appLoading: true })
       try {
         await request.delete(`/apps/${id}`)
         const currentApps = Array.isArray(get().apps) ? get().apps : []
         set({
           apps: currentApps.filter((app) => app.id !== id),
           currentApp: get().currentApp?.id === id ? null : get().currentApp,
-          isLoading: false,
+          appLoading: false,
         })
       } catch (error) {
-        set({ isLoading: false })
+        set({ appLoading: false })
         throw error
       }
     },

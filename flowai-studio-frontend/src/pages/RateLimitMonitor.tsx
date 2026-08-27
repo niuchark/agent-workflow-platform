@@ -9,8 +9,10 @@ import { Spin, Tag, Button, message, Progress } from 'antd'
 import { SafetyOutlined, ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import {
   getCircuitBreakers,
+  getRateLimitConfig,
   resetCircuitBreaker,
   CircuitBreakerStats,
+  RateLimitConfig,
 } from '../utils/rateLimitApi'
 
 /** 熔断器状态 → 标签颜色与文案 */
@@ -27,20 +29,36 @@ const CIRCUIT_NAME_MAP: Record<string, string> = {
   knowledge_base: '知识库操作',
 }
 
+/** 限流规则名称 → 中文名 */
+const LIMIT_NAME_MAP: Record<string, string> = {
+  'api:global': '全局限流',
+  'api:user': '用户限流',
+  'workflow:run': '工作流执行',
+  'ai:call': 'AI 模型调用',
+  'kb:operation': '知识库操作',
+}
+
 /** 限流监控页面组件 */
 const RateLimitMonitor: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [circuits, setCircuits] = useState<CircuitBreakerStats[]>([])
+  const [limits, setLimits] = useState<Record<string, RateLimitConfig>>({})
 
   /** 加载熔断器数据 */
   const loadData = async () => {
     setLoading(true)
     try {
-      const data = await getCircuitBreakers()
-      setCircuits(Array.isArray(data) ? data : [])
+      const [circuitData, limitData] = await Promise.all([
+        getCircuitBreakers(),
+        getRateLimitConfig(),
+      ])
+      setCircuits(Array.isArray(circuitData) ? circuitData : [])
+      setLimits(limitData)
     } catch (err) {
       console.error('Failed to load rate limit data:', err)
       setCircuits([])
+      setLimits({})
+      message.error('加载限流监控数据失败')
     } finally {
       setLoading(false)
     }
@@ -66,13 +84,6 @@ const RateLimitMonitor: React.FC = () => {
   const getQuotaPercent = (remaining: number, max: number) => {
     if (max === 0) return 100
     return Math.round((remaining / max) * 100)
-  }
-
-  /** 按剩余比例分档（高/中/低） */
-  const getQuotaLevel = (percent: number) => {
-    if (percent > 60) return 'high'
-    if (percent > 20) return 'medium'
-    return 'low'
   }
 
   return (
@@ -138,18 +149,12 @@ const RateLimitMonitor: React.FC = () => {
           <div className="rate-limit-section">
             <h3><SafetyOutlined style={{ color: '#3b82f6', marginRight: 8 }} />限流策略</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
-              {[
-                { name: '全局限流', window: '60秒', max: 300, concurrent: '-' },
-                { name: '用户限流', window: '60秒', max: 60, concurrent: '-' },
-                { name: '工作流执行', window: '60秒', max: 20, concurrent: 5 },
-                { name: 'AI 模型调用', window: '60秒', max: 30, concurrent: '-' },
-                { name: '知识库操作', window: '60秒', max: 30, concurrent: '-' },
-              ].map((item) => (
-                <div key={item.name} style={{ padding: 12, border: '1px solid #f0f0f0', borderRadius: 8 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 4 }}>{item.name}</div>
+              {Object.entries(limits).map(([name, config]) => (
+                <div key={name} style={{ padding: 12, border: '1px solid #f0f0f0', borderRadius: 8 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>{LIMIT_NAME_MAP[name] || name}</div>
                   <div style={{ fontSize: 13, color: '#666' }}>
-                    窗口: {item.window} | 上限: {item.max}次
-                    {item.concurrent !== '-' && ` | 并发: ${item.concurrent}`}
+                    窗口: {config.windowSeconds}秒 | 上限: {config.maxRequests}次
+                    {config.maxConcurrent ? ` | 并发: ${config.maxConcurrent}` : ''}
                   </div>
                 </div>
               ))}

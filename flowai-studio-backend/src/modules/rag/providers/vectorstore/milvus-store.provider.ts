@@ -34,22 +34,6 @@ import {
   VectorStoreStats,
 } from '../../interfaces/vector-store.interface';
 
-/**
- * Milvus 数据类型映射
- */
-const MilvusDataType = {
-  BOOL: 1,
-  INT8: 2,
-  INT16: 3,
-  INT32: 4,
-  INT64: 5,
-  FLOAT: 10,
-  DOUBLE: 11,
-  VARCHAR: 21,
-  JSON: 23,
-  FLOAT_VECTOR: 101,
-} as const;
-
 @Injectable()
 export class MilvusVectorStore implements VectorStore {
   private readonly logger = new Logger(MilvusVectorStore.name);
@@ -134,7 +118,7 @@ export class MilvusVectorStore implements VectorStore {
   }
 
   async search(collectionName: string, query: VectorSearchQuery): Promise<VectorSearchResult[]> {
-    const { queryVector, topK = 5, similarityThreshold = 0, filter } = query;
+    const { queryVector, topK = 5, filter } = query;
 
     const requestBody: any = {
       collectionName,

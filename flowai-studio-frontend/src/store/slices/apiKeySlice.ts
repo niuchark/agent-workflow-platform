@@ -12,7 +12,7 @@ import * as teamApi from '../../utils/teamApi'
 export interface ApiKeySlice {
   apiKeys: ApiKey[]
   createdKey: ApiKeyCreatedResponse | null
-  isLoading: boolean
+  apiKeyLoading: boolean
 
   setApiKeys: (keys: ApiKey[]) => void
   setCreatedKey: (key: ApiKeyCreatedResponse | null) => void
@@ -26,64 +26,55 @@ export interface ApiKeySlice {
 export const createApiKeySlice: StateCreator<ApiKeySlice> = (set, get) => ({
   apiKeys: [],
   createdKey: null,
-  isLoading: false,
+  apiKeyLoading: false,
 
   setApiKeys: (apiKeys) => set({ apiKeys }),
   setCreatedKey: (createdKey) => set({ createdKey }),
 
   /** 拉取 API Key 列表（可按应用过滤） */
   fetchApiKeys: async (applicationId) => {
-    set({ isLoading: true })
+    set({ apiKeyLoading: true })
     try {
       const response = await teamApi.fetchApiKeys(applicationId) as any
       const apiKeys = (Array.isArray(response.data) ? response.data : []) as ApiKey[]
-      set({ apiKeys, isLoading: false })
+      set({ apiKeys, apiKeyLoading: false })
       return apiKeys
     } catch (error) {
-      set({ isLoading: false })
+      set({ apiKeyLoading: false })
       throw error
     }
   },
 
   /** 创建 API Key：保存本次返回的完整 key（仅此一次），供页面提示用户 */
   createApiKey: async (data) => {
-    set({ isLoading: true })
+    set({ apiKeyLoading: true })
     try {
       const response = await teamApi.createApiKey(data) as any
       const createdKey = response.data as ApiKeyCreatedResponse
-      const currentKeys = Array.isArray(get().apiKeys) ? get().apiKeys : []
       // 创建后重新获取列表（因为完整 key 只返回一次）
-      set({ createdKey, isLoading: false })
+      set({ createdKey, apiKeyLoading: false })
       return createdKey
     } catch (error) {
-      set({ isLoading: false })
+      set({ apiKeyLoading: false })
       throw error
     }
   },
 
   /** 删除 API Key：成功后从本地列表中移除 */
   deleteApiKey: async (keyId) => {
-    try {
-      await teamApi.deleteApiKey(keyId)
-      set({ apiKeys: get().apiKeys.filter((k) => k.id !== keyId) })
-    } catch (error) {
-      throw error
-    }
+    await teamApi.deleteApiKey(keyId)
+    set({ apiKeys: get().apiKeys.filter((k) => k.id !== keyId) })
   },
 
   /** 启用/停用 API Key：用服务端返回的最新状态更新列表 */
   toggleApiKey: async (keyId, isActive) => {
-    try {
-      const response = await teamApi.toggleApiKey(keyId, isActive) as any
-      const updatedKey = response.data as ApiKey
-      set({
-        apiKeys: get().apiKeys.map((k) =>
-          k.id === keyId ? updatedKey : k
-        ),
-      })
-      return updatedKey
-    } catch (error) {
-      throw error
-    }
+    const response = await teamApi.toggleApiKey(keyId, isActive) as any
+    const updatedKey = response.data as ApiKey
+    set({
+      apiKeys: get().apiKeys.map((k) =>
+        k.id === keyId ? updatedKey : k
+      ),
+    })
+    return updatedKey
   },
 })

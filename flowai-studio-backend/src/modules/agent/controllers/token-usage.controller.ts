@@ -1,16 +1,11 @@
 /**
  * Token 用量控制器：用量明细、成本报表与模型排行查询接口。
  */
-import {
-  Controller,
-  Get,
-  Query,
-  UseGuards,
-  Request,
-} from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { TokenUsageService } from '../services/token-usage.service';
-import { GetTokenUsageDto, GetCostReportDto } from '../dto/token-usage.dto';
+import { GetTokenUsageDto, GetCostReportDto, GetModelRankingDto } from '../dto/token-usage.dto';
 
 @Controller('token-usage')
 @UseGuards(JwtAuthGuard)
@@ -22,8 +17,8 @@ export class TokenUsageController {
    * 查询 Token 使用量列表 + 汇总
    */
   @Get()
-  async getUsage(@Request() req: any, @Query() dto: GetTokenUsageDto) {
-    return this.tokenUsageService.getUsage(req.user.id, dto);
+  async getUsage(@CurrentUser('userId') userId: string, @Query() dto: GetTokenUsageDto) {
+    return this.tokenUsageService.getUsage(userId, dto);
   }
 
   /**
@@ -31,8 +26,8 @@ export class TokenUsageController {
    * 成本报表（按时间/模型/Provider 分组）
    */
   @Get('cost-report')
-  async getCostReport(@Request() req: any, @Query() dto: GetCostReportDto) {
-    return this.tokenUsageService.getCostReport(req.user.id, dto);
+  async getCostReport(@CurrentUser('userId') userId: string, @Query() dto: GetCostReportDto) {
+    return this.tokenUsageService.getCostReport(userId, dto);
   }
 
   /**
@@ -40,11 +35,7 @@ export class TokenUsageController {
    * 模型使用排行
    */
   @Get('model-ranking')
-  async getModelRanking(
-    @Request() req: any,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    return this.tokenUsageService.getModelRanking(req.user.id, startDate, endDate);
+  async getModelRanking(@CurrentUser('userId') userId: string, @Query() dto: GetModelRankingDto) {
+    return this.tokenUsageService.getModelRanking(userId, dto.startDate, dto.endDate);
   }
 }

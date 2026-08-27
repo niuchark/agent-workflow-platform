@@ -10,9 +10,9 @@ import { z } from 'zod';
 /** 环境变量 schema：全部配置项及其默认值、校验规则 */
 export const envSchema = z.object({
   // 服务器配置
-  PORT: z.string().default('3001'),
+  PORT: z.string().default('3000'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  FRONTEND_URL: z.string().default('http://localhost:5173'),
+  FRONTEND_URL: z.string().url().default('http://localhost:5173'),
 
   // JWT配置
   JWT_SECRET: z.string().min(1, 'JWT_SECRET is required'),
@@ -60,10 +60,6 @@ export const envSchema = z.object({
   // Ollama Rerank 配置
   OLLAMA_RERANK_MODEL: z.string().default('bge-reranker-v2-m3'),
 
-  // 文件上传配置
-  UPLOAD_PATH: z.string().default('./uploads'),
-  MAX_FILE_SIZE: z.string().default('10485760'),
-
   // 数据库配置 — PostgreSQL + pgvector
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
 
@@ -73,6 +69,13 @@ export const envSchema = z.object({
   // 用户模型凭证加密与私网 Base URL 白名单
   MODEL_CREDENTIAL_ENCRYPTION_KEY: z.string().optional(),
   MODEL_PRIVATE_BASE_URL_ALLOWLIST: z.string().default(''),
+
+  // 其他出站 HTTP（自定义/内置 Skill）允许访问的私网 Origin 白名单
+  OUTBOUND_PRIVATE_URL_ALLOWLIST: z.string().default(''),
+
+  // stdio MCP 会启动本机子进程，默认关闭；启用后仍必须配置精确命令白名单
+  MCP_STDIO_ENABLED: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
+  MCP_STDIO_COMMAND_ALLOWLIST: z.string().default(''),
 }).superRefine((config, ctx) => {
   // 生产环境必须配置模型凭证加密密钥，否则拒绝启动
   if (config.NODE_ENV === 'production' && !config.MODEL_CREDENTIAL_ENCRYPTION_KEY) {
@@ -81,6 +84,16 @@ export const envSchema = z.object({
       path: ['MODEL_CREDENTIAL_ENCRYPTION_KEY'],
       message: 'MODEL_CREDENTIAL_ENCRYPTION_KEY is required in production',
     });
+  }
+  if (config.NODE_ENV === 'production') {
+    const secret = config.JWT_SECRET.trim();
+    if (secret.length < 32 || ['change-me-in-production', 'your-secret-key-change-me'].includes(secret)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['JWT_SECRET'],
+        message: 'JWT_SECRET must be at least 32 characters and non-default in production',
+      });
+    }
   }
 });
 

@@ -15,8 +15,6 @@ import {
   RetrievalRequest,
   RetrievalResult,
 } from '../interfaces/retrieval-strategy.interface';
-import { VectorStore } from '../interfaces/vector-store.interface';
-import { EmbeddingProvider } from '../interfaces/embedding-provider.interface';
 import { VectorSearchFilter } from '../interfaces/vector-store.interface';
 
 @Injectable()
@@ -30,7 +28,6 @@ export class VectorRetrievalStrategy implements RetrievalStrategy {
    */
   async retrieve(request: RetrievalRequest): Promise<RetrievalResult[]> {
     const {
-      query,
       queryVector,
       knowledgeBaseId,
       topK = 5,
@@ -69,10 +66,10 @@ export class VectorRetrievalStrategy implements RetrievalStrategy {
    * 执行向量搜索（内部方法）
    */
   private async performVectorSearch(
-    queryVector: number[],
-    topK: number,
-    similarityThreshold: number,
-    filter?: VectorSearchFilter,
+    _queryVector: number[],
+    _topK: number,
+    _similarityThreshold: number,
+    _filter?: VectorSearchFilter,
   ): Promise<RetrievalResult[]> {
     // 注意：实际的 VectorStore 搜索由 RAGService 调用，此处仅定义策略逻辑
     // VectorStore 实例由 RAGService 注入和管理

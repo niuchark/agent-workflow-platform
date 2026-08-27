@@ -31,7 +31,17 @@
  *   未安装时使用 simple 分词器（按字符分割），中文检索效果会打折扣
  */
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../common/services/prisma.service';
+
+type TextSearchConfig = 'zhparser' | 'pg_jieba' | 'english' | 'simple';
+
+const TEXT_SEARCH_CONFIG_SQL: Record<TextSearchConfig, Prisma.Sql> = {
+  zhparser: Prisma.sql`'zhparser'`,
+  pg_jieba: Prisma.sql`'pg_jieba'`,
+  english: Prisma.sql`'english'`,
+  simple: Prisma.sql`'simple'`,
+};
 
 /**
  * BM25 检索参数
@@ -66,7 +76,7 @@ export class BM25KeywordService {
   private readonly logger = new Logger(BM25KeywordService.name);
 
   /** PostgreSQL 全文搜索配置（尝试中文分词，回退到英文分词） */
-  private textSearchConfig: string = 'simple';
+  private textSearchConfig: TextSearchConfig = 'simple';
   private configDetected: boolean = false;
 
   constructor(private prisma: PrismaService) {}
@@ -75,17 +85,20 @@ export class BM25KeywordService {
    * 检测 PostgreSQL 全文搜索配置
    * 优先使用中文分词配置（zhparser / pg_jieba），回退到 simple
    */
-  async detectTextSearchConfig(): Promise<string> {
+  async detectTextSearchConfig(): Promise<TextSearchConfig> {
     if (this.configDetected) return this.textSearchConfig;
 
     try {
       // 查询可用的全文搜索配置
-      const configs: any[] = await this.prisma.$queryRawUnsafe(
-        `SELECT cfgname FROM pg_ts_config WHERE cfgname IN ('zhparser', 'pg_jieba', 'english', 'simple') ORDER BY cfgname`
-      );
+      const configs = await this.prisma.$queryRaw<Array<{ cfgname: string }>>(Prisma.sql`
+        SELECT cfgname
+        FROM pg_ts_config
+        WHERE cfgname IN ('zhparser', 'pg_jieba', 'english', 'simple')
+        ORDER BY cfgname
+      `);
 
       // 优先级: zhparser > pg_jieba > english > simple
-      const configNames = configs.map((c: any) => c.cfgname);
+      const configNames = configs.map((config) => config.cfgname);
       if (configNames.includes('zhparser')) {
         this.textSearchConfig = 'zhparser';
         this.logger.log('Detected zhparser Chinese text search config');
@@ -101,7 +114,7 @@ export class BM25KeywordService {
       }
     } catch (error) {
       this.logger.warn(
-        `Failed to detect text search config: ${error instanceof Error ? error.message : error}, using simple`
+        `Failed to detect text search config: ${error instanceof Error ? error.message : error}, using simple`,
       );
       this.textSearchConfig = 'simple';
     }
@@ -132,47 +145,40 @@ export class BM25KeywordService {
     // 确保已检测全文搜索配置
     const config = await this.detectTextSearchConfig();
 
-    // 构建查询文本 — 同时支持精确短语和单词匹配
-    // 使用 plainto_tsquery 自动解析查询文本
-    const escapedQuery = query.replace(/'/g, "''");
-
-    // 构建 WHERE 条件
-    const conditions: string[] = [];
-
-    // 知识库过滤 — 通过 metadata JSON 字段或关联查询
-    conditions.push(`metadata->>'knowledgeBaseId' = '${knowledgeBaseId}'`);
+    const conditions: Prisma.Sql[] = [Prisma.sql`metadata ->> 'knowledgeBaseId' = ${knowledgeBaseId}`];
 
     // 额外元数据过滤
     if (filter) {
-      const filterConditions = this.buildFilterConditions(filter);
-      if (filterConditions) {
-        conditions.push(filterConditions);
-      }
+      conditions.push(...this.buildFilterConditions(filter));
     }
-
-    const whereClause = conditions.length > 0 ? `AND ${conditions.join(' AND ')}` : '';
 
     // 使用 ts_rank_cd 计算 BM25-like 相关性分数
     // ts_rank_cd 使用覆盖密度排名，更接近 BM25 的行为
-    const sql = `
-      SELECT
-        id,
-        content,
-        ts_rank_cd(
-          to_tsvector('${config}', content),
-          plainto_tsquery('${config}', '${escapedQuery}'),
-          32 /* normalization: divide by document length */
-        ) AS raw_score,
-        metadata
-      FROM document_chunks
-      WHERE to_tsvector('${config}', content) @@ plainto_tsquery('${config}', '${escapedQuery}')
-      ${whereClause}
-      ORDER BY raw_score DESC
-      LIMIT ${topK}
-    `;
-
     try {
-      const rows: any[] = await this.prisma.$queryRawUnsafe(sql);
+      const rows = await this.prisma.$queryRaw<
+        Array<{
+          id: string;
+          content: string;
+          raw_score: number | string;
+          metadata?: Record<string, any> | string | null;
+        }>
+      >(Prisma.sql`
+        SELECT
+          id,
+          content,
+          ts_rank_cd(
+            to_tsvector(${config}::regconfig, content),
+            plainto_tsquery(${config}::regconfig, ${query}),
+            32 /* normalization: divide by document length */
+          ) AS raw_score,
+          metadata
+        FROM document_chunks
+        WHERE to_tsvector(${config}::regconfig, content)
+          @@ plainto_tsquery(${config}::regconfig, ${query})
+          AND ${Prisma.join(conditions, ' AND ')}
+        ORDER BY raw_score DESC
+        LIMIT ${topK}
+      `);
 
       if (rows.length === 0) {
         return [];
@@ -180,30 +186,28 @@ export class BM25KeywordService {
 
       // 归一化分数到 0-1 范围
       // 使用 max-min 归一化，如果所有分数相同则设为 1.0
-      const scores = rows.map((r: any) => Number(r.raw_score));
+      const scores = rows.map((row) => Number(row.raw_score));
       const maxScore = Math.max(...scores);
       const minScore = Math.min(...scores);
       const scoreRange = maxScore - minScore;
 
-      return rows.map((row: any) => {
+      return rows.map((row) => {
         const rawScore = Number(row.raw_score);
-        const normalizedScore = scoreRange > 0
-          ? (rawScore - minScore) / scoreRange
-          : (rawScore > 0 ? 1.0 : 0.0);
+        const normalizedScore = scoreRange > 0 ? (rawScore - minScore) / scoreRange : rawScore > 0 ? 1.0 : 0.0;
 
         return {
           id: row.id,
           content: row.content,
           score: Math.min(Math.max(normalizedScore, 0), 1), // clamp to [0, 1]
           metadata: row.metadata
-            ? (typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata)
+            ? typeof row.metadata === 'string'
+              ? JSON.parse(row.metadata)
+              : row.metadata
             : undefined,
         };
       });
     } catch (error) {
-      this.logger.error(
-        `BM25 keyword search failed: ${error instanceof Error ? error.message : error}`
-      );
+      this.logger.error(`BM25 keyword search failed: ${error instanceof Error ? error.message : error}`);
       // 全文搜索失败时回退到 LIKE 模糊匹配
       return this.fallbackLikeSearch(params);
     }
@@ -218,16 +222,16 @@ export class BM25KeywordService {
 
     try {
       // 创建 GIN 索引加速全文搜索
-      await this.prisma.$executeRawUnsafe(`
+      await this.prisma.$executeRaw(Prisma.sql`
         CREATE INDEX IF NOT EXISTS idx_document_chunks_content_fts
         ON document_chunks
-        USING gin (to_tsvector('${config}', content))
+        USING gin (to_tsvector(${TEXT_SEARCH_CONFIG_SQL[config]}, content))
       `);
       this.logger.log(`Full-text search GIN index ensured (config: ${config})`);
     } catch (error) {
       this.logger.warn(
         `Failed to create full-text search index: ${error instanceof Error ? error.message : error}. ` +
-        `Full-text search will use sequential scan (slower for large datasets).`
+          `Full-text search will use sequential scan (slower for large datasets).`,
       );
     }
   }
@@ -245,43 +249,40 @@ export class BM25KeywordService {
     const keywords = query.trim().split(/\s+/).filter(Boolean);
     if (keywords.length === 0) return [];
 
-    // 构建 LIKE 条件
-    const likeConditions = keywords
-      .map((kw) => `content ILIKE '%${kw.replace(/'/g, "''")}%'`)
-      .join(' OR ');
-
-    // 构建 WHERE
-    const conditions: string[] = [`(${likeConditions})`];
-    conditions.push(`metadata->>'knowledgeBaseId' = '${knowledgeBaseId}'`);
+    const likeConditions = keywords.map((keyword) => Prisma.sql`content ILIKE ${`%${keyword}%`}`);
+    const conditions: Prisma.Sql[] = [
+      Prisma.sql`(${Prisma.join(likeConditions, ' OR ')})`,
+      Prisma.sql`metadata ->> 'knowledgeBaseId' = ${knowledgeBaseId}`,
+    ];
 
     if (filter) {
-      const filterConditions = this.buildFilterConditions(filter);
-      if (filterConditions) {
-        conditions.push(filterConditions);
-      }
+      conditions.push(...this.buildFilterConditions(filter));
     }
 
-    const sql = `
-      SELECT
-        id,
-        content,
-        metadata
-      FROM document_chunks
-      WHERE ${conditions.join(' AND ')}
-      LIMIT ${topK}
-    `;
-
     try {
-      const rows: any[] = await this.prisma.$queryRawUnsafe(sql);
+      const rows = await this.prisma.$queryRaw<
+        Array<{
+          id: string;
+          content: string;
+          metadata?: Record<string, any> | string | null;
+        }>
+      >(Prisma.sql`
+        SELECT
+          id,
+          content,
+          metadata
+        FROM document_chunks
+        WHERE ${Prisma.join(conditions, ' AND ')}
+        LIMIT ${topK}
+      `);
 
       // LIKE 匹配的分数基于匹配关键词数量和位置
-      return rows.map((row: any, index: number) => {
+      return rows.map((row) => {
         const content: string = row.content || '';
+        const lowerContent = content.toLocaleLowerCase();
         let matchCount = 0;
         for (const kw of keywords) {
-          const regex = new RegExp(kw, 'gi');
-          const matches = content.match(regex);
-          if (matches) matchCount += matches.length;
+          matchCount += lowerContent.split(kw.toLocaleLowerCase()).length - 1;
         }
         // 归一化分数：匹配次数 / 关键词数，上限为 1.0
         const score = Math.min(matchCount / (keywords.length * 2), 1.0);
@@ -291,14 +292,14 @@ export class BM25KeywordService {
           content,
           score,
           metadata: row.metadata
-            ? (typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata)
+            ? typeof row.metadata === 'string'
+              ? JSON.parse(row.metadata)
+              : row.metadata
             : undefined,
         };
       });
     } catch (error) {
-      this.logger.error(
-        `LIKE fallback search failed: ${error instanceof Error ? error.message : error}`
-      );
+      this.logger.error(`LIKE fallback search failed: ${error instanceof Error ? error.message : error}`);
       return [];
     }
   }
@@ -306,28 +307,30 @@ export class BM25KeywordService {
   /**
    * 构建元数据过滤 WHERE 条件
    */
-  private buildFilterConditions(filter: Record<string, any>): string {
-    const conditions: string[] = [];
+  private buildFilterConditions(filter: Record<string, any>): Prisma.Sql[] {
+    const conditions: Prisma.Sql[] = [];
 
     for (const [key, value] of Object.entries(filter)) {
       if (typeof value === 'string') {
-        conditions.push(`metadata->>'${key}' = '${value.replace(/'/g, "''")}'`);
+        conditions.push(Prisma.sql`metadata ->> ${key} = ${value}`);
       } else if (Array.isArray(value)) {
-        const valueList = value.map((v: any) => `'${String(v).replace(/'/g, "''")}'`).join(',');
-        conditions.push(`metadata->>'${key}' IN (${valueList})`);
+        const values = value.map((item) => Prisma.sql`${String(item)}`);
+        conditions.push(
+          values.length > 0 ? Prisma.sql`metadata ->> ${key} IN (${Prisma.join(values)})` : Prisma.sql`FALSE`,
+        );
       } else if (typeof value === 'object' && value !== null) {
         // Range filter: { gte: 0, lte: 100 }
         if (value.gte !== undefined) {
-          conditions.push(`(metadata->>'${key}')::numeric >= ${value.gte}`);
+          conditions.push(Prisma.sql`(metadata ->> ${key})::numeric >= ${value.gte}`);
         }
         if (value.lte !== undefined) {
-          conditions.push(`(metadata->>'${key}')::numeric <= ${value.lte}`);
+          conditions.push(Prisma.sql`(metadata ->> ${key})::numeric <= ${value.lte}`);
         }
       } else {
-        conditions.push(`metadata->>'${key}' = '${value}'`);
+        conditions.push(Prisma.sql`metadata ->> ${key} = ${String(value)}`);
       }
     }
 
-    return conditions.join(' AND ');
+    return conditions;
   }
 }

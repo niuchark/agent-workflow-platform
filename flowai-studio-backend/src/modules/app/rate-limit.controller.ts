@@ -4,19 +4,16 @@
  */
 import { Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RateLimiterService, CircuitBreakerService, DEFAULT_RATE_LIMITS } from '../../common/guards/rate-limit.guard';
+import { AdminGuard } from '../../common/guards/admin.guard';
+import { CircuitBreakerService, DEFAULT_RATE_LIMITS } from '../../common/services/rate-limit.service';
 
 @Controller('rate-limit')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, AdminGuard)
 export class RateLimitController {
   constructor(
-    private readonly rateLimiterService: RateLimiterService,
     private readonly circuitBreakerService: CircuitBreakerService,
   ) {}
 
-  /**
-   * 获取所有限流配置
-   */
   /** 获取所有限流配置 */
   @Get('config')
   getConfig() {
@@ -25,37 +22,10 @@ export class RateLimitController {
     };
   }
 
-  /**
-   * 获取用户剩余配额
-   */
-  /** 获取用户在各限流规则下的剩余配额 */
-  @Get('quota/:userId')
-  async getUserQuota(@Param('userId') userId: string) {
-    const checks = await Promise.all(
-      Object.entries(DEFAULT_RATE_LIMITS).map(async ([name, config]) => {
-        const result = await this.rateLimiterService.checkRateLimit(
-          `rate_limit:${name.replace(':', ':')}${name.includes('global') ? '' : `:${userId}`}`,
-          config,
-        );
-        return {
-          name,
-          remaining: result.remaining,
-          max: config.maxRequests,
-          windowSeconds: config.windowSeconds,
-        };
-      }),
-    );
-
-    return { quotas: checks };
-  }
-
-  /**
-   * 获取所有熔断器状态
-   */
   /** 获取所有熔断器状态 */
   @Get('circuit-breakers')
   async getCircuitBreakers() {
-    const circuits = ['workflow', 'ai', 'knowledge_base'];
+    const circuits = ['workflow'];
     const stats = await Promise.all(
       circuits.map(async (name) => ({
         name,
@@ -66,9 +36,6 @@ export class RateLimitController {
     return { circuitBreakers: stats };
   }
 
-  /**
-   * 重置熔断器
-   */
   /** 重置指定熔断器 */
   @Post('circuit-breakers/:name/reset')
   async resetCircuitBreaker(@Param('name') name: string) {

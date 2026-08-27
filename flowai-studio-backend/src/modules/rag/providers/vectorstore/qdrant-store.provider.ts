@@ -285,7 +285,7 @@ export class QdrantVectorStore implements VectorStore {
    */
   private extractMetadata(payload: any): Record<string, any> | undefined {
     if (!payload) return undefined;
-    const { content, ...metadata } = payload;
+    const metadata = (({ content: _content, ...rest }) => rest)(payload);
     return Object.keys(metadata).length > 0 ? metadata : undefined;
   }
 

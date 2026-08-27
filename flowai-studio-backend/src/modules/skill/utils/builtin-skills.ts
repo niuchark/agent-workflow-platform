@@ -1,16 +1,21 @@
 /**
- * 内置技能实现：时间、HTTP、JSON、正则、计算器与沙箱代码执行。
+ * 内置技能实现：时间、HTTP、JSON、正则与安全计算器。
  */
 import axios from 'axios';
-import { VM } from 'vm2';
+
+type RequestUrlValidator = (url: string) => Promise<string>;
 
 /** 按类型分发到对应的内置技能执行器 */
-export async function executeBuiltinSkill(type: string, params: Record<string, any>): Promise<any> {
+export async function executeBuiltinSkill(
+  type: string,
+  params: Record<string, any>,
+  validateRequestUrl?: RequestUrlValidator,
+): Promise<any> {
   switch (type) {
     case 'time':
       return executeTimeSkill();
     case 'http':
-      return executeHttpSkill(params);
+      return executeHttpSkill(params, validateRequestUrl);
     case 'json':
       return executeJsonSkill(params);
     case 'regex':
@@ -18,7 +23,7 @@ export async function executeBuiltinSkill(type: string, params: Record<string, a
     case 'calculator':
       return executeCalculatorSkill(params);
     case 'code':
-      return executeCodeSkill(params);
+      throw new Error('代码执行已禁用；请使用进程外、资源受限的专用执行器');
     default:
       throw new Error(`Unknown builtin skill type: ${type}`);
   }
@@ -35,20 +40,31 @@ function executeTimeSkill(): any {
   };
 }
 
-async function executeHttpSkill(params: any): Promise<any> {
+async function executeHttpSkill(
+  params: Record<string, unknown>,
+  validateRequestUrl?: RequestUrlValidator,
+): Promise<unknown> {
   const { url, method = 'GET', headers = {}, body } = params;
 
-  if (!url) {
+  if (typeof url !== 'string' || !url.trim()) {
     throw new Error('URL is required for HTTP skill');
   }
+  if (!validateRequestUrl) {
+    throw new Error('HTTP skill URL validator is not configured');
+  }
+
+  const safeUrl = await validateRequestUrl(url);
 
   try {
     const response = await axios({
-      url,
-      method,
-      headers,
+      url: safeUrl,
+      method: typeof method === 'string' ? method : 'GET',
+      headers: typeof headers === 'object' && headers !== null ? headers : {},
       data: body,
       timeout: 10000, // 10 秒超时
+      maxRedirects: 0,
+      maxContentLength: 2 * 1024 * 1024,
+      maxBodyLength: 2 * 1024 * 1024,
     });
 
     return {
@@ -109,25 +125,21 @@ function executeRegexSkill(params: any): any {
   }
 }
 
-function executeCalculatorSkill(params: any): any {
+function executeCalculatorSkill(params: Record<string, unknown>): { expression: string; result: number } {
   const { expression } = params;
 
   if (!expression || typeof expression !== 'string') {
     throw new Error('expression (string) is required for calculator skill');
   }
 
-  // Validate: only allow digits, operators, parentheses, spaces, dots
-  if (!/^[\d\s+\-*/().%^]+$/.test(expression)) {
-    throw new Error('Invalid expression: only numbers and basic operators (+, -, *, /, %, ^, parentheses) are allowed');
+  if (expression.length > 256) {
+    throw new Error('Invalid expression: maximum length is 256 characters');
   }
 
   try {
-    // Replace ^ with ** for exponentiation
-    const sanitized = expression.replace(/\^/g, '**');
-    const vm = new VM({ timeout: 1000, sandbox: {} });
-    const result = vm.run(sanitized);
+    const result = new ArithmeticParser(expression).parse();
 
-    if (typeof result !== 'number' || !isFinite(result)) {
+    if (!Number.isFinite(result)) {
       throw new Error('Expression did not evaluate to a valid number');
     }
 
@@ -137,36 +149,77 @@ function executeCalculatorSkill(params: any): any {
   }
 }
 
-function executeCodeSkill(params: any): any {
-  const { code, language = 'javascript' } = params;
+/**
+ * 只解析数字与 + - * / % ^ 括号的递归下降计算器。
+ * 不调用 eval/vm，也不会把用户表达式当作 JavaScript 执行。
+ */
+class ArithmeticParser {
+  private index = 0;
 
-  if (!code || typeof code !== 'string') {
-    throw new Error('code (string) is required for code execution skill');
+  constructor(private readonly source: string) {}
+
+  parse(): number {
+    const value = this.parseAdditive();
+    this.skipWhitespace();
+    if (this.index !== this.source.length) {
+      throw new Error(`Unexpected token at position ${this.index + 1}`);
+    }
+    return value;
   }
 
-  if (language !== 'javascript') {
-    throw new Error('Currently only JavaScript code execution is supported');
+  private parseAdditive(): number {
+    let value = this.parseMultiplicative();
+    while (true) {
+      if (this.consume('+')) value += this.parseMultiplicative();
+      else if (this.consume('-')) value -= this.parseMultiplicative();
+      else return value;
+    }
   }
 
-  try {
-    const logs: string[] = [];
-    const vm = new VM({
-      timeout: 5000,
-      sandbox: {
-        console: {
-          log: (...args: any[]) => logs.push(args.map(String).join(' ')),
-          warn: (...args: any[]) => logs.push('[WARN] ' + args.map(String).join(' ')),
-          error: (...args: any[]) => logs.push('[ERROR] ' + args.map(String).join(' ')),
-        },
-      },
-    });
-    const result = vm.run(code);
+  private parseMultiplicative(): number {
+    let value = this.parsePower();
+    while (true) {
+      if (this.consume('*')) value *= this.parsePower();
+      else if (this.consume('/')) value /= this.parsePower();
+      else if (this.consume('%')) value %= this.parsePower();
+      else return value;
+    }
+  }
 
-    return {
-      result: result !== undefined ? result : null,
-      logs,
-    };
-  } catch (error) {
-    throw new Error(`Code execution error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  /** 指数运算右结合：2^3^2 等价于 2^(3^2) */
+  private parsePower(): number {
+    const base = this.parseUnary();
+    return this.consume('^') ? Math.pow(base, this.parsePower()) : base;
+  }
+
+  private parseUnary(): number {
+    if (this.consume('+')) return this.parseUnary();
+    if (this.consume('-')) return -this.parseUnary();
+    return this.parsePrimary();
+  }
+
+  private parsePrimary(): number {
+    if (this.consume('(')) {
+      const value = this.parseAdditive();
+      if (!this.consume(')')) throw new Error('Missing closing parenthesis');
+      return value;
+    }
+
+    this.skipWhitespace();
+    const match = this.source.slice(this.index).match(/^(?:\d+(?:\.\d*)?|\.\d+)/);
+    if (!match) throw new Error(`Expected a number at position ${this.index + 1}`);
+    this.index += match[0].length;
+    return Number(match[0]);
+  }
+
+  private consume(token: string): boolean {
+    this.skipWhitespace();
+    if (!this.source.startsWith(token, this.index)) return false;
+    this.index += token.length;
+    return true;
+  }
+
+  private skipWhitespace(): void {
+    while (/\s/.test(this.source[this.index] || '')) this.index += 1;
   }
 }

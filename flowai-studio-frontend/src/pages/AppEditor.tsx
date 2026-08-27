@@ -23,6 +23,8 @@ import {
   CloseOutlined,
   DeleteOutlined,
   PlusSquareOutlined,
+  LockOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
@@ -32,16 +34,18 @@ import WorkflowCanvas from '../components/workflow/WorkflowCanvas'
 import NodePanel from '../components/workflow/NodePanel'
 import ConfigPanel from '../components/workflow/ConfigPanel'
 import RunPanel from '../components/workflow/RunPanel'
+import VersionPanel from '../components/workflow/VersionPanel'
 import AppShareSettings from '../components/AppShareSettings'
 
-/** 右侧面板类型：配置 / 调试 / 分享 */
-type RightPanel = 'config' | 'debug' | 'share'
+/** 右侧面板类型：配置 / 调试 / 分享 / 版本 */
+type RightPanel = 'config' | 'debug' | 'share' | 'versions'
 
 /** 右侧面板的切换项定义（顶栏与移动端工具栏共用） */
 const RIGHT_PANELS = [
   { key: 'config', label: '配置', icon: SettingOutlined },
   { key: 'debug', label: '调试', icon: BugOutlined },
   { key: 'share', label: '分享', icon: ShareAltOutlined },
+  { key: 'versions', label: '版本', icon: HistoryOutlined },
 ] satisfies Array<{ key: RightPanel; label: string; icon: React.ComponentType }>
 
 /** 工作流运行状态 → 标签颜色与文案 */
@@ -83,11 +87,12 @@ const AppEditor: React.FC = () => {
     createWorkflow,
     nodes,
     edges,
-    isLoading,
+    workflowLoading,
     saveWorkflow,
     executionStatus,
     selectedNode,
     deleteNode,
+    setCurrentWorkflow,
   } = useStore()
 
   const [rightPanel, setRightPanel] = useState<RightPanel>('config')
@@ -103,6 +108,20 @@ const AppEditor: React.FC = () => {
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH)
   const [nodePanelWidth, setNodePanelWidth] = useState(DEFAULT_NODE_PANEL_WIDTH)
 
+  const currentAccessType = currentApp?.id === appId ? currentApp.accessType : undefined
+  const canEditWorkflow = currentAccessType === 'owner'
+    || currentAccessType === 'full_access'
+    || currentAccessType === 'can_edit'
+  const canRunWorkflow = canEditWorkflow
+  const canManageSharing = currentAccessType === 'owner'
+  const isReadOnly = currentAccessType === 'can_view'
+  const availableRightPanels = RIGHT_PANELS.filter(({ key }) =>
+    key === 'config'
+      || (key === 'debug' && canRunWorkflow)
+      || (key === 'share' && canManageSharing)
+      || (key === 'versions' && canManageSharing)
+  )
+
   // 使用 ref 防止 React StrictMode 下 useEffect 重复执行导致弹两次错误
   const initRef = useRef(false)
 
@@ -114,12 +133,13 @@ const AppEditor: React.FC = () => {
     const initEditor = async () => {
       if (!appId) return
       try {
-        await fetchAppById(appId)
+        setCurrentWorkflow(null)
+        const app = await fetchAppById(appId)
         const workflows = await fetchWorkflows(appId)
 
         if (workflows && workflows.length > 0) {
           await fetchWorkflowById(workflows[0].id)
-        } else {
+        } else if (app.accessType !== 'can_view') {
           // 新建空白工作流
           const createdWorkflow = await createWorkflow(appId, {
             name: '默认工作流',
@@ -132,7 +152,18 @@ const AppEditor: React.FC = () => {
       }
     }
     initEditor()
-  }, [appId, createWorkflow, fetchAppById, fetchWorkflowById, fetchWorkflows, messageApi])
+  }, [appId, createWorkflow, fetchAppById, fetchWorkflowById, fetchWorkflows, messageApi, setCurrentWorkflow])
+
+  // 权限变化后，把已不可访问的调试/分享面板收回到配置面板。
+  useEffect(() => {
+    if (
+      (rightPanel === 'debug' && !canRunWorkflow)
+      || (rightPanel === 'share' && !canManageSharing)
+      || (rightPanel === 'versions' && !canManageSharing)
+    ) {
+      setRightPanel('config')
+    }
+  }, [canManageSharing, canRunWorkflow, rightPanel])
 
   // 监听视口变化：进入窄屏自动收起面板，回到宽屏恢复
   useEffect(() => {
@@ -325,13 +356,18 @@ const AppEditor: React.FC = () => {
               <AppstoreOutlined />
             </span>
             <span className="editor-app-name">{currentApp?.name || '应用编辑器'}</span>
+            {isReadOnly && (
+              <span className="editor-access-badge" role="status">
+                <LockOutlined aria-hidden="true" /> 仅查看
+              </span>
+            )}
             {tag && <Tag color={tag.color}>{tag.label}</Tag>}
           </div>
         </div>
 
         <div className="editor-topbar-center">
           <div className="editor-panel-tabs" role="tablist" aria-label="编辑器侧边面板">
-            {RIGHT_PANELS.map(({ key, label, icon: Icon }) => {
+            {availableRightPanels.map(({ key, label, icon: Icon }) => {
               const isActive = isPanelOpen && rightPanel === key
               return (
                 <button
@@ -350,7 +386,7 @@ const AppEditor: React.FC = () => {
         </div>
 
         <div className="editor-topbar-right">
-          {selectedNode && (
+          {selectedNode && canEditWorkflow && (
             <Tooltip title="删除所选节点（Delete / Backspace）">
               <Button
                 size="small"
@@ -393,9 +429,10 @@ const AppEditor: React.FC = () => {
             size="small"
             icon={<SaveOutlined />}
             onClick={handleSave}
-            loading={isLoading}
+            loading={workflowLoading}
+            disabled={!canEditWorkflow || !currentWorkflow}
             className="editor-action-btn"
-            aria-label="保存工作流"
+            aria-label={isReadOnly ? '保存工作流（当前为仅查看模式）' : '保存工作流'}
           >
             <span className="editor-action-label">保存</span>
           </Button>
@@ -404,8 +441,9 @@ const AppEditor: React.FC = () => {
             type="primary"
             icon={<PlayCircleOutlined />}
             onClick={handleRun}
+            disabled={!canRunWorkflow || !currentWorkflow}
             className="editor-action-btn"
-            aria-label="运行工作流"
+            aria-label={isReadOnly ? '运行工作流（当前为仅查看模式）' : '运行工作流'}
           >
             <span className="editor-action-label">运行</span>
           </Button>
@@ -415,7 +453,7 @@ const AppEditor: React.FC = () => {
       {/* ---- Editor body ---- */}
       <ReactFlowProvider>
         <div className="editor-body">
-          {isNodePanelOpen && (
+          {canEditWorkflow && isNodePanelOpen && (
             <button
               type="button"
               className="editor-panel-scrim"
@@ -423,7 +461,7 @@ const AppEditor: React.FC = () => {
               aria-label="关闭节点库"
             />
           )}
-          <aside
+          {canEditWorkflow && <aside
             id="editor-node-library"
             className={`editor-node-panel-shell ${isNodePanelOpen ? 'editor-node-panel-shell--mobile-open' : ''}`}
             style={{ width: nodePanelWidth }}
@@ -455,16 +493,24 @@ const AppEditor: React.FC = () => {
               onKeyDown={handleNodePanelResizeKeyDown}
               onDoubleClick={() => setNodePanelWidth(DEFAULT_NODE_PANEL_WIDTH)}
             />
-          </aside>
+          </aside>}
           <div className="editor-canvas-wrapper">
-            <WorkflowCanvas onNodeSelect={handleCanvasNodeSelect} />
+            <WorkflowCanvas onNodeSelect={handleCanvasNodeSelect} readOnly={!canEditWorkflow} />
           </div>
           {isPanelOpen && (
             <aside
               id="editor-inspector"
               className="editor-inspector"
               style={{ width: panelWidth }}
-              aria-label={`${rightPanel === 'config' ? '配置' : rightPanel === 'debug' ? '调试' : '分享'}面板`}
+              aria-label={`${
+                rightPanel === 'config'
+                  ? '配置'
+                  : rightPanel === 'debug'
+                    ? '调试'
+                    : rightPanel === 'share'
+                      ? '分享'
+                      : '版本'
+              }面板`}
             >
               <div
                 className="editor-inspector-resizer"
@@ -491,16 +537,18 @@ const AppEditor: React.FC = () => {
                 </button>
               </Tooltip>
               <div className="editor-inspector-content">
-                {rightPanel === 'config' ? <ConfigPanel /> : rightPanel === 'debug' ? <RunPanel /> : (
+                {rightPanel === 'config' ? <ConfigPanel readOnly={!canEditWorkflow} /> : rightPanel === 'debug' ? <RunPanel /> : rightPanel === 'share' ? (
                   <div className="editor-share-panel">
                     <AppShareSettings appId={appId!} />
                   </div>
+                ) : (
+                  <VersionPanel />
                 )}
               </div>
             </aside>
           )}
           <nav className="editor-mobile-toolbar" aria-label="编辑器面板">
-            <button
+            {canEditWorkflow && <button
               type="button"
               className={`editor-mobile-toolbar-btn ${isNodePanelOpen ? 'editor-mobile-toolbar-btn--active' : ''}`}
               onClick={handleNodePanelToggle}
@@ -509,9 +557,9 @@ const AppEditor: React.FC = () => {
             >
               <PlusSquareOutlined aria-hidden="true" />
               <span>节点</span>
-            </button>
+            </button>}
             <div className="editor-mobile-panel-actions">
-              {RIGHT_PANELS.map(({ key, label, icon: Icon }) => {
+              {availableRightPanels.map(({ key, label, icon: Icon }) => {
                 const isActive = isPanelOpen && rightPanel === key
                 return (
                   <button

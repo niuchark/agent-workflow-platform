@@ -6,12 +6,13 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HealthController } from './health.controller';
 import { RateLimitController } from './rate-limit.controller';
-import { RateLimiterService, CircuitBreakerService } from '../../common/guards/rate-limit.guard';
+import { CircuitBreakerService } from '../../common/services/rate-limit.service';
+import { AdminGuard } from '../../common/guards/admin.guard';
 
 /** 应用模块：注册控制器与限流/熔断服务 */
 @Module({
   controllers: [AppController, HealthController, RateLimitController],
-  providers: [AppService, RateLimiterService, CircuitBreakerService],
-  exports: [RateLimiterService, CircuitBreakerService],
+  providers: [AppService, CircuitBreakerService, AdminGuard],
+  exports: [CircuitBreakerService],
 })
 export class AppModule {}

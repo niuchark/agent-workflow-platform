@@ -1,7 +1,7 @@
 /**
  * Token 用量 DTO：记录、查询与成本报表的请求体。
  */
-import { IsString, IsNumber, IsOptional, IsDateString, IsEnum, Min } from 'class-validator';
+import { IsDateString, IsEnum, IsIn, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export enum CallType {
   CHAT = 'chat',
@@ -105,6 +105,17 @@ export class GetCostReportDto {
    * 分组维度: day, week, month, model, provider
    */
   @IsOptional()
-  @IsString()
+  @IsIn(['day', 'week', 'month', 'model', 'provider'])
   groupBy?: 'day' | 'week' | 'month' | 'model' | 'provider';
+}
+
+/** 模型使用排行查询 */
+export class GetModelRankingDto {
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
 }

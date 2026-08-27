@@ -3,6 +3,7 @@
  */
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { TracingService } from '../services/tracing.service';
 
 @Controller('traces')
@@ -14,8 +15,8 @@ export class WorkflowTraceController {
    * 获取 Trace 详情
    */
   @Get(':traceId')
-  async getTrace(@Param('traceId') traceId: string) {
-    return this.tracingService.getTrace(traceId);
+  async getTrace(@CurrentUser('userId') userId: string, @Param('traceId') traceId: string) {
+    return this.tracingService.getTrace(userId, traceId);
   }
 
   /**
@@ -23,10 +24,11 @@ export class WorkflowTraceController {
    */
   @Get('workflow/:workflowId')
   async getWorkflowTraces(
+    @CurrentUser('userId') userId: string,
     @Param('workflowId') workflowId: string,
     @Query('limit') limit?: string,
   ) {
-    return this.tracingService.getWorkflowTraces(workflowId, limit ? Number(limit) : 20);
+    return this.tracingService.getWorkflowTraces(userId, workflowId, limit ? Number(limit) : 20);
   }
 
   /**
@@ -34,17 +36,18 @@ export class WorkflowTraceController {
    */
   @Get('slow/list')
   async getSlowTraces(
+    @CurrentUser('userId') userId: string,
     @Query('workflowId') workflowId?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.tracingService.getSlowTraces(workflowId, limit ? Number(limit) : 10);
+    return this.tracingService.getSlowTraces(userId, workflowId, limit ? Number(limit) : 10);
   }
 
   /**
    * 获取 Trace 统计
    */
   @Get('stats/overview')
-  async getTraceStats(@Query('workflowId') workflowId?: string) {
-    return this.tracingService.getTraceStats(workflowId);
+  async getTraceStats(@CurrentUser('userId') userId: string, @Query('workflowId') workflowId?: string) {
+    return this.tracingService.getTraceStats(userId, workflowId);
   }
 }

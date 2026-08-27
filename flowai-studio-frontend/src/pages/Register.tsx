@@ -13,7 +13,7 @@ import { PASSWORD_RULES, USERNAME_PLACEHOLDER, USERNAME_RULES } from '../utils/a
 
 const Register: React.FC = () => {
   const navigate = useNavigate()
-  const { register, isLoading, authError, clearError } = useStore()
+  const { register, userLoading, authError, clearError } = useStore()
   const [form] = Form.useForm()
 
   /** 提交注册：成功后提示并跳转登录页 */
@@ -62,7 +62,7 @@ const Register: React.FC = () => {
             prefix={<UserOutlined />}
             placeholder={USERNAME_PLACEHOLDER}
             size="large"
-            disabled={isLoading}
+            disabled={userLoading}
             autoComplete="username"
           />
         </Form.Item>
@@ -78,7 +78,7 @@ const Register: React.FC = () => {
             prefix={<LockOutlined />}
             placeholder="请输入密码"
             size="large"
-            disabled={isLoading}
+            disabled={userLoading}
             autoComplete="new-password"
           />
         </Form.Item>
@@ -105,7 +105,7 @@ const Register: React.FC = () => {
             prefix={<LockOutlined />}
             placeholder="请再次输入密码"
             size="large"
-            disabled={isLoading}
+            disabled={userLoading}
             autoComplete="new-password"
           />
         </Form.Item>
@@ -115,8 +115,8 @@ const Register: React.FC = () => {
             type="primary"
             htmlType="submit"
             className="auth-submit-btn"
-            loading={isLoading}
-            disabled={isLoading}
+            loading={userLoading}
+            disabled={userLoading}
             block
             size="large"
           >

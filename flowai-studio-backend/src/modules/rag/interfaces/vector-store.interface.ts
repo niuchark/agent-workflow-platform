@@ -45,8 +45,6 @@ export interface VectorSearchQuery {
   similarityThreshold?: number;
   /** 元数据过滤条件 */
   filter?: VectorSearchFilter;
-  /** 额外需要返回的字段 */
-  selectFields?: string[];
 }
 
 /**

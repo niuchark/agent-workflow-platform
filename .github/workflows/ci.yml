@@ -1,7 +1,7 @@
 # ============================================================
 # FlowAI Studio - CI Pipeline
 # ============================================================
-# 触发条件: push/PR to main
+# 触发条件: push to main/develop、PR to main、手动触发
 # 流程: lint → type-check → test → build
 #
 # 竞品对标:
@@ -13,12 +13,15 @@
 name: CI
 
 on:
-  # 暂时禁用 CI，后续按需启用
-  # push:
-  #   branches: [main, develop]
-  # pull_request:
-  #   branches: [main]
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
   workflow_dispatch: {}
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   NODE_VERSION: '20'
@@ -30,6 +33,12 @@ jobs:
   backend:
     name: Backend CI
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/flowai_studio_test?schema=public
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: test-jwt-secret
+      QWEN_API_KEY: test-api-key
+      NODE_ENV: test
     defaults:
       run:
         working-directory: flowai-studio-backend
@@ -76,24 +85,22 @@ jobs:
         run: npx prisma generate
 
       - name: Lint
-        run: npm run lint --if-present
+        run: npm run lint
 
       - name: Type check
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       - name: Run database migrations
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/flowai_studio_test?schema=public
-        run: npx prisma migrate deploy || echo "Migration skipped (may need manual setup)"
+        run: npm run db:migrate:deploy
 
       - name: Test
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/flowai_studio_test?schema=public
-          REDIS_URL: redis://localhost:6379
-          JWT_SECRET: test-jwt-secret
-          QWEN_API_KEY: test-api-key
-          NODE_ENV: test
-        run: npm test --if-present
+        run: npm run test:ci
+
+      - name: Test HTTP API
+        run: npm run test:e2e -- --runInBand
+
+      - name: Build
+        run: npm run build
 
   # ============================================================
   # 前端检查
@@ -119,10 +126,10 @@ jobs:
         run: npm ci
 
       - name: Lint
-        run: npm run lint --if-present
+        run: npm run lint:ci
 
       - name: Type check
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       - name: Build
         run: npm run build
@@ -137,6 +144,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Validate Docker Compose configuration
+        env:
+          POSTGRES_PASSWORD: compose-validation
+          JWT_SECRET: compose-validation-secret
+          MODEL_CREDENTIAL_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+        run: docker compose --env-file .env.example config --quiet
 
       - name: Build backend image
         run: docker build -t flowai-backend:test ./flowai-studio-backend

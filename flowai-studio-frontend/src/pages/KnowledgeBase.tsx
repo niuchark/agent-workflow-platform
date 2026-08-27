@@ -61,7 +61,7 @@ const KnowledgeBase: React.FC = () => {
   const { availableProviders, loading: modelCatalogLoading } = useModelCatalog()
   const {
     knowledgeBases,
-    isLoading,
+    ragLoading,
     fetchKnowledgeBases,
     fetchKnowledgeBaseById,
     createKnowledgeBase,
@@ -102,9 +102,9 @@ const KnowledgeBase: React.FC = () => {
   const [chunksLoading, setChunksLoading] = useState(false)
 
   // 进入页面加载知识库列表
-  useEffect(() => { fetchKnowledgeBases() }, [])
+  useEffect(() => { fetchKnowledgeBases() }, [fetchKnowledgeBases])
 
-  const safeKnowledgeBases = Array.isArray(knowledgeBases) ? knowledgeBases : []
+  const safeKnowledgeBases = knowledgeBases
   // 全库文档总量统计
   const totalDocuments = useMemo(
     () => safeKnowledgeBases.reduce((count, kb) => count + (kb.documents?.length || 0), 0),
@@ -136,10 +136,10 @@ const KnowledgeBase: React.FC = () => {
       name: kb.name, description: kb.description || '',
       embeddingProvider: kb.embeddingProvider || 'qwen',
       embeddingModel: kb.embeddingModel || 'text-embedding-v3',
-      embeddingDimension: kb.embeddingDimension || 1024,
+      embeddingDimension: kb.embeddingDimension ?? 1024,
       vectorStore: kb.vectorStore || 'pgvector',
-      chunkSize: kb.chunkSize || 500, chunkOverlap: kb.chunkOverlap || 50,
-      topK: kb.topK || 5, similarityThreshold: kb.similarityThreshold || 0.7,
+      chunkSize: kb.chunkSize ?? 500, chunkOverlap: kb.chunkOverlap ?? 50,
+      topK: kb.topK ?? 5, similarityThreshold: kb.similarityThreshold ?? 0.7,
       retrievalMode: kb.retrievalMode || 'vector',
       vectorWeight: kb.vectorWeight ?? 0.7,
       rrfK: kb.rrfK ?? 60,
@@ -240,7 +240,7 @@ const KnowledgeBase: React.FC = () => {
           >
             分块
           </Button>
-          <Button aria-label={`删除文档 ${record.name}`} icon={<DeleteOutlined />} size="small" danger type="text" onClick={() => handleDeleteDocument(record.id)} loading={isLoading} className="action-btn" />
+          <Button aria-label={`删除文档 ${record.name}`} icon={<DeleteOutlined />} size="small" danger type="text" onClick={() => handleDeleteDocument(record.id)} loading={ragLoading} className="action-btn" />
         </Space>
       ),
     },
@@ -340,7 +340,7 @@ const KnowledgeBase: React.FC = () => {
             columns={kbColumns}
             dataSource={safeKnowledgeBases}
             rowKey="id"
-            loading={isLoading}
+            loading={ragLoading}
             scroll={{ x: 1000 }}
             pagination={{ pageSize: 8, size: 'small' }}
           />
@@ -353,7 +353,7 @@ const KnowledgeBase: React.FC = () => {
       <Modal
         title={editingKb ? '编辑知识库' : '新建知识库'}
         open={modalVisible} onOk={handleSaveKb} onCancel={() => setModalVisible(false)}
-        confirmLoading={isLoading} okText={editingKb ? '保存修改' : '创建知识库'} cancelText="取消" width={560}
+        confirmLoading={ragLoading} okText={editingKb ? '保存修改' : '创建知识库'} cancelText="取消" width={560}
         okButtonProps={{ style: { background: 'var(--c-accent)', borderColor: 'var(--c-accent)' } }}
       >
         <div className="kb-modal-fields">
@@ -591,7 +591,7 @@ const KnowledgeBase: React.FC = () => {
                         >
                           查看分块
                         </Button>
-                        <Button danger icon={<DeleteOutlined />} onClick={() => handleDeleteDocument(document.id)} loading={isLoading}>删除</Button>
+                        <Button danger icon={<DeleteOutlined />} onClick={() => handleDeleteDocument(document.id)} loading={ragLoading}>删除</Button>
                       </div>
                     </article>
                   ))}

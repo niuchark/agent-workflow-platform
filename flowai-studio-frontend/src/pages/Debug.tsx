@@ -63,7 +63,7 @@ interface NodeExecState {
 const Debug: React.FC = () => {
   const navigate = useNavigate()
   const { availableProviders, modelsByProvider, loading: modelCatalogLoading } = useModelCatalog()
-  const { isLoading, setIsLoading, apps, fetchApps, knowledgeBases, fetchKnowledgeBases } = useStore()
+  const { debugIsLoading, setDebugIsLoading, apps, fetchApps, knowledgeBases, fetchKnowledgeBases } = useStore()
   const [input, setInput] = useState('')
   // 标记是否处于输入法组合状态（回车选字时不触发发送）
   const isComposingRef = useRef(false)
@@ -293,7 +293,7 @@ const Debug: React.FC = () => {
       }
     }
 
-    setIsLoading(true)
+    setDebugIsLoading(true)
     setWorkflowResult(null)
     setNodeStates({})
     setWfStatus('running')
@@ -373,7 +373,7 @@ const Debug: React.FC = () => {
       message.error('工作流执行失败')
       setWfStatus('failed')
     } finally {
-      setIsLoading(false)
+      setDebugIsLoading(false)
     }
   }
 
@@ -669,7 +669,7 @@ const Debug: React.FC = () => {
               type="primary"
               icon={<PlayCircleOutlined />}
               onClick={handleRunWorkflow}
-              loading={isLoading}
+              loading={debugIsLoading}
               disabled={!selectedWorkflowId}
               className="debug-wf-run-btn"
             >
@@ -685,7 +685,7 @@ const Debug: React.FC = () => {
                 取消
               </Button>
             )}
-            {(nodeExecList.length > 0 || workflowResult) && !isLoading && (
+            {(nodeExecList.length > 0 || workflowResult) && !debugIsLoading && (
               <Button
                 icon={<ClearOutlined />}
                 onClick={handleClearWorkflow}
@@ -711,7 +711,7 @@ const Debug: React.FC = () => {
               placeholder='{"question": "你好"}'
               autoSize={{ minRows: 2, maxRows: 5 }}
               className="debug-wf-inputs-textarea"
-              disabled={isLoading}
+              disabled={debugIsLoading}
             />
           </div>
 

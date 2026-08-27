@@ -32,7 +32,7 @@ export interface WorkflowSlice {
   canvasZoom: number
   executionStates: Record<string, NodeExecution>
   executionStatus: string | null
-  isLoading: boolean
+  workflowLoading: boolean
   
   // Actions
   setWorkflows: (workflows: Workflow[]) => void
@@ -72,7 +72,7 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
   canvasZoom: 1,
   executionStates: {},
   executionStatus: null,
-  isLoading: false,
+  workflowLoading: false,
 
   setWorkflows: (workflows) => set({ workflows }),
   
@@ -186,13 +186,13 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
   
   /** 普通方式运行工作流：不接收节点级流式输出 */
   runWorkflow: async (workflowId) => {
-    set({ isLoading: true, executionStatus: 'running', executionStates: {} })
+    set({ workflowLoading: true, executionStatus: 'running', executionStates: {} })
     try {
       const response = await request.post(`/workflows/${workflowId}/run`, { inputs: {} })
-      set({ isLoading: false, executionStatus: 'success' })
+      set({ workflowLoading: false, executionStatus: 'success' })
       return response.data
     } catch (error) {
-      set({ isLoading: false, executionStatus: 'failed' })
+      set({ workflowLoading: false, executionStatus: 'failed' })
       throw error
     }
   },
@@ -256,14 +256,14 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
 
   /** 拉取某应用下的工作流列表 */
   fetchWorkflows: async (appId) => {
-    set({ isLoading: true })
+    set({ workflowLoading: true })
     try {
       const response = await request.get(`/workflows/app/${appId}`) as any
       const workflows = (Array.isArray(response.data) ? response.data : []) as Workflow[]
-      set({ workflows, isLoading: false })
+      set({ workflows, workflowLoading: false })
       return workflows
     } catch (error) {
-      set({ isLoading: false })
+      set({ workflowLoading: false })
       set({ workflows: [] })
       throw error
     }
@@ -271,36 +271,36 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
 
   /** 按 ID 拉取工作流并载入画布（节点/连线） */
   fetchWorkflowById: async (id) => {
-    set({ isLoading: true })
+    set({ workflowLoading: true })
     try {
       const response = await request.get(`/workflows/${id}`) as any
       const workflow = response.data as Workflow
-      set({ currentWorkflow: workflow, nodes: workflow.nodes || [], edges: workflow.edges || [], isLoading: false })
+      set({ currentWorkflow: workflow, nodes: workflow.nodes || [], edges: workflow.edges || [], workflowLoading: false })
       return workflow
     } catch (error) {
-      set({ isLoading: false })
+      set({ workflowLoading: false })
       throw error
     }
   },
 
   /** 创建工作流：成功后追加到列表末尾 */
   createWorkflow: async (appId, data) => {
-    set({ isLoading: true })
+    set({ workflowLoading: true })
     try {
       const response = await request.post('/workflows', { ...data, applicationId: appId }) as any
       const workflow = response.data as Workflow
       const currentWorkflows = Array.isArray(get().workflows) ? get().workflows : []
-      set({ workflows: [...currentWorkflows, workflow], isLoading: false })
+      set({ workflows: [...currentWorkflows, workflow], workflowLoading: false })
       return workflow
     } catch (error) {
-      set({ isLoading: false })
+      set({ workflowLoading: false })
       throw error
     }
   },
 
   /** 更新工作流：同步更新列表与当前工作流 */
   updateWorkflow: async (id, data) => {
-    set({ isLoading: true })
+    set({ workflowLoading: true })
     try {
       const response = await request.patch(`/workflows/${id}`, data) as any
       const updatedWorkflow = response.data as Workflow
@@ -309,42 +309,42 @@ export const createWorkflowSlice: StateCreator<WorkflowSlice> = (set, get) => ({
       set({
         workflows: currentWorkflows.map((wf) => wf.id === id ? updatedWorkflow : wf),
         currentWorkflow: get().currentWorkflow?.id === id ? updatedWorkflow : get().currentWorkflow,
-        isLoading: false,
+        workflowLoading: false,
       })
       
       return updatedWorkflow
     } catch (error) {
-      set({ isLoading: false })
+      set({ workflowLoading: false })
       throw error
     }
   },
 
   /** 保存画布：仅更新当前工作流的节点与连线 */
   saveWorkflow: async (id, data) => {
-    set({ isLoading: true })
+    set({ workflowLoading: true })
     try {
       const response = await request.patch(`/workflows/${id}`, data) as any
       const updatedWorkflow = response.data as Workflow
-      set({ currentWorkflow: updatedWorkflow, isLoading: false })
+      set({ currentWorkflow: updatedWorkflow, workflowLoading: false })
       return updatedWorkflow
     } catch (error) {
-      set({ isLoading: false })
+      set({ workflowLoading: false })
       throw error
     }
   },
 
   /** 删除工作流：若删除的是当前工作流则清空画布 */
   deleteWorkflow: async (id) => {
-    set({ isLoading: true })
+    set({ workflowLoading: true })
     try {
       await request.delete(`/workflows/${id}`)
       set({
         workflows: get().workflows.filter((wf) => wf.id !== id),
         currentWorkflow: get().currentWorkflow?.id === id ? null : get().currentWorkflow,
-        isLoading: false,
+        workflowLoading: false,
       })
     } catch (error) {
-      set({ isLoading: false })
+      set({ workflowLoading: false })
       throw error
     }
   },

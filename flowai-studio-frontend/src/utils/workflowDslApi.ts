@@ -4,7 +4,26 @@
  * DSL 是工作流节点/连线的声明式表示（YAML/JSON），
  * 用于工作流的备份、迁移与批量创建。
  */
-import request from './axios'
+import request, { getResponseData } from './axios'
+
+export interface WorkflowDslValidationResult {
+  valid: boolean
+  errors: string[]
+  warnings: string[]
+}
+
+/** 后端导入接口返回新建后的扁平工作流及旧/新节点 ID 映射。 */
+export interface ImportedWorkflowDsl {
+  id: string
+  name: string
+  description: string | null
+  nodes: unknown[]
+  edges: unknown[]
+  variables: unknown
+  createdAt: string
+  updatedAt: string
+  idMapping: Record<string, string>
+}
 
 /**
  * 导出工作流 DSL
@@ -29,12 +48,10 @@ export async function exportWorkflowDsl(
 export async function validateWorkflowDsl(
   dsl: string,
   format: 'yaml' | 'json' = 'yaml',
-): Promise<{
-  valid: boolean
-  errors: string[]
-  warnings: string[]
-}> {
-  return request.post('/workflow-dsl/validate', { dsl, format })
+): Promise<WorkflowDslValidationResult> {
+  return getResponseData<WorkflowDslValidationResult>(
+    await request.post('/workflow-dsl/validate', { dsl, format }),
+  )
 }
 
 /**
@@ -45,15 +62,8 @@ export async function importWorkflowDsl(data: {
   format: 'yaml' | 'json'
   applicationId: string
   nameOverride?: string
-}): Promise<{
-  workflow: {
-    id: string
-    name: string
-    description: string | null
-    createdAt: string
-    updatedAt: string
-  }
-  idMap: Record<string, string>
-}> {
-  return request.post('/workflow-dsl/import', data)
+}): Promise<ImportedWorkflowDsl> {
+  return getResponseData<ImportedWorkflowDsl>(
+    await request.post('/workflow-dsl/import', data),
+  )
 }

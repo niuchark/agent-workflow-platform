@@ -101,10 +101,12 @@ const createNodeData = (type: NodeType): WorkflowNode['data'] => {
 interface WorkflowCanvasProps {
   /** 节点被点击时的回调（由父组件打开配置面板） */
   onNodeSelect?: (node: WorkflowNode) => void
+  /** 只读模式仍允许查看与选择，但禁止修改画布结构 */
+  readOnly?: boolean
 }
 
 /** 工作流画布组件 */
-const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({ onNodeSelect }) => {
+const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({ onNodeSelect, readOnly = false }) => {
   const [modal, modalContextHolder] = Modal.useModal()
   const [messageApi, messageContextHolder] = message.useMessage()
   const { 
@@ -144,14 +146,15 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({ onNodeSelect }) => {
 
   /** 重连成功：更新连线并提示 */
   const onReconnect = useCallback((edge: WorkflowEdge, connection: Connection) => {
+    if (readOnly) return
     reconnectSuccessful.current = true
     reconnectWorkflowEdge(edge, connection)
     messageApi.success('连线已重新连接')
-  }, [messageApi, reconnectWorkflowEdge])
+  }, [messageApi, readOnly, reconnectWorkflowEdge])
 
   /** 重连结束：若未成功则弹窗询问是否断开原连线 */
   const onReconnectEnd = useCallback((_event: MouseEvent | TouchEvent, edge: WorkflowEdge) => {
-    if (reconnectSuccessful.current) {
+    if (readOnly || reconnectSuccessful.current) {
       return
     }
 
@@ -167,13 +170,18 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({ onNodeSelect }) => {
         messageApi.success('已断开连线')
       },
     })
-  }, [deleteEdge, messageApi, modal])
+  }, [deleteEdge, messageApi, modal, readOnly])
 
   /** 删除前确认：节点与连线统一弹窗二次确认 */
   const onBeforeDelete = useCallback(({ nodes: nodesToDelete, edges: edgesToDelete }: {
     nodes: WorkflowNode[]
     edges: WorkflowEdge[]
   }) => new Promise<boolean>((resolve) => {
+    if (readOnly) {
+      resolve(false)
+      return
+    }
+
     const nodeCount = nodesToDelete.length
     const edgeCount = edgesToDelete.length
     const title = nodeCount > 0
@@ -192,7 +200,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({ onNodeSelect }) => {
       onOk: () => resolve(true),
       onCancel: () => resolve(false),
     })
-  }), [modal])
+  }), [modal, readOnly])
 
   /** 节点删除后：清空选中并提示 */
   const onNodesDelete = useCallback((deletedNodes: WorkflowNode[]) => {
@@ -212,13 +220,15 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({ onNodeSelect }) => {
 
   /** 拖拽经过画布：允许放置 */
   const onDragOver = useCallback((event: React.DragEvent) => {
+    if (readOnly) return
     event.preventDefault()
     event.dataTransfer.dropEffect = 'copy'
-  }, [])
+  }, [readOnly])
 
   /** 放下节点：按拖入类型创建节点并放到鼠标位置 */
   const onDrop = useCallback(
     (event: React.DragEvent) => {
+      if (readOnly) return
       event.preventDefault()
 
       const type = event.dataTransfer.getData('application/reactflow') as NodeType
@@ -242,7 +252,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({ onNodeSelect }) => {
 
       setNodes([...nodes, newNode])
     },
-    [screenToFlowPosition, nodes, setNodes]
+    [readOnly, screenToFlowPosition, nodes, setNodes]
   )
 
   return (
@@ -259,12 +269,19 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({ onNodeSelect }) => {
         onReconnectStart={onReconnectStart}
         onReconnect={onReconnect}
         onReconnectEnd={onReconnectEnd}
-        edgesReconnectable
+        edgesReconnectable={!readOnly}
+        nodesDraggable={!readOnly}
+        nodesConnectable={!readOnly}
         reconnectRadius={20}
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}
-        onSelectionChange={({ edges: selectedEdges }) => {
+        onSelectionChange={({ nodes: selectedNodes, edges: selectedEdges }) => {
+          const nextSelectedNode = selectedNodes[0] as WorkflowNode | undefined
           setSelectedEdgeId(selectedEdges[0]?.id ?? null)
+          if (useStore.getState().selectedNode?.id !== nextSelectedNode?.id) {
+            setSelectedNode(nextSelectedNode ?? null)
+            if (nextSelectedNode) onNodeSelect?.(nextSelectedNode)
+          }
         }}
         onPaneClick={() => {
           setSelectedNode(null)
@@ -273,7 +290,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({ onNodeSelect }) => {
         onBeforeDelete={onBeforeDelete}
         onNodesDelete={onNodesDelete}
         onEdgesDelete={onEdgesDelete}
-        deleteKeyCode={['Backspace', 'Delete']}
+        deleteKeyCode={readOnly ? null : ['Backspace', 'Delete']}
         onDragOver={onDragOver}
         onDrop={onDrop}
         nodeTypes={nodeTypes}
@@ -281,10 +298,10 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({ onNodeSelect }) => {
         attributionPosition="top-right"
       >
         <Background color="#f0f0f0" gap={16} />
-        <Controls />
+        <Controls showInteractive={!readOnly} />
         <MiniMap />
       </ReactFlow>
-      {selectedEdgeId && (
+      {selectedEdgeId && !readOnly && (
         <div className="workflow-edge-hint" role="status">
           拖动连线端点可重新连接 · Delete / Backspace 可断开
         </div>

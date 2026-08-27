@@ -6,7 +6,7 @@
  * - 卡片上直观展示连接状态与传输方式。
  */
 import { useState, useEffect } from 'react'
-import { Button, Input, message, Modal, Select, Empty, Dropdown, Spin, Tag, Form, Switch } from 'antd'
+import { Button, Input, message, Modal, Select, Empty, Dropdown, Spin, Tag, Form } from 'antd'
 import {
   PlusOutlined,
   DeleteOutlined,
@@ -18,7 +18,6 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   PlayCircleOutlined,
-  ReloadOutlined,
   CodeOutlined,
 } from '@ant-design/icons'
 import request from '../utils/axios'

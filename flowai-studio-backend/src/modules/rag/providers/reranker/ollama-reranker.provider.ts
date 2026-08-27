@@ -146,7 +146,7 @@ export class OllamaReranker implements RerankerProvider {
     // 并行处理，每批 maxConcurrency 个
     for (let i = 0; i < documents.length; i += batchSize) {
       const batch = documents.slice(i, i + batchSize);
-      const batchPromises = batch.map((doc, batchIndex) =>
+      const batchPromises = batch.map((doc) =>
         this.computeSingleScore(query, doc.content).catch((error) => {
           this.logger.warn(
             `Failed to compute score for doc ${doc.id}: ${error instanceof Error ? error.message : error}`,

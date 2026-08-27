@@ -8,7 +8,6 @@
  * - NoOpReranker: 原样返回
  */
 import { RerankerFactory, RerankerType } from '../reranker.factory';
-import { ConfigService } from '@nestjs/config';
 
 // ─── Mocks ────────────────────────────────────────────────
 

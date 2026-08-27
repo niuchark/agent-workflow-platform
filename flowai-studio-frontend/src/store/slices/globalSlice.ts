@@ -15,6 +15,7 @@ export interface GlobalSlice {
     autoSave: boolean
   }
   loading: boolean
+  debugIsLoading: boolean
   message: {
     type: 'success' | 'error' | 'warning' | 'info'
     content: string
@@ -24,6 +25,7 @@ export interface GlobalSlice {
   // Actions
   setGlobalConfig: (config: Partial<GlobalSlice['globalConfig']>) => void
   setLoading: (loading: boolean) => void
+  setDebugIsLoading: (loading: boolean) => void
   showMessage: (type: 'success' | 'error' | 'warning' | 'info', content: string) => void
   hideMessage: () => void
   toggleSidebar: () => void
@@ -38,6 +40,7 @@ export const createGlobalSlice: StateCreator<GlobalSlice> = (set, get) => ({
     autoSave: true,
   },
   loading: false,
+  debugIsLoading: false,
   message: {
     type: 'info',
     content: '',
@@ -55,6 +58,8 @@ export const createGlobalSlice: StateCreator<GlobalSlice> = (set, get) => ({
   },
   
   setLoading: (loading) => set({ loading }),
+
+  setDebugIsLoading: (debugIsLoading) => set({ debugIsLoading }),
   
   /** 显示全局提示消息，3 秒后自动隐藏 */
   showMessage: (type, content) => {

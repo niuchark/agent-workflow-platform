@@ -18,7 +18,6 @@ import {
   LLMResponse,
   LLMModelInfo,
   LLMProviderConfig,
-  ToolDefinition,
   ToolCall,
 } from '../interfaces/llm-provider.interface';
 import { BaseLLMProvider } from './base-llm.provider';

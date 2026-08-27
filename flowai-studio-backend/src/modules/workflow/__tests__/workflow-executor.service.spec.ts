@@ -18,11 +18,14 @@ describe('WorkflowExecutorService', () => {
   let service: WorkflowExecutorService;
   let mockPrisma: any;
   let mockFactory: any;
+  let mockWorkflowAccess: any;
   let mockExecutor: any;
 
   const buildWorkflow = (nodes: any[], edges: any[]) => ({
     id: 'wf_1',
     name: 'Test Workflow',
+    applicationId: 'app_1',
+    application: { id: 'app_1', userId: 'user_1' },
     nodes: JSON.stringify(nodes),
     edges: JSON.stringify(edges),
   });
@@ -44,7 +47,14 @@ describe('WorkflowExecutorService', () => {
       },
     };
 
-    service = new WorkflowExecutorService(mockPrisma, mockFactory);
+    mockWorkflowAccess = {
+      assertPermission: jest.fn(async (userId: string, application: { userId: string }) => {
+        if (application.userId === userId) return 'owner';
+        throw new Error('You do not have permission to access this workflow');
+      }),
+    };
+
+    service = new WorkflowExecutorService(mockPrisma, mockFactory, mockWorkflowAccess);
   });
 
   // ============================================================
@@ -66,7 +76,10 @@ describe('WorkflowExecutorService', () => {
         ),
       );
 
-      const result = await service.executeWorkflow('wf_1', { inputs: {} });
+      const result = await service.executeWorkflow('wf_1', {
+        inputs: {},
+        userId: 'user_1',
+      });
 
       expect(mockExecutor.execute).toHaveBeenCalledTimes(3);
       expect(result.start).toEqual({ result: 'ok' });
@@ -77,15 +90,25 @@ describe('WorkflowExecutorService', () => {
     it('should throw when workflow not found', async () => {
       mockPrisma.workflow.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.executeWorkflow('missing', { inputs: {} }),
-      ).rejects.toThrow('Workflow not found');
+      await expect(service.executeWorkflow('missing', { inputs: {}, userId: 'user_1' })).rejects.toThrow(
+        'Workflow not found',
+      );
+    });
+
+    it('should reject execution by a user who does not own the workflow', async () => {
+      mockPrisma.workflow.findUnique.mockResolvedValue(buildWorkflow([{ id: 'start', type: 'start', data: {} }], []));
+
+      await expect(service.executeWorkflow('wf_1', { inputs: {}, userId: 'user_2' })).rejects.toThrow('permission');
+      expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+
+    it('should reject execution without an authenticated user', async () => {
+      await expect(service.executeWorkflow('wf_1', { inputs: {} })).rejects.toThrow('user is required');
+      expect(mockPrisma.workflow.findUnique).not.toHaveBeenCalled();
     });
 
     it('should pass inputs to context', async () => {
-      mockPrisma.workflow.findUnique.mockResolvedValue(
-        buildWorkflow([{ id: 'start', type: 'start', data: {} }], []),
-      );
+      mockPrisma.workflow.findUnique.mockResolvedValue(buildWorkflow([{ id: 'start', type: 'start', data: {} }], []));
 
       let capturedContext: any;
       mockExecutor.execute.mockImplementation((_node: any, ctx: any) => {
@@ -93,7 +116,10 @@ describe('WorkflowExecutorService', () => {
         return Promise.resolve({ result: 'ok' });
       });
 
-      await service.executeWorkflow('wf_1', { inputs: { question: 'hello' } });
+      await service.executeWorkflow('wf_1', {
+        inputs: { question: 'hello' },
+        userId: 'user_1',
+      });
 
       expect(capturedContext.question).toBe('hello');
     });
@@ -104,15 +130,13 @@ describe('WorkflowExecutorService', () => {
   // ============================================================
   describe('SSE Events & Progress', () => {
     it('should emit workflow_start with control config', async () => {
-      mockPrisma.workflow.findUnique.mockResolvedValue(
-        buildWorkflow([{ id: 'start', type: 'start', data: {} }], []),
-      );
+      mockPrisma.workflow.findUnique.mockResolvedValue(buildWorkflow([{ id: 'start', type: 'start', data: {} }], []));
 
       const subject = new Subject<any>();
       const events: any[] = [];
       subject.subscribe((e) => events.push(e));
 
-      await service.executeWorkflow('wf_1', { inputs: {} }, subject);
+      await service.executeWorkflow('wf_1', { inputs: {}, userId: 'user_1' }, subject);
 
       const startEvent = events.find((e) => e.type === 'workflow_start');
       expect(startEvent).toBeDefined();
@@ -135,26 +159,22 @@ describe('WorkflowExecutorService', () => {
       const events: any[] = [];
       subject.subscribe((e) => events.push(e));
 
-      await service.executeWorkflow('wf_1', { inputs: {} }, subject);
+      await service.executeWorkflow('wf_1', { inputs: {}, userId: 'user_1' }, subject);
 
-      const successEvents = events.filter(
-        (e) => e.type === 'node_status' && e.data.status === 'success',
-      );
+      const successEvents = events.filter((e) => e.type === 'node_status' && e.data.status === 'success');
       expect(successEvents.length).toBe(2);
       expect(successEvents[0].data.durationMs).toBeGreaterThanOrEqual(0);
       expect(successEvents[0].data.progress.total).toBe(2);
     });
 
     it('should emit done event with stats', async () => {
-      mockPrisma.workflow.findUnique.mockResolvedValue(
-        buildWorkflow([{ id: 'a', type: 'start', data: {} }], []),
-      );
+      mockPrisma.workflow.findUnique.mockResolvedValue(buildWorkflow([{ id: 'a', type: 'start', data: {} }], []));
 
       const subject = new Subject<any>();
       const events: any[] = [];
       subject.subscribe((e) => events.push(e));
 
-      await service.executeWorkflow('wf_1', { inputs: {} }, subject);
+      await service.executeWorkflow('wf_1', { inputs: {}, userId: 'user_1' }, subject);
 
       const doneEvent = events.find((e) => e.type === 'done');
       expect(doneEvent).toBeDefined();
@@ -168,9 +188,7 @@ describe('WorkflowExecutorService', () => {
   // ============================================================
   describe('Node Timeout', () => {
     it('should timeout a slow node', async () => {
-      mockPrisma.workflow.findUnique.mockResolvedValue(
-        buildWorkflow([{ id: 'slow', type: 'llm', data: {} }], []),
-      );
+      mockPrisma.workflow.findUnique.mockResolvedValue(buildWorkflow([{ id: 'slow', type: 'llm', data: {} }], []));
 
       mockExecutor.execute.mockImplementation(
         () => new Promise((resolve) => setTimeout(() => resolve({ result: 'late' }), 500)),
@@ -183,14 +201,16 @@ describe('WorkflowExecutorService', () => {
       await expect(
         service.executeWorkflow(
           'wf_1',
-          { inputs: {}, control: { nodeTimeoutMs: 50, heartbeatIntervalMs: 0 } },
+          {
+            inputs: {},
+            userId: 'user_1',
+            control: { nodeTimeoutMs: 50, heartbeatIntervalMs: 0 },
+          },
           subject,
         ),
       ).rejects.toThrow(/timed out/);
 
-      const timeoutEvent = events.find(
-        (e) => e.type === 'node_status' && e.data.status === 'timeout',
-      );
+      const timeoutEvent = events.find((e) => e.type === 'node_status' && e.data.status === 'timeout');
       expect(timeoutEvent).toBeDefined();
     });
   });
@@ -217,7 +237,12 @@ describe('WorkflowExecutorService', () => {
       await expect(
         service.executeWorkflow('wf_1', {
           inputs: {},
-          control: { workflowTimeoutMs: 50, nodeTimeoutMs: 0, heartbeatIntervalMs: 0 },
+          userId: 'user_1',
+          control: {
+            workflowTimeoutMs: 50,
+            nodeTimeoutMs: 0,
+            heartbeatIntervalMs: 0,
+          },
         }),
       ).rejects.toThrow(/timed out/);
     });
@@ -228,9 +253,7 @@ describe('WorkflowExecutorService', () => {
   // ============================================================
   describe('Node Retry', () => {
     it('should retry a failing node and succeed', async () => {
-      mockPrisma.workflow.findUnique.mockResolvedValue(
-        buildWorkflow([{ id: 'flaky', type: 'llm', data: {} }], []),
-      );
+      mockPrisma.workflow.findUnique.mockResolvedValue(buildWorkflow([{ id: 'flaky', type: 'llm', data: {} }], []));
 
       mockExecutor.execute
         .mockRejectedValueOnce({ response: { status: 503 } })
@@ -242,16 +265,18 @@ describe('WorkflowExecutorService', () => {
 
       const result = await service.executeWorkflow(
         'wf_1',
-        { inputs: {}, control: { maxRetries: 2, heartbeatIntervalMs: 0 } },
+        {
+          inputs: {},
+          userId: 'user_1',
+          control: { maxRetries: 2, heartbeatIntervalMs: 0 },
+        },
         subject,
       );
 
       expect(result.flaky).toEqual({ result: 'recovered' });
       expect(mockExecutor.execute).toHaveBeenCalledTimes(2);
 
-      const retryEvent = events.find(
-        (e) => e.type === 'node_status' && e.data.status === 'retrying',
-      );
+      const retryEvent = events.find((e) => e.type === 'node_status' && e.data.status === 'retrying');
       expect(retryEvent).toBeDefined();
     });
   });
@@ -290,7 +315,11 @@ describe('WorkflowExecutorService', () => {
 
       const result = await service.executeWorkflow(
         'wf_1',
-        { inputs: {}, control: { continueOnError: true, heartbeatIntervalMs: 0 } },
+        {
+          inputs: {},
+          userId: 'user_1',
+          control: { continueOnError: true, heartbeatIntervalMs: 0 },
+        },
         subject,
       );
 
@@ -305,15 +334,14 @@ describe('WorkflowExecutorService', () => {
     });
 
     it('should fail fast when continueOnError is false (default)', async () => {
-      mockPrisma.workflow.findUnique.mockResolvedValue(
-        buildWorkflow([{ id: 'fail', type: 'llm', data: {} }], []),
-      );
+      mockPrisma.workflow.findUnique.mockResolvedValue(buildWorkflow([{ id: 'fail', type: 'llm', data: {} }], []));
 
       mockExecutor.execute.mockRejectedValue(new Error('boom'));
 
       await expect(
         service.executeWorkflow('wf_1', {
           inputs: {},
+          userId: 'user_1',
           control: { heartbeatIntervalMs: 0 },
         }),
       ).rejects.toThrow('boom');
@@ -339,8 +367,9 @@ describe('WorkflowExecutorService', () => {
 
       mockExecutor.execute.mockImplementation(async (node: any) => {
         if (node.id === 'a') {
-          // 第一个节点执行时触发取消
-          service.cancelExecution(executionId);
+          expect(service.cancelExecution(executionId, 'user_2', 'wf_1')).toBe(false);
+          // 只有登记执行的用户才能触发取消
+          service.cancelExecution(executionId, 'user_1', 'wf_1');
         }
         return { result: 'ok' };
       });
@@ -348,7 +377,11 @@ describe('WorkflowExecutorService', () => {
       await expect(
         service.executeWorkflow(
           'wf_1',
-          { inputs: {}, control: { heartbeatIntervalMs: 0 } },
+          {
+            inputs: {},
+            userId: 'user_1',
+            control: { heartbeatIntervalMs: 0 },
+          },
           undefined,
           executionId,
         ),
@@ -356,30 +389,33 @@ describe('WorkflowExecutorService', () => {
     });
 
     it('should return false when cancelling non-existent execution', () => {
-      expect(service.cancelExecution('nonexistent')).toBe(false);
+      expect(service.cancelExecution('nonexistent', 'user_1')).toBe(false);
     });
 
     it('should track running executions', async () => {
-      mockPrisma.workflow.findUnique.mockResolvedValue(
-        buildWorkflow([{ id: 'a', type: 'start', data: {} }], []),
-      );
+      mockPrisma.workflow.findUnique.mockResolvedValue(buildWorkflow([{ id: 'a', type: 'start', data: {} }], []));
 
       let runningDuringExec: string[] = [];
       mockExecutor.execute.mockImplementation(async () => {
-        runningDuringExec = service.getRunningExecutions();
+        runningDuringExec = service.getRunningExecutions('user_1', 'wf_1');
+        expect(service.getRunningExecutions('user_2', 'wf_1')).toEqual([]);
         return { result: 'ok' };
       });
 
       await service.executeWorkflow(
         'wf_1',
-        { inputs: {}, control: { heartbeatIntervalMs: 0 } },
+        {
+          inputs: {},
+          userId: 'user_1',
+          control: { heartbeatIntervalMs: 0 },
+        },
         undefined,
         'tracked_exec',
       );
 
       expect(runningDuringExec).toContain('tracked_exec');
       // 执行结束后应清理
-      expect(service.getRunningExecutions()).not.toContain('tracked_exec');
+      expect(service.getRunningExecutions('user_1', 'wf_1')).not.toContain('tracked_exec');
     });
   });
 
@@ -388,9 +424,7 @@ describe('WorkflowExecutorService', () => {
   // ============================================================
   describe('Heartbeat', () => {
     it('should emit heartbeat during long execution', async () => {
-      mockPrisma.workflow.findUnique.mockResolvedValue(
-        buildWorkflow([{ id: 'slow', type: 'llm', data: {} }], []),
-      );
+      mockPrisma.workflow.findUnique.mockResolvedValue(buildWorkflow([{ id: 'slow', type: 'llm', data: {} }], []));
 
       mockExecutor.execute.mockImplementation(
         () => new Promise((resolve) => setTimeout(() => resolve({ result: 'ok' }), 150)),
@@ -402,7 +436,11 @@ describe('WorkflowExecutorService', () => {
 
       await service.executeWorkflow(
         'wf_1',
-        { inputs: {}, control: { heartbeatIntervalMs: 40, nodeTimeoutMs: 0 } },
+        {
+          inputs: {},
+          userId: 'user_1',
+          control: { heartbeatIntervalMs: 40, nodeTimeoutMs: 0 },
+        },
         subject,
       );
 

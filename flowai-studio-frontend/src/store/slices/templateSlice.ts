@@ -117,13 +117,8 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set) => ({
   },
 
   /** 按 ID 拉取模板详情 */
-  fetchTemplateById: async (id) => {
-    try {
-      return getResponseData<WorkflowTemplate>(await request.get(`${TEMPLATE_API}/${id}`))
-    } catch (error) {
-      throw error
-    }
-  },
+  fetchTemplateById: async (id) =>
+    getResponseData<WorkflowTemplate>(await request.get(`${TEMPLATE_API}/${id}`)),
 
   /** 创建模板（支持从现有工作流复制） */
   createTemplate: async (data) => {
@@ -139,65 +134,36 @@ export const createTemplateSlice: StateCreator<TemplateSlice> = (set) => ({
   },
 
   /** 更新模板基础信息 */
-  updateTemplate: async (id, data) => {
-    try {
-      return getResponseData<WorkflowTemplate>(await request.patch(`${TEMPLATE_API}/${id}`, data))
-    } catch (error) {
-      throw error
-    }
-  },
+  updateTemplate: async (id, data) =>
+    getResponseData<WorkflowTemplate>(await request.patch(`${TEMPLATE_API}/${id}`, data)),
 
   /** 发布模板（进入模板市场展示） */
-  publishTemplate: async (id) => {
-    try {
-      return getResponseData<WorkflowTemplate>(await request.post(`${TEMPLATE_API}/${id}/publish`))
-    } catch (error) {
-      throw error
-    }
-  },
+  publishTemplate: async (id) =>
+    getResponseData<WorkflowTemplate>(await request.post(`${TEMPLATE_API}/${id}/publish`)),
 
   /** 归档模板（从市场下架） */
-  archiveTemplate: async (id) => {
-    try {
-      return getResponseData<WorkflowTemplate>(await request.post(`${TEMPLATE_API}/${id}/archive`))
-    } catch (error) {
-      throw error
-    }
-  },
+  archiveTemplate: async (id) =>
+    getResponseData<WorkflowTemplate>(await request.post(`${TEMPLATE_API}/${id}/archive`)),
 
   /** 从模板导入创建新工作流 */
-  createFromTemplate: async (id, data) => {
-    try {
-      return getResponseData<{
-        workflowId: string
-        name: string
-        templateName: string
-        templateId: string
-      }>(await request.post(`${TEMPLATE_API}/${id}/import`, data))
-    } catch (error) {
-      throw error
-    }
-  },
+  createFromTemplate: async (id, data) =>
+    getResponseData<{
+      workflowId: string
+      name: string
+      templateName: string
+      templateId: string
+    }>(await request.post(`${TEMPLATE_API}/${id}/import`, data)),
 
   /** 给模板评分，返回最新均分与评分人数 */
-  rateTemplate: async (id, rating) => {
-    try {
-      return getResponseData<{
-        rating: number
-        ratingCount: number
-        yourRating: number
-      }>(await request.post(`${TEMPLATE_API}/${id}/rate`, { rating }))
-    } catch (error) {
-      throw error
-    }
-  },
+  rateTemplate: async (id, rating) =>
+    getResponseData<{
+      rating: number
+      ratingCount: number
+      yourRating: number
+    }>(await request.post(`${TEMPLATE_API}/${id}/rate`, { rating })),
 
   /** 删除模板 */
   deleteTemplate: async (id) => {
-    try {
-      await request.delete(`${TEMPLATE_API}/${id}`)
-    } catch (error) {
-      throw error
-    }
+    await request.delete(`${TEMPLATE_API}/${id}`)
   },
 })

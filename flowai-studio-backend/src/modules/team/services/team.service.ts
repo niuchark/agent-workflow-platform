@@ -124,7 +124,7 @@ export class TeamService {
 
   /** 更新团队信息 */
   async update(userId: string, teamId: string, dto: UpdateTeamDto) {
-    const team = await this.assertTeamAdmin(userId, teamId);
+    await this.assertTeamAdmin(userId, teamId);
 
     const updated = await this.prisma.team.update({
       where: { id: teamId },
