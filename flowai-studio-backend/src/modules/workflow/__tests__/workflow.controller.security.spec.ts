@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { WorkflowController } from '../workflow.controller';
+import { PERMISSIONS } from '../../../common/constants/permissions';
 
 describe('WorkflowController execution isolation', () => {
   let controller: WorkflowController;
@@ -36,7 +37,7 @@ describe('WorkflowController execution isolation', () => {
 
     await controller.run('user_1', 'wf_1', dto);
 
-    expect(workflowService.findOne).toHaveBeenCalledWith('user_1', 'wf_1');
+    expect(workflowService.findOne).toHaveBeenCalledWith('user_1', 'wf_1', PERMISSIONS.WORKFLOW_EXECUTE);
     expect(workflowService.findOne.mock.invocationCallOrder[0]).toBeLessThan(
       rateLimiter.checkRateLimit.mock.invocationCallOrder[0],
     );
@@ -113,7 +114,7 @@ describe('WorkflowController execution isolation', () => {
 
     await controller.streamRun('user_1', 'wf_1', { inputs: {} }, response);
 
-    expect(workflowService.findOne).toHaveBeenCalledWith('user_1', 'wf_1');
+    expect(workflowService.findOne).toHaveBeenCalledWith('user_1', 'wf_1', PERMISSIONS.WORKFLOW_EXECUTE);
     expect(rateLimiter.releaseConcurrent).toHaveBeenCalledTimes(1);
     expect(executor.cancelExecution).toHaveBeenCalledWith(expect.stringMatching(/^wf_1_/), 'user_1', 'wf_1');
   });
